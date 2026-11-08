@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Access denied · OneGov PH{% endblock %}
+{% block content %}
+<section class="page">
+    <div class="site-width">
+        <h1>Access denied</h1>
+        <p class="lede">{{ message or "You do not have access to this page." }}</p>
+    </div>
+</section>
+{% endblock %}

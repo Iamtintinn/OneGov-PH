@@ -1,0 +1,16 @@
+.summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 280px));
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.summary div {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-top: 4px solid var(--navy);
+    padding: 1rem 1.1rem;
+}
+
+.summary dt { color: var(--muted); font-size: 0.9rem; }
+.summary dd { margin: 0.2rem 0 0; font-weight: 700; color: var(--navy); }

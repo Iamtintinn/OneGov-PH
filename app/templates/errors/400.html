@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Form expired · OneGov PH{% endblock %}
+{% block content %}
+<section class="page">
+    <div class="site-width">
+        <h1>Form expired</h1>
+        <p class="lede">{{ message or "Refresh the page and submit the form again." }}</p>
+        <p><a href="{{ url_for('auth.login') }}">Return to log in</a></p>
+    </div>
+</section>
+{% endblock %}

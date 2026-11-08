@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Citizen dashboard · OneGov PH{% endblock %}
+{% block content %}
+<section class="page">
+    <div class="site-width">
+        <p class="kicker">Citizen</p>
+        <h1>Welcome, {{ current_user.first_name }}</h1>
+        <p class="lede">You are signed in to the OneGov PH website. Service requests will be listed on this page.</p>
+        <dl class="summary">
+            <div>
+                <dt>Name</dt>
+                <dd>{{ current_user.full_name }}</dd>
+            </div>
+            <div>
+                <dt>Role</dt>
+                <dd>{{ current_user.role_label }}</dd>
+            </div>
+        </dl>
+    </div>
+</section>
+{% endblock %}

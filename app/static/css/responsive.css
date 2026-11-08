@@ -1,0 +1,24 @@
+@media (max-width: 900px) {
+    .page-grid,
+    .name-row,
+    .summary { grid-template-columns: 1fr; }
+
+    h1 { font-size: 2rem; }
+}
+
+@media (max-width: 640px) {
+    .site-width { width: min(1120px, calc(100% - 1.5rem)); }
+
+    .header-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 0.7rem 0;
+    }
+
+    .brand-logo { height: 92px; }
+
+    .site-nav { flex-wrap: wrap; gap: 0.85rem 1.1rem; }
+
+    input { font-size: 1rem; }
+}

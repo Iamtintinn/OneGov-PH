@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}OneGov PH{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename='images/onegov-ph-logo.png') }}" type="image/png">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
+</head>
+<body>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+        <div class="gov-bar">
+            <div class="site-width">Republic of the Philippines</div>
+        </div>
+        <div class="header-main">
+            <div class="site-width header-row">
+                <a class="brand" href="{{ url_for('auth.login') }}">
+                    <img class="brand-logo" src="{{ url_for('static', filename='images/onegov-ph-logo.png') }}" alt="OneGov PH" width="148" height="112">
+                </a>
+                <nav class="site-nav" aria-label="Account">
+                    {% if current_user.is_authenticated %}
+                    <span class="nav-role">{{ current_user.role_label }}</span>
+                    <form class="inline-form" method="post" action="{{ url_for('auth.logout') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="nav-button" type="submit">Log out</button>
+                    </form>
+                    {% else %}
+                    <a href="{{ url_for('auth.login') }}">Log in</a>
+                    <a href="{{ url_for('auth.register') }}">Register</a>
+                    {% endif %}
+                </nav>
+            </div>
+        </div>
+    </header>
+    <main id="content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="site-width">
+                {% for category, message in messages %}
+                <p class="notice notice-{{ category }}" role="status">{{ message }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+    <footer class="site-footer">
+        <div class="site-width">
+            <p>OneGov PH is a government services website. Passwords are stored as secure hashes.</p>
+        </div>
+    </footer>
+</body>
+</html>
