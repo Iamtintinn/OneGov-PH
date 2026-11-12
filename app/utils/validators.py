@@ -26,13 +26,13 @@ def normalize_contact_number(value):
     return digits
 
 
-def validate_name(value, label, required=True):
+def validate_name(value, label, required=True, max_length=80):
     name = clean_text(value)
     if not name:
         if required:
             return None, f"{label} is required."
         return None, None
-    if len(name) > 80 or not _NAME.fullmatch(name):
+    if len(name) > max_length or not _NAME.fullmatch(name):
         return None, f"Enter a valid {label.lower()}."
     return name, None
 

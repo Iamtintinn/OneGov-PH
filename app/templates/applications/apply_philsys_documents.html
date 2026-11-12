@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Documents · {{ service.service_name }} · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard{% endblock %}
+{% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
+{% block content %}
+<div class="dash-page site-width">
+    <section class="apply-card" aria-labelledby="documents-heading">
+        {% include "applications/_progress.html" %}
+        <p class="dash-kicker">{{ spec.department_label or service.department.department_name }}</p>
+        <h1 id="documents-heading">Upload documents</h1>
+        <p class="welcome-text">Upload a PDF, JPG, JPEG, or PNG. Each file must be 16 MB or smaller. You can preview, replace, or remove a file before you continue.</p>
+        {% if spec.disclaimer %}<p class="field-help">{{ spec.disclaimer }}</p>{% endif %}
+        {% if spec.biometrics %}<p class="field-help">{{ spec.biometrics }}</p>{% endif %}
+        {% if spec.document_note %}<p class="field-help">{{ spec.document_note }}</p>{% endif %}
+        {% if missing %}
+        <p class="field-error" role="status">Still needed: {{ missing|join(', ') }}.</p>
+        {% endif %}
+        <div class="document-list">
+            {% for document in documents %}
+            {% set row = requirements.get(document.key) %}
+            <article class="detail-card document-card{% if row and row.uploaded_file %} is-uploaded{% elif document.required %} is-needed{% else %} is-optional{% endif %}">
+                <h2>{{ document.label }}</h2>
+                <p class="field-help">{{ document.help }}</p>
+                <p class="document-state">{% if document.required %}Required{% else %}Optional{% endif %} · {% if row and row.uploaded_file %}Uploaded{% else %}Missing{% endif %}</p>
+                {% if row and row.uploaded_file %}
+                <p class="document-file">File: {{ row.remarks or 'Uploaded file' }}</p>
+                {% if document.key == 'supporting_id' and matched and matched.value == 'matched' %}
+                <p class="field-help">Selected: {{ matched.label }}. This title check is not PSA acceptance.</p>
+                {% endif %}
+                {% set lower = (row.uploaded_file or '')|lower %}
+                {% if lower.endswith('.jpg') or lower.endswith('.jpeg') or lower.endswith('.png') %}
+                <img class="document-preview" src="{{ url_for('citizen.application_document', application_id=application.application_id, requirement_id=row.requirement_id) }}" alt="Preview of {{ document.label }}">
+                {% else %}
+                <a href="{{ url_for('citizen.application_document', application_id=application.application_id, requirement_id=row.requirement_id) }}">View uploaded PDF</a>
+                {% endif %}
+                {% endif %}
+                <form class="upload-form" method="post" enctype="multipart/form-data" action="{{ url_for('citizen.upload_document', application_id=application.application_id, document_key=document.key) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% if document.key == 'supporting_id' %}
+                    <label for="document_type">Supporting document in this file</label>
+                    <p class="field-help" id="document-type-help">Select the document you are uploading. The list follows the documents published for PhilSys registration.</p>
+                    <select id="document_type" name="document_type" required aria-describedby="document-type-help">
+                        <option value="">Select a supporting document</option>
+                        {% for group in groups %}
+                        <optgroup label="{{ group.title }}">
+                            {% for choice in group["items"] %}
+                            <option value="{{ choice.key }}" {% if matched and matched.document_key == choice.key %}selected{% endif %}>{{ choice.label }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        {% endfor %}
+                    </select>
+                    {% endif %}
+                    <label for="file-{{ document.key }}">{% if row and row.uploaded_file %}Replace file{% else %}Choose file{% endif %}</label>
+                    <input id="file-{{ document.key }}" name="document" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required>
+                    <p class="upload-progress" hidden role="status">Uploading…</p>
+                    <button class="dash-button" type="submit">{% if row and row.uploaded_file %}Replace{% else %}Upload{% endif %}</button>
+                </form>
+                {% if row and row.uploaded_file %}
+                <form method="post" action="{{ url_for('citizen.remove_document', application_id=application.application_id, document_key=document.key) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="dash-button apply-cancel" type="submit">Remove file</button>
+                </form>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </div>
+        <div class="apply-actions">
+            <a class="dash-button apply-cancel" href="{{ url_for('citizen.apply_details', service_id=service.service_id) }}">Back</a>
+            <form method="post" action="{{ url_for('citizen.apply_cancel', application_id=application.application_id) }}" onsubmit="return confirm('Cancel this application? The information and files you entered will be removed.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="dash-button apply-cancel" type="submit">Cancel</button>
+            </form>
+            <form method="post" action="{{ url_for('citizen.continue_documents', application_id=application.application_id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="dash-button" type="submit">Continue</button>
+            </form>
+        </div>
+    </section>
+</div>
+<script>
+document.querySelectorAll(".upload-form").forEach(function (form) {
+    form.addEventListener("submit", function () {
+        var input = form.querySelector("input[type=file]");
+        var button = form.querySelector("button[type=submit]");
+        var progress = form.querySelector(".upload-progress");
+        if (!input || !input.files.length) {
+            return;
+        }
+        if (progress) {
+            progress.hidden = false;
+        }
+        button.disabled = true;
+        button.classList.add("is-busy");
+        button.textContent = "Uploading...";
+    });
+});
+</script>
+{% endblock %}

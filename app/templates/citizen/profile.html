@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}My profile · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard{% endblock %}
+{% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
+{% block content %}
+<div class="dash-page site-width">
+    <section class="detail-card profile-card" aria-labelledby="profile-heading">
+        <p class="dash-kicker">Account</p>
+        <h1 id="profile-heading">My profile</h1>
+        <form class="dash-form" method="post" action="{{ url_for('citizen.profile') }}" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="first_name">First name</label>
+            <input id="first_name" name="first_name" value="{{ request.form.get('first_name', current_user.first_name) }}" required autocomplete="given-name" aria-invalid="{{ 'true' if errors.first_name else 'false' }}">
+            {% if errors.first_name %}<p class="field-error">{{ errors.first_name }}</p>{% endif %}
+            <label for="middle_name">Middle name <span class="optional">(optional)</span></label>
+            <input id="middle_name" name="middle_name" value="{{ request.form.get('middle_name', current_user.middle_name or '') }}" autocomplete="additional-name" aria-invalid="{{ 'true' if errors.middle_name else 'false' }}">
+            {% if errors.middle_name %}<p class="field-error">{{ errors.middle_name }}</p>{% endif %}
+            <label for="last_name">Last name</label>
+            <input id="last_name" name="last_name" value="{{ request.form.get('last_name', current_user.last_name) }}" required autocomplete="family-name" aria-invalid="{{ 'true' if errors.last_name else 'false' }}">
+            {% if errors.last_name %}<p class="field-error">{{ errors.last_name }}</p>{% endif %}
+            <label for="email">Email address</label>
+            <input id="email" value="{{ current_user.email }}" readonly>
+            <p class="empty-note">Email is used to sign in and cannot be changed here.</p>
+            <label for="contact_number">Contact number</label>
+            <input id="contact_number" name="contact_number" value="{{ request.form.get('contact_number', current_user.contact_number or '') }}" required autocomplete="tel" aria-invalid="{{ 'true' if errors.contact_number else 'false' }}">
+            {% if errors.contact_number %}<p class="field-error">{{ errors.contact_number }}</p>{% endif %}
+            <label for="address">Address <span class="optional">(optional)</span></label>
+            <input id="address" name="address" value="{{ request.form.get('address', current_user.address or '') }}" autocomplete="street-address" aria-invalid="{{ 'true' if errors.address else 'false' }}">
+            {% if errors.address %}<p class="field-error">{{ errors.address }}</p>{% endif %}
+            <button class="dash-button" type="submit">Save profile</button>
+        </form>
+    </section>
+</div>
+{% endblock %}

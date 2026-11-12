@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Review · {{ service.service_name }} · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard{% endblock %}
+{% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
+{% block content %}
+<div class="dash-page site-width">
+    <section class="detail-card apply-card" aria-labelledby="review-heading">
+        {% include "applications/_progress.html" %}
+        <p class="dash-kicker">Check everything before you submit</p>
+        <h1 id="review-heading">{{ spec.service_title or service.service_name }}</h1>
+        <p class="welcome-text">{{ spec.department_label or service.department.department_name }}{% if not spec.department_label and service.department.department_description %} — {{ service.department.department_description }}{% endif %}</p>
+        {% if spec.disclaimer %}<p class="field-help">{{ spec.disclaimer }}</p>{% endif %}
+        {% include "applications/_office.html" %}
+        <h2>Application details</h2>
+        <dl class="detail-list">
+            {% set shown = namespace(keys=[]) %}
+            {% for field in fields %}
+            {% if spec.kind == 'sss' and (field.key in spec.private_keys or field.key in shown.keys or field.type == 'hidden' or not show_saved_answer(spec, fields, field.key)) %}
+            {% else %}
+            {% if spec.kind == 'sss' %}{% set shown.keys = shown.keys + [field.key] %}{% endif %}
+            {% if field.section and (loop.first or field.section != fields[loop.index0 - 1].section) %}
+            <div>
+                <dt>{{ field.section }}</dt>
+                <dd>{% if field.step %}<a href="{{ url_for('citizen.apply_details', service_id=service.service_id, step=field.step) }}">Edit</a>{% endif %}</dd>
+            </div>
+            {% endif %}
+            <div>
+                <dt>{{ field.label }}</dt>
+                <dd>{% if field.key == 'beneficiaries' %}{% set people = beneficiary_rows(field.value) %}{% if people %}{% for person in people %}{{ loop.index }}. {{ person.name }} — {{ person.relationship }} — born {{ person.birth_date }}{% if person.note %} — {{ person.note }}{% endif %}{% if not loop.last %}<br>{% endif %}{% endfor %}{% else %}None added{% endif %}{% else %}{{ field.value or "Not provided" }}{% endif %}</dd>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </dl>
+        {% if spec.kind != 'cenomar' %}<p><a href="{{ url_for('citizen.apply_details', service_id=service.service_id) }}">Edit application details</a></p>{% endif %}
+        {% if spec.checklist %}
+        <h2>Uploaded document</h2>
+        <p class="field-help">The photo check compared the words on the file with the document you selected. PSA has not validated it.</p>
+        <ul class="apply-need-list">
+            {% for item in checklist %}
+            {% set row = requirements.get(item.key) %}
+            <li>
+                {{ item.label }}:
+                {% if item.value == "matched" and row and row.uploaded_file %}
+                photo matches this document —
+                <a href="{{ url_for('citizen.application_document', application_id=application.application_id, requirement_id=row.requirement_id) }}">{{ item.filename or row.remarks or "View file" }}</a>
+                {% else %}
+                Not uploaded
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% elif documents %}
+        <h2>Uploaded documents</h2>
+        <ul class="apply-need-list">
+            {% for document in documents %}
+            {% set row = requirements.get(document.key) %}
+            <li>
+                {{ document.label }}:
+                {% if row and row.uploaded_file %}
+                <a href="{{ url_for('citizen.application_document', application_id=application.application_id, requirement_id=row.requirement_id) }}">{{ row.remarks or 'View file' }}</a>
+                {% if spec.kind == 'philsys' and document.key == 'supporting_id' %}
+                {% for item in checklist if item.key == 'supporting_id' and item.value == 'matched' %}
+                — selected {{ item.label }}. This title check is not PSA acceptance.
+                {% endfor %}
+                {% endif %}
+                {% if spec.kind == 'passport' and document.key == 'valid_id' %}
+                {% for item in checklist if item.key == 'valid_id' and item.value == 'matched' %}
+                — selected {{ item.label }}. This title check is not DFA acceptance.
+                {% endfor %}
+                {% endif %}
+                {% else %}
+                Not uploaded{% if not document.required %} (optional){% endif %}
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        <p><a href="{{ url_for('citizen.apply_documents', application_id=application.application_id) }}">Edit documents</a></p>
+        {% elif spec.kind == 'cenomar' and spec.official_url %}
+        <h2>Documents</h2>
+        <p class="field-help">OneGov PH does not collect documents for this request. PSA may still ask the requesting party for identification on the official channel.</p>
+        {% endif %}
+        {% if spec.kind == 'cenomar' and spec.official_url %}
+        <h2>Official PSA application</h2>
+        <p>Complete the official CENOMAR application and payment on PSA Serbilis. OneGov PH does not send this form to PSA.</p>
+        <p><a class="dash-button" href="{{ spec.official_url }}" target="_blank" rel="noopener noreferrer">Apply through the official PSA channel</a></p>
+        <h2>OneGov PH monitoring</h2>
+        <p>Save this request here so you can keep your details and, after PSA gives you a reference number, record that 16-digit number. OneGov PH does not create a PSA reference number.</p>
+        {% elif spec.kind == 'sss' and spec.official_url %}
+        <h2>{{ spec.official_heading }}</h2>
+        <p>{{ spec.official_text }}</p>
+        <p><a class="dash-button" href="{{ spec.official_url }}" target="_blank" rel="noopener noreferrer">{{ spec.official_action }}</a></p>
+        <p class="field-help">Opening this link does not register you with SSS, does not generate an SS Number, and does not change the OneGov PH status. Save the request below if you want OneGov PH to keep monitoring it.</p>
+        {% endif %}
+        <h2>Fee</h2>
+        {% if spec.fee_note %}
+        <p>{{ spec.fee_note }}</p>
+        {% elif service.processing_fee and service.processing_fee > 0 %}
+        <p>Listed application fee: ₱{{ "%.2f"|format(service.processing_fee) }}. OneGov PH does not collect this payment.</p>
+        {% else %}
+        <p>No processing fee is listed for this service.</p>
+        {% endif %}
+        <h2>{% if spec.checklist %}Consent and privacy{% else %}Terms{% endif %}</h2>
+        <form class="apply-form review-form" method="post" action="{{ url_for('citizen.apply_submit', application_id=application.application_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="check-label" for="accept_terms">
+                <input id="accept_terms" name="accept_terms" type="checkbox" value="yes" required>
+                <span>{{ terms }}</span>
+            </label>
+            <div class="apply-actions">
+                {% if spec.review_back == 'details' %}
+                <a class="dash-button apply-cancel" href="{{ url_for('citizen.apply_details', service_id=service.service_id, step=spec.review_back_step) }}">Back</a>
+                {% else %}
+                <a class="dash-button apply-cancel" href="{{ url_for('citizen.apply_documents', application_id=application.application_id) }}">Back</a>
+                {% endif %}
+                <button class="dash-button" id="submit-application" type="submit">{{ spec.submit_label or "Submit application" }}</button>
+            </div>
+        </form>
+        <form method="post" action="{{ url_for('citizen.apply_cancel', application_id=application.application_id) }}" onsubmit="return confirm('Cancel this application? The information and files you entered will be removed.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="dash-button apply-cancel" type="submit">Cancel application</button>
+        </form>
+    </section>
+</div>
+<script>
+document.querySelector(".review-form").addEventListener("submit", function () {
+    var button = document.getElementById("submit-application");
+    if (!document.getElementById("accept_terms").checked) {
+        return;
+    }
+    button.disabled = true;
+    button.classList.add("is-busy");
+    button.textContent = "Submitting...";
+});
+</script>
+{% endblock %}

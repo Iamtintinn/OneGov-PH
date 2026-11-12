@@ -1,0 +1,40 @@
+{% if spec and spec.local_office %}
+<h2>{{ spec.local_office.heading or "Barangay" }}</h2>
+<dl class="detail-list">
+    {% if spec.local_office.barangay %}
+    <div>
+        <dt>Barangay name</dt>
+        <dd>{{ spec.local_office.barangay }}</dd>
+    </div>
+    {% endif %}
+    {% if spec.local_office.city %}
+    <div>
+        <dt>City or municipality</dt>
+        <dd>{{ spec.local_office.city }}</dd>
+    </div>
+    {% endif %}
+    {% if spec.local_office.address %}
+    <div>
+        <dt>{{ spec.local_office.address_label or "Barangay office address" }}</dt>
+        <dd>{{ spec.local_office.address }}</dd>
+    </div>
+    {% endif %}
+    {% if spec.local_office.contact_number %}
+    <div>
+        <dt>Contact number</dt>
+        <dd>{{ spec.local_office.contact_number }}</dd>
+    </div>
+    {% endif %}
+    {% if spec.local_office.office_hours %}
+    <div>
+        <dt>Office hours</dt>
+        <dd>{{ spec.local_office.office_hours }}</dd>
+    </div>
+    {% endif %}
+</dl>
+{% if spec.local_office.note %}<p class="field-help">{{ spec.local_office.note }}</p>{% endif %}
+{% if spec.local_office.instructions %}
+<h2>{{ spec.local_office.instructions_heading or "Instructions from the barangay" }}</h2>
+<p>{{ spec.local_office.instructions }}</p>
+{% endif %}
+{% endif %}

@@ -1,0 +1,1239 @@
+/* OneGov PH payment experience — government / fintech surfaces */
+
+.pay-shell {
+    --pay-blue: var(--dash-blue, #3B82B0);
+    --pay-navy: var(--dash-navy, #245878);
+    --pay-maroon: var(--dash-maroon, #781F3A);
+    --pay-gold: var(--dash-yellow, #F2C94C);
+    --pay-surface: #ffffff;
+    --pay-surface-soft: #f7fafc;
+    --pay-border: #e4ebf2;
+    --pay-shadow: 0 10px 28px rgba(36, 88, 120, 0.08);
+    --pay-shadow-sm: 0 4px 14px rgba(36, 88, 120, 0.06);
+}
+
+.payment-page.pay-shell {
+    padding-bottom: 1.5rem;
+}
+
+.pay-hero {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem 1.5rem;
+    margin: 0.35rem 0 1.25rem;
+    padding-bottom: 1.15rem;
+    border-bottom: 1px solid var(--pay-border);
+}
+
+.pay-kicker {
+    margin: 0 0 0.35rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--pay-maroon);
+}
+
+.pay-hero h1 {
+    margin: 0 0 0.45rem;
+}
+
+.pay-hero .welcome-text {
+    margin: 0;
+    max-width: 40rem;
+}
+
+.pay-secure-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-shrink: 0;
+    padding: 0.55rem 0.85rem;
+    border-radius: 999px;
+    border: 1px solid #d7e5f0;
+    background: linear-gradient(180deg, #ffffff 0%, #f3f8fc 100%);
+    color: var(--pay-navy);
+    font-size: 0.84rem;
+    font-weight: 650;
+    box-shadow: var(--pay-shadow-sm);
+}
+
+.pay-status-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    margin: 0 0 1.25rem;
+    padding: 0.95rem 1.05rem;
+    border-radius: 14px;
+    border: 1px solid var(--pay-border);
+    background: var(--pay-surface);
+    box-shadow: var(--pay-shadow-sm);
+}
+
+.pay-status-banner--paid {
+    border-color: #7dcc9d;
+    background: #e4f8ec;
+}
+
+.pay-status-banner--failed {
+    border-color: #efc4c4;
+    background: #fff7f7;
+}
+
+.pay-status-banner--cancelled {
+    border-color: #e5d3b3;
+    background: #fffbf2;
+}
+
+.pay-status-banner--processing,
+.pay-status-banner--pending {
+    border-color: #c5daf0;
+    background: #f5f9fd;
+}
+
+.pay-status-banner-copy {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.pay-status-banner-copy strong {
+    color: var(--pay-navy);
+}
+
+.pay-status-banner-copy span {
+    color: var(--dash-muted);
+    font-size: 0.92rem;
+}
+
+.pay-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.28rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.pay-status-pill::before {
+    content: "";
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.pay-status-pill--paid {
+    color: #157a40;
+    background: #d4f3e0;
+    border-color: #8fd4ad;
+}
+
+.pay-status-pill--processing {
+    color: #1f5f8a;
+    background: #e8f3fb;
+    border-color: #c5daf0;
+}
+
+.pay-status-pill--pending {
+    color: #8a6a12;
+    background: #fff7df;
+    border-color: #f0df9d;
+}
+
+.pay-status-pill--failed {
+    color: #8b2e2e;
+    background: #fdeeee;
+    border-color: #efc4c4;
+}
+
+.pay-status-pill--cancelled,
+.pay-status-pill--refunded {
+    color: #7a4d12;
+    background: #fff4e5;
+    border-color: #efd2a8;
+}
+
+.pay-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(17rem, 0.9fr);
+    gap: 1.25rem 1.5rem;
+    align-items: start;
+}
+
+.pay-panel {
+    margin: 0 0 1.15rem;
+    padding: 1.15rem 1.2rem 1.25rem;
+    border: 1px solid var(--pay-border);
+    border-radius: 16px;
+    background: var(--pay-surface);
+    box-shadow: var(--pay-shadow-sm);
+}
+
+.pay-panel-head {
+    margin-bottom: 0.95rem;
+}
+
+.pay-panel-head h2 {
+    margin: 0 0 0.25rem;
+    font-size: 1.05rem;
+    color: var(--pay-navy);
+}
+
+.pay-panel-head p {
+    margin: 0;
+    color: var(--dash-muted);
+    font-size: 0.92rem;
+}
+
+.pay-channel-grid,
+.pay-method-grid {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.pay-channel-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pay-method-grid {
+    grid-template-columns: 1fr;
+}
+
+.pay-channel-card,
+.pay-method-card {
+    position: relative;
+    margin: 0;
+    cursor: pointer;
+}
+
+.pay-channel-card input,
+.pay-method-card input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.pay-channel-body,
+.pay-method-body {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    min-height: 4.4rem;
+    padding: 0.9rem 1rem;
+    border: 1.5px solid var(--pay-border);
+    border-radius: 14px;
+    background: var(--pay-surface-soft);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.pay-channel-card:hover .pay-channel-body,
+.pay-method-card:hover .pay-method-body {
+    border-color: #bfd3e4;
+    box-shadow: var(--pay-shadow-sm);
+}
+
+.pay-channel-card:has(input:checked) .pay-channel-body,
+.pay-method-card:has(input:checked) .pay-method-body,
+.pay-channel-card input:focus-visible + .pay-channel-body,
+.pay-method-card input:focus-visible + .pay-method-body {
+    border-color: var(--pay-blue);
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(59, 130, 176, 0.16), var(--pay-shadow-sm);
+}
+
+.pay-channel-card:has(input:checked) .pay-channel-body {
+    border-color: var(--pay-maroon);
+    box-shadow: 0 0 0 3px rgba(120, 31, 58, 0.12), var(--pay-shadow-sm);
+}
+
+.pay-channel-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.55rem;
+    height: 2.55rem;
+    border-radius: 12px;
+    flex-shrink: 0;
+}
+
+.pay-channel-icon--online {
+    color: #fff;
+    background: var(--pay-blue);
+}
+
+.pay-channel-icon--onsite {
+    color: var(--pay-navy);
+    background: #ffe9a8;
+}
+
+.pay-channel-text,
+.pay-method-copy {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.pay-channel-text strong,
+.pay-method-copy strong {
+    color: var(--pay-navy);
+    font-size: 0.98rem;
+}
+
+.pay-channel-text small,
+.pay-method-copy small {
+    color: var(--dash-muted);
+    font-size: 0.84rem;
+    line-height: 1.35;
+}
+
+.pay-method-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 4.6rem;
+    height: 2.75rem;
+    padding: 0.35rem 0.45rem;
+    border-radius: 12px;
+    font-weight: 800;
+    font-size: 1rem;
+    flex-shrink: 0;
+    letter-spacing: 0.02em;
+    background: #fff;
+    border: 1px solid var(--pay-border);
+    box-sizing: border-box;
+}
+
+.pay-method-logo img {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    height: 1.35rem;
+    object-fit: contain;
+}
+
+.pay-method-logo--maya {
+    background: #fff;
+}
+
+.pay-method-logo--gcash {
+    background: #fff;
+}
+
+.pay-method-logo--bank {
+    width: 2.75rem;
+    color: var(--pay-navy);
+    background: linear-gradient(145deg, #ffe8a3 0%, #f2c94c 100%);
+    border-color: #efd988;
+}
+
+.pay-method-check {
+    margin-left: auto;
+    width: 1.15rem;
+    height: 1.15rem;
+    border-radius: 50%;
+    border: 1.5px solid #c5ced8;
+    background: #fff;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.pay-method-card:has(input:checked) .pay-method-check {
+    border-color: var(--pay-maroon);
+    background: var(--pay-maroon);
+}
+
+.pay-method-card:has(input:checked) .pay-method-check::after {
+    content: "";
+    position: absolute;
+    inset: 0.28rem;
+    border-radius: 50%;
+    background: #fff;
+}
+
+.pay-inline-help {
+    margin: 0.85rem 0 0;
+    color: var(--dash-muted);
+    font-size: 0.9rem;
+}
+
+.pay-aside {
+    position: sticky;
+    top: 1rem;
+}
+
+.pay-summary {
+    padding: 1.2rem 1.2rem 1.25rem;
+    border-radius: 18px;
+    border: 1px solid var(--pay-border);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, #ffffff 42%),
+        linear-gradient(135deg, rgba(59, 130, 176, 0.08), rgba(242, 201, 76, 0.08));
+    box-shadow: var(--pay-shadow);
+}
+
+.pay-summary-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.95rem;
+}
+
+.pay-summary-top h2 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: var(--pay-navy);
+}
+
+.pay-summary-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.28rem 0.6rem;
+    border-radius: 999px;
+    background: #fff4cc;
+    color: #7a5a00;
+    border: 1px solid #efd988;
+    font-size: 0.72rem;
+    font-weight: 750;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.pay-summary-meta {
+    margin: 0 0 1rem;
+    padding: 0 0 0.95rem;
+    border-bottom: 1px dashed #d7e0ea;
+}
+
+.pay-summary-meta div {
+    display: grid;
+    gap: 0.15rem;
+    margin-top: 0.7rem;
+}
+
+.pay-summary-meta div:first-child {
+    margin-top: 0;
+}
+
+.pay-summary-meta dt {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--dash-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.pay-summary-meta dd {
+    margin: 0;
+    color: var(--pay-navy);
+    font-weight: 650;
+}
+
+.pay-summary-breakdown,
+.pay-summary-txn {
+    display: grid;
+    gap: 0.65rem;
+}
+
+.pay-summary-txn {
+    margin-top: 1rem;
+    padding-top: 0.95rem;
+    border-top: 1px dashed #d7e0ea;
+}
+
+.pay-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    color: var(--dash-text);
+    font-size: 0.94rem;
+}
+
+.pay-line strong {
+    color: var(--pay-navy);
+    font-weight: 700;
+    text-align: right;
+}
+
+.pay-line--total {
+    margin-top: 0.35rem;
+    padding-top: 0.75rem;
+    border-top: 1.5px solid #d5e1ec;
+    font-size: 1.05rem;
+}
+
+.pay-line--total span {
+    font-weight: 750;
+    color: var(--pay-navy);
+}
+
+.pay-line--total strong {
+    color: var(--pay-maroon);
+    font-size: 1.25rem;
+}
+
+.pay-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.82rem;
+    font-weight: 650;
+    word-break: break-all;
+}
+
+.pay-trust-list {
+    list-style: none;
+    margin: 1.1rem 0 0;
+    padding: 0.9rem 0 0;
+    border-top: 1px solid var(--pay-border);
+    display: grid;
+    gap: 0.45rem;
+}
+
+.pay-trust-list li {
+    position: relative;
+    padding-left: 1.2rem;
+    color: var(--dash-muted);
+    font-size: 0.86rem;
+}
+
+.pay-trust-list li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.42rem;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: var(--pay-gold);
+    box-shadow: 0 0 0 3px rgba(242, 201, 76, 0.25);
+}
+
+.pay-actions {
+    margin-top: 1.35rem;
+    padding-top: 1.15rem;
+    border-top: 1px solid var(--pay-border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+    align-items: center;
+}
+
+.pay-btn-primary {
+    min-width: 9.5rem;
+    box-shadow: 0 8px 18px rgba(59, 130, 176, 0.28);
+}
+
+.pay-btn-primary:hover {
+    transform: translateY(-1px);
+}
+
+.pay-btn-secondary,
+.pay-btn-ghost {
+    min-width: 7rem;
+}
+
+/* Passport details step (matches confirmation language) */
+.passport-details-shell {
+    padding: 1.4rem 1.5rem 1.75rem 2.15rem;
+    background: #fff;
+}
+
+.passport-details-title {
+    color: #123a52;
+}
+
+.passport-step-chip {
+    border-color: #c5daf0;
+    background: linear-gradient(180deg, #f7fbfe 0%, #eef5fb 100%);
+    color: var(--pay-navy);
+}
+
+.passport-details-form {
+    display: block;
+}
+
+.passport-details-form > .passport-details-layout,
+.passport-details-form > .pay-actions {
+    grid-column: 1 / -1;
+    width: 100%;
+}
+
+.passport-details-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(15rem, 18rem);
+    gap: 1.15rem 1.25rem;
+    align-items: start;
+    width: 100%;
+}
+
+.passport-details-main {
+    min-width: 0;
+    margin: 0;
+    height: 100%;
+}
+
+.passport-autofill-note {
+    margin: 0 0 1rem;
+    padding: 0.7rem 0.85rem;
+    border-radius: 12px;
+    border: 1px solid #d5ebde;
+    background: #f5fbf7;
+    color: #1f6b43;
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+.passport-validation-banner {
+    margin: 0 0 1.15rem;
+    padding: 0.95rem 1.05rem;
+    border-radius: 14px;
+    border: 1px solid #efc4c4;
+    background: #fff7f7;
+    box-shadow: var(--pay-shadow-sm);
+}
+
+.passport-validation-banner:focus {
+    outline: 2px solid #c45b5b;
+    outline-offset: 2px;
+}
+
+.passport-validation-banner-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.35rem 1rem;
+    margin-bottom: 0.35rem;
+}
+
+.passport-validation-banner-head strong {
+    color: #8a2f2f;
+    font-size: 0.98rem;
+}
+
+.passport-validation-banner-head span {
+    color: #9a5050;
+    font-size: 0.82rem;
+    font-weight: 650;
+}
+
+.passport-validation-banner > p {
+    margin: 0 0 0.65rem;
+    color: #6d3a3a;
+    font-size: 0.9rem;
+}
+
+.passport-validation-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.45rem;
+}
+
+.passport-validation-list li {
+    display: grid;
+    gap: 0.1rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 10px;
+    border: 1px solid #f0d0d0;
+    background: #fff;
+}
+
+.passport-validation-list a {
+    color: #8a2f2f;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.passport-validation-list span {
+    color: #6d3a3a;
+    font-size: 0.86rem;
+    line-height: 1.4;
+}
+
+.passport-details-fields .apply-field.has-error label {
+    color: #8a2f2f;
+}
+
+.passport-details-fields .apply-field.has-error input,
+.passport-details-fields .apply-field.has-error select,
+.passport-details-fields .apply-field.has-error textarea,
+.passport-details-fields .apply-field.has-error .select-input select,
+.passport-details-fields .apply-field.has-error .date-input-control {
+    border-color: #d98888;
+    box-shadow: 0 0 0 3px rgba(196, 91, 91, 0.12);
+}
+
+.passport-details-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.1rem 1.25rem;
+    width: 100%;
+}
+
+.passport-details-fields .apply-field {
+    margin: 0;
+    width: 100%;
+}
+
+.passport-details-fields .apply-field-wide {
+    grid-column: 1 / -1;
+}
+
+.passport-details-section {
+    grid-column: 1 / -1;
+    margin: 0.35rem 0 0;
+    padding-top: 0.35rem;
+    border-top: 1px solid var(--pay-border);
+    color: var(--pay-navy);
+    font-size: 0.95rem;
+}
+
+.passport-details-fields > .passport-details-section:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+}
+
+.passport-details-fields .select-input,
+.passport-details-fields .text-input,
+.passport-details-fields select,
+.passport-details-fields input {
+    width: 100%;
+    max-width: none;
+}
+
+.passport-details-side {
+    display: grid;
+    gap: 0.85rem;
+    min-width: 0;
+    align-content: start;
+}
+
+.passport-notice-card {
+    padding: 0.85rem 0.95rem;
+    border-radius: 14px;
+    border: 1px solid #ead5dc;
+    background: linear-gradient(180deg, #fffafb 0%, #fdf6f8 100%);
+    box-shadow: var(--pay-shadow-sm);
+}
+
+.passport-notice-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.65rem;
+}
+
+.passport-notice-top strong {
+    color: var(--pay-maroon);
+    font-size: 0.88rem;
+}
+
+.passport-notice-meta {
+    margin: 0;
+    display: grid;
+    gap: 0.45rem;
+}
+
+.passport-notice-meta div {
+    display: grid;
+    gap: 0.1rem;
+}
+
+.passport-notice-meta dt {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--dash-muted);
+}
+
+.passport-notice-meta dd {
+    margin: 0;
+    color: var(--pay-navy);
+    font-size: 0.86rem;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.passport-next-card {
+    margin: 0;
+    padding: 0.85rem 0.95rem;
+    border-radius: 14px;
+    border: 1px solid var(--pay-border);
+    border-top: 3px solid #2f9e66;
+    background: #fff;
+    box-shadow: var(--pay-shadow-sm);
+}
+
+.passport-next-card h2 {
+    margin: 0 0 0.65rem;
+    color: var(--pay-navy);
+    font-size: 0.92rem;
+}
+
+.passport-details-steps {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+}
+
+.passport-details-steps li {
+    padding: 0.7rem 0.75rem 0.7rem 2.55rem;
+    font-size: 0.84rem;
+    line-height: 1.4;
+}
+
+.passport-details-steps li::before {
+    left: 0.7rem;
+    width: 1.3rem;
+    height: 1.3rem;
+    font-size: 0.7rem;
+}
+
+.passport-details-disclaimer {
+    margin: 0.7rem 0 0;
+    padding-top: 0.65rem;
+    border-top: 1px solid #ead5dc;
+    color: var(--dash-muted);
+    font-size: 0.76rem;
+    line-height: 1.45;
+}
+
+.passport-details-form .pay-actions {
+    margin-top: 1.25rem;
+}
+
+@media (max-width: 960px) {
+    .passport-details-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .passport-details-fields {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Confirmation step (passport) */
+.confirm-shell {
+    padding: 1.4rem 1.5rem 1.75rem 2.15rem;
+    background: #fff;
+}
+
+.confirm-hero {
+    align-items: center;
+    margin-left: 0.35rem;
+    padding-left: 0.35rem;
+}
+
+.confirm-hero .pay-hero-copy {
+    max-width: 38rem;
+}
+
+.confirm-hero .welcome-text {
+    max-width: 34rem;
+    line-height: 1.55;
+}
+
+.confirm-success-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-shrink: 0;
+    padding: 0.55rem 0.9rem;
+    border-radius: 999px;
+    border: 1px solid #b9dcc8;
+    background: linear-gradient(180deg, #f3fbf6 0%, #e7f6ee 100%);
+    color: #1f6b43;
+    font-size: 0.84rem;
+    font-weight: 700;
+    box-shadow: var(--pay-shadow-sm);
+}
+
+.confirm-metric-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.85rem;
+    margin: 0 0 1.2rem;
+}
+
+.confirm-metric {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 4.4rem;
+    padding: 0.85rem 0.95rem;
+    border-radius: 14px;
+    border: 1px solid var(--pay-border);
+    background: #fff;
+    box-shadow: var(--pay-shadow-sm);
+}
+
+.confirm-metric strong {
+    display: block;
+    color: var(--pay-navy);
+    font-size: 0.92rem;
+}
+
+.confirm-metric small {
+    color: var(--dash-muted);
+    font-size: 0.8rem;
+}
+
+.confirm-metric-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.4rem;
+    height: 2.4rem;
+    border-radius: 12px;
+    flex-shrink: 0;
+}
+
+.confirm-metric--green {
+    border-color: #d5ebde;
+    background: #f5fbf7;
+}
+
+.confirm-metric--green .confirm-metric-icon {
+    color: #2a7a4d;
+    background: #e4f4ea;
+}
+
+.confirm-metric--gold {
+    border-color: #efe4bc;
+    background: #fffcef;
+}
+
+.confirm-metric--gold .confirm-metric-icon {
+    color: #9a7420;
+    background: #f8efd0;
+}
+
+.confirm-metric--maroon {
+    border-color: #ead5dc;
+    background: #fdf6f8;
+}
+
+.confirm-metric--maroon .confirm-metric-icon {
+    color: #8a3a55;
+    background: #f5e4ea;
+}
+
+.confirm-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(17rem, 0.9fr);
+    gap: 1.25rem 1.5rem;
+    align-items: start;
+}
+
+.confirm-main {
+    display: grid;
+    gap: 1rem;
+}
+
+.confirm-panel {
+    margin: 0;
+    overflow: hidden;
+}
+
+.confirm-panel--appointment {
+    border-top: 4px solid var(--pay-maroon);
+}
+
+.confirm-panel--payment {
+    border-top: 4px solid var(--pay-gold);
+}
+
+.confirm-panel--next {
+    border-top: 4px solid #2f9e66;
+}
+
+.confirm-panel-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+}
+
+.confirm-panel-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 12px;
+    flex-shrink: 0;
+}
+
+.confirm-panel-icon--maroon {
+    color: #fff;
+    background: linear-gradient(145deg, #9a3555 0%, var(--pay-maroon) 100%);
+}
+
+.confirm-panel-icon--gold {
+    color: #7a5a00;
+    background: linear-gradient(145deg, #ffe9a8 0%, var(--pay-gold) 100%);
+}
+
+.confirm-panel-icon--green {
+    color: #fff;
+    background: linear-gradient(145deg, #3fb57a 0%, #1f6b43 100%);
+}
+
+.confirm-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.confirm-info-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    min-height: 4.5rem;
+    padding: 0.85rem 0.9rem;
+    border-radius: 14px;
+    border: 1px solid var(--pay-border);
+    background: #fff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.confirm-info-label {
+    display: block;
+    margin-bottom: 0.2rem;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--dash-muted);
+}
+
+.confirm-info-card strong {
+    color: var(--pay-navy);
+    font-size: 0.94rem;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.confirm-info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.confirm-info-card--maroon,
+.confirm-info-card--gold,
+.confirm-info-card--blue,
+.confirm-info-card--green {
+    border-color: var(--pay-border);
+    background: #fff;
+}
+
+.confirm-info-card--maroon .confirm-info-icon,
+.confirm-info-card--gold .confirm-info-icon,
+.confirm-info-card--blue .confirm-info-icon,
+.confirm-info-card--green .confirm-info-icon {
+    color: var(--pay-navy);
+    background: #eef3f7;
+}
+
+.confirm-pay-total {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 0 0 1rem;
+    padding: 0.9rem 1rem;
+    border-radius: 12px;
+    border: 1px solid var(--pay-border);
+    background: #f8fafc;
+}
+
+.confirm-pay-total-label {
+    color: var(--pay-navy);
+    font-weight: 700;
+}
+
+.confirm-pay-total strong {
+    color: var(--pay-maroon);
+    font-size: 1.3rem;
+}
+
+.confirm-steps {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.65rem;
+    counter-reset: confirm-step;
+}
+
+.confirm-steps li {
+    position: relative;
+    padding: 0.85rem 0.95rem 0.85rem 3rem;
+    border-radius: 12px;
+    border: 1px solid var(--pay-border);
+    background: #f8fafc;
+    color: var(--dash-text);
+    counter-increment: confirm-step;
+}
+
+.confirm-steps li::before {
+    content: counter(confirm-step);
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1.45rem;
+    height: 1.45rem;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--pay-navy);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.confirm-aside {
+    position: sticky;
+    top: 1rem;
+}
+
+.confirm-summary {
+    margin: 0;
+    border-top: 4px solid var(--pay-blue);
+    background: #fff;
+}
+
+@media (max-width: 960px) {
+    .confirm-layout,
+    .confirm-metric-row {
+        grid-template-columns: 1fr;
+    }
+
+    .confirm-aside {
+        position: static;
+        order: -1;
+    }
+}
+
+@media (max-width: 720px) {
+    .confirm-info-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.pay-table-panel {
+    padding: 0;
+    overflow: hidden;
+}
+
+.pay-table-panel .app-table {
+    margin: 0;
+}
+
+/* Confirmation / result surfaces */
+.pay-result {
+    margin: 1rem 0 1.25rem;
+    padding: 1.15rem 1.2rem;
+    border-radius: 16px;
+    border: 1px solid var(--pay-border);
+    background: #fff;
+    box-shadow: var(--pay-shadow-sm);
+}
+
+.pay-result--success {
+    border-color: #b9dcc8;
+    background: linear-gradient(180deg, #f6fcf8 0%, #ffffff 70%);
+}
+
+.pay-result--warning {
+    border-color: #efd988;
+    background: linear-gradient(180deg, #fffbeb 0%, #ffffff 70%);
+}
+
+.pay-result-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.85rem;
+}
+
+.pay-result-head h2 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: var(--pay-navy);
+}
+
+.pay-result-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem 1rem;
+}
+
+.pay-result-item dt {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--dash-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.pay-result-item dd {
+    margin: 0.2rem 0 0;
+    color: var(--pay-navy);
+    font-weight: 650;
+}
+
+@media (max-width: 960px) {
+    .pay-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .pay-aside {
+        position: static;
+        order: -1;
+    }
+}
+
+@media (max-width: 720px) {
+    .pay-hero {
+        flex-direction: column;
+    }
+
+    .pay-channel-grid,
+    .pay-result-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .pay-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .pay-actions .dash-button,
+    .pay-actions form {
+        width: 100%;
+    }
+
+    .pay-actions form .dash-button {
+        width: 100%;
+    }
+}

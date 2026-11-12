@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Notifications · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard{% endblock %}
+{% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
+{% block content %}
+<div class="dash-page site-width">
+    <section class="dash-section" aria-labelledby="notifications-heading">
+        <p class="dash-kicker">Updates</p>
+        <h1 id="notifications-heading">Notifications</h1>
+        {% if notifications %}
+        <ul class="notice-page-list">
+            {% for notice in notifications %}
+            <li class="detail-card">
+                <p class="notice-title">{{ notice.notification_title }}</p>
+                <p>{{ notice.notification_message }}</p>
+                <p class="notice-meta">{{ notice.created_date.strftime("%d %b %Y") }} · {{ notice.notification_type|replace('_', ' ') }} · {{ notice.read_status }}</p>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty-state" role="status">You have no notifications.</p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

@@ -1,0 +1,6 @@
+{% set labels = step_labels if step_labels else ["1. Application details", "2. Documents", "3. Review", "4. Confirmation"] %}
+<ol class="apply-steps" aria-label="Application progress">
+    {% for label in labels %}
+    <li class="{% if step > loop.index %}is-done{% endif %}{% if step == loop.index %} is-current{% endif %}" {% if step == loop.index %}aria-current="step"{% endif %}>{{ label }}</li>
+    {% endfor %}
+</ol>

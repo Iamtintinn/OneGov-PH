@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Settings · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard{% endblock %}
+{% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
+{% block content %}
+<div class="dash-page site-width">
+    <section class="detail-card profile-card" aria-labelledby="settings-heading">
+        <p class="dash-kicker">Account</p>
+        <h1 id="settings-heading">Settings</h1>
+        <dl class="detail-list">
+            <div>
+                <dt>Email</dt>
+                <dd>{{ current_user.email }}</dd>
+            </div>
+            <div>
+                <dt>Role</dt>
+                <dd>{{ current_user.role_label }}</dd>
+            </div>
+            <div>
+                <dt>Account status</dt>
+                <dd>{{ current_user.account_status|replace('_', ' ')|title }}</dd>
+            </div>
+            <div>
+                <dt>Email verification</dt>
+                <dd>{{ current_user.email_verification_status|replace('_', ' ')|title }}</dd>
+            </div>
+            <div>
+                <dt>Date registered</dt>
+                <dd>{{ current_user.date_registered.strftime("%d %b %Y") }}</dd>
+            </div>
+        </dl>
+        <h2>Change password</h2>
+        <form class="dash-form" method="post" action="{{ url_for('citizen.settings') }}" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="current_password">Current password</label>
+            <input id="current_password" name="current_password" type="password" autocomplete="current-password" required aria-invalid="{{ 'true' if errors.current_password else 'false' }}">
+            {% if errors.current_password %}<p class="field-error">{{ errors.current_password }}</p>{% endif %}
+            <label for="password">New password</label>
+            <input id="password" name="password" type="password" autocomplete="new-password" required aria-invalid="{{ 'true' if errors.password else 'false' }}">
+            {% if errors.password %}<p class="field-error">{{ errors.password }}</p>{% endif %}
+            <label for="confirm_password">Confirm new password</label>
+            <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required aria-invalid="{{ 'true' if errors.confirm_password else 'false' }}">
+            {% if errors.confirm_password %}<p class="field-error">{{ errors.confirm_password }}</p>{% endif %}
+            <p class="empty-note">Use 8 to 128 characters, with at least one letter and one number.</p>
+            <button class="dash-button" type="submit">Update password</button>
+        </form>
+    </section>
+</div>
+{% endblock %}

@@ -1,0 +1,906 @@
+"""Citizen Apply Now steps. These views are registered on the citizen blueprint."""
+
+from flask import abort, flash, redirect, render_template, request, send_file, url_for
+from flask_login import current_user
+from sqlalchemy.orm import joinedload
+
+from app import db
+from app.models.application import Application
+from app.models.department import Department
+from app.models.service import Service
+from app.models.user import User
+from app.services.application_forms import specification_for
+from app.services.tracking_service import cancel_application
+from app.services.application_service import (
+    TERMS_TEXT,
+    absolute_upload,
+    cancel_draft,
+    clear_id_autofill,
+    continue_target,
+    document_rules,
+    ensure_draft,
+    field_map,
+    find_draft,
+    missing_documents,
+    owned_application,
+    passport_details_ready,
+    prefill_values,
+    read_checklist,
+    read_details,
+    read_fields,
+    remove_upload,
+    requirement_for,
+    save_draft,
+    save_passport_id,
+    save_philsys_document,
+    save_philsys_reference,
+    save_cenomar_tracking,
+    save_sss_tracking,
+    save_upload,
+    submit_application,
+    validate_answers,
+    write_details,
+)
+from app.utils.decorators import role_required
+from app.routes.citizen import STATUS_LABELS
+
+
+def _service_or_404(service_id):
+    service = db.session.scalar(
+        db.select(Service)
+        .join(Service.department)
+        .where(
+            Service.service_id == service_id,
+            Service.service_status == "active",
+            Department.department_status == "active",
+        )
+    )
+    if service is None or specification_for(service) is None:
+        abort(404)
+    return service
+
+
+def _draft_or_404(application_id):
+    application = db.session.scalars(
+        db.select(Application)
+        .options(
+            joinedload(Application.service).joinedload(Service.department),
+            joinedload(Application.department),
+            joinedload(Application.requirements),
+            joinedload(Application.payments),
+        )
+        .where(
+            Application.application_id == application_id,
+            Application.applicant_id == current_user.user_id,
+        )
+    ).unique().first()
+    if application is None or specification_for(application.service) is None:
+        abort(404)
+    return application
+
+
+def _common(application, step):
+    service = application.service
+    values = field_map(application)
+    spec = specification_for(service, values)
+    return {
+        "application": application,
+        "service": service,
+        "spec": spec,
+        "step": step,
+        "documents": document_rules(spec, values),
+        "status_labels": STATUS_LABELS,
+        "step_labels": spec.get("step_labels"),
+    }
+
+
+def _merge_answers(spec, previous_rows, stored_rows):
+    incoming = {row["key"]: row for row in stored_rows}
+    previous = {row["key"]: row for row in previous_rows}
+    merged = []
+    known = set()
+    for field in spec["fields"]:
+        key = field["key"]
+        known.add(key)
+        if key in incoming:
+            merged.append(incoming[key])
+        elif key in previous:
+            merged.append(previous[key])
+    for key, row in previous.items():
+        if key not in known:
+            merged.append(row)
+    return merged
+
+
+def _cenomar_details(service, spec, draft):
+    from app.services.application_forms import cenomar_incomplete_step
+
+    saved = prefill_values(draft)
+    raw_step = request.form.get("cenomar_step") if request.method == "POST" else request.args.get("step")
+    try:
+        step = int(raw_step or 1)
+    except ValueError:
+        step = 1
+    step = min(3, max(1, step))
+    if request.method == "GET":
+        incomplete = cenomar_incomplete_step(saved)
+        if incomplete and step > incomplete:
+            step = incomplete
+    step_fields = [field for field in spec["fields"] if field.get("step") == step]
+    errors = {}
+    values = dict(saved)
+    if request.method == "POST":
+        incomplete = cenomar_incomplete_step(saved)
+        if incomplete and step > incomplete:
+            return redirect(url_for("citizen.apply_details", service_id=service.service_id, step=incomplete))
+        stored, errors = validate_answers(service, {**spec, "fields": step_fields}, request.form)
+        if not errors:
+            draft = save_draft(
+                current_user,
+                service,
+                _merge_answers(spec, read_fields(draft), stored),
+                draft,
+            )
+            if step < 3:
+                return redirect(url_for("citizen.apply_details", service_id=service.service_id, step=step + 1))
+            return redirect(url_for("citizen.apply_review", application_id=draft.application_id))
+        values.update({item["key"]: item["value"] for item in stored})
+    return render_template(
+        "applications/apply_details.html",
+        service=service,
+        spec=spec,
+        fields=step_fields,
+        values=values,
+        errors=errors,
+        step=step,
+        step_labels=spec.get("step_labels"),
+        application=draft,
+    )
+
+
+def _sss_request(service, values):
+    """Show the SSS question on Step 1 and keep the saved answer when the form is reopened."""
+    from app.services.application_forms import _sss_choice
+
+    merged = dict(values)
+    if request.method == "GET" and not merged.get("has_ss_number"):
+        requested = (request.args.get("sss_path") or "").strip()
+        if requested:
+            merged["sss_path"] = requested
+            choice = _sss_choice(merged)
+            if choice:
+                merged["has_ss_number"] = choice
+    source = request.form if request.method == "POST" else merged
+    return specification_for(service, source), merged
+
+
+@role_required(User.ROLE_CITIZEN)
+def apply_details(service_id):
+    service = _service_or_404(service_id)
+    draft = find_draft(current_user.user_id, service.service_id)
+    errors = {}
+    values = prefill_values(draft)
+    spec = specification_for(service, request.form if request.method == "POST" else values)
+    if spec.get("kind") == "cenomar":
+        return _cenomar_details(service, spec, draft)
+    if spec.get("kind") == "sss":
+        spec, values = _sss_request(service, values)
+    if spec.get("kind") == "passport" or spec.get("documents_first"):
+        draft = ensure_draft(current_user, service)
+        values = prefill_values(draft)
+        spec = specification_for(service, request.form if request.method == "POST" else values)
+        if missing_documents(draft, spec):
+            return redirect(url_for("citizen.apply_documents", application_id=draft.application_id))
+        if request.method == "POST":
+            stored, errors = validate_and_store(service, spec)
+            if not errors:
+                draft = save_draft(current_user, service, stored, draft)
+                return redirect(url_for("citizen.apply_schedule", application_id=draft.application_id))
+            values = {item["key"]: item["value"] for item in stored}
+            flash(
+                "This application cannot continue to scheduling yet. "
+                "Fix the highlighted fields below, then try Continue again.",
+                "warning",
+            )
+        autofill_keys = set(read_details(draft).get("id_autofill_keys") or [])
+        autofilled_labels = [
+            field["label"]
+            for field in spec["fields"]
+            if field["key"] in autofill_keys and values.get(field["key"])
+        ]
+        error_items = [
+            {"key": field["key"], "label": field["label"], "message": errors[field["key"]]}
+            for field in spec["fields"]
+            if field["key"] in errors
+        ]
+        return render_template(
+            "applications/apply_details.html",
+            service=service,
+            spec=spec,
+            fields=spec["fields"],
+            values=values,
+            errors=errors,
+            error_items=error_items,
+            step=2,
+            step_labels=spec.get("step_labels"),
+            application=draft,
+            autofilled_labels=autofilled_labels,
+        )
+    if request.method == "POST":
+        stored, errors = validate_and_store(service, spec)
+        if not errors:
+            draft = save_draft(current_user, service, stored, draft)
+            return redirect(url_for("citizen.apply_documents", application_id=draft.application_id))
+        values = {item["key"]: item["value"] for item in stored}
+        if spec.get("kind") == "barangay":
+            flash(
+                "This application cannot continue to documents yet. "
+                "Fix the highlighted fields below, then try Continue again.",
+                "warning",
+            )
+    error_items = []
+    if errors and spec.get("kind") == "barangay":
+        error_items = [
+            {"key": field["key"], "label": field["label"], "message": errors[field["key"]]}
+            for field in spec["fields"]
+            if field["key"] in errors
+        ]
+    return render_template(
+        "applications/apply_details.html",
+        service=service,
+        spec=spec,
+        fields=spec["fields"],
+        values=values,
+        errors=errors,
+        error_items=error_items,
+        step=1,
+        step_labels=spec.get("step_labels"),
+        application=draft,
+    )
+
+
+def validate_and_store(service, spec):
+    return validate_answers(service, spec, request.form)
+
+
+@role_required(User.ROLE_CITIZEN)
+def apply_documents(application_id):
+    application = _draft_or_404(application_id)
+    if application.application_status != "draft":
+        return redirect(url_for("citizen.apply_confirmation", application_id=application.application_id))
+    spec = specification_for(application.service, field_map(application))
+    if not (spec.get("kind") == "passport" or spec.get("documents_first")) and not read_fields(application):
+        return redirect(url_for("citizen.apply_details", service_id=application.service_id))
+    if spec.get("kind") == "cenomar":
+        return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+    document_step = 1 if (spec.get("kind") == "passport" or spec.get("documents_first")) else 2
+    context = _common(application, document_step)
+    if context["spec"].get("kind") == "philsys":
+        from app.services.philsys_national_id import supporting_id_groups
+
+        matched = next(
+            (item for item in read_checklist(application) if item.get("key") == "supporting_id"),
+            None,
+        )
+        context["groups"] = supporting_id_groups(field_map(application).get("citizenship"))
+        context["matched"] = matched
+        context["requirements"] = {item.requirement_name: item for item in application.requirements}
+        context["missing"] = missing_documents(application, context["spec"])
+        return render_template("applications/apply_philsys_documents.html", **context)
+    if context["spec"].get("checklist"):
+        from app.services.philsys_national_id import checklist_groups
+
+        matched = next(
+            (item for item in read_checklist(application) if item.get("value") == "matched"),
+            None,
+        )
+        context["groups"] = checklist_groups(field_map(application).get("citizenship"))
+        context["matched"] = matched
+        context["uploaded"] = requirement_for(application, matched["key"]) if matched else None
+        return render_template("applications/apply_philsys_documents.html", **context)
+    context["requirements"] = {item.requirement_name: item for item in application.requirements}
+    context["upload_error"] = {}
+    context["missing"] = missing_documents(application, context["spec"])
+    if context["spec"].get("kind") == "passport":
+        from app.services.passport_ids import passport_id_groups
+
+        answers = field_map(application)
+        context["passport_id_groups"] = passport_id_groups(
+            answers.get("application_type"),
+            answers.get("date_of_birth"),
+        )
+        context["passport_id_match"] = next(
+            (
+                item
+                for item in read_checklist(application)
+                if item.get("key") == "valid_id" and item.get("value") == "matched"
+            ),
+            None,
+        )
+    return render_template("applications/apply_documents.html", **context)
+
+
+@role_required(User.ROLE_CITIZEN)
+def upload_document(application_id, document_key):
+    application = _draft_or_404(application_id)
+    if application.application_status != "draft":
+        return redirect(url_for("citizen.apply_confirmation", application_id=application.application_id))
+    values = field_map(application)
+    spec = specification_for(application.service, values)
+    allowed = {item["key"]: item for item in document_rules(spec, values)}
+    document = allowed.get(document_key)
+    if document is None:
+        abort(404)
+    upload = request.files.get("document")
+    error = None
+    if upload is None or not upload.filename:
+        error = f"Choose a file for {document['label']}."
+    elif spec.get("kind") == "philsys" and document_key == "supporting_id":
+        from app.services.philsys_national_id import _BIRTH_RECORD_KEYS, document_by_key
+
+        selected = document_by_key(values.get("citizenship"), request.form.get("document_type", ""))
+        if selected is None or selected["key"] in _BIRTH_RECORD_KEYS:
+            error = "Select the supporting identification document shown in the file."
+        else:
+            error = save_philsys_document(application, selected, upload)
+            if not error:
+                return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
+    elif document.get("id_choices") == "dfa":
+        from app.services.passport_ids import passport_id_by_key
+
+        selected = passport_id_by_key(
+            values.get("application_type"),
+            values.get("date_of_birth"),
+            request.form.get("id_type", ""),
+        )
+        if selected is None:
+            error = "Select one valid government ID from the list."
+        else:
+            error = save_passport_id(application, selected, upload)
+            if not error:
+                filled = read_details(application).get("id_autofill_keys") or []
+                if filled:
+                    flash(
+                        "ID uploaded. Readable details were filled into the application form. "
+                        "Blank fields still need your input.",
+                        "success",
+                    )
+                else:
+                    flash(
+                        "ID uploaded. No personal details could be read from this file. "
+                        "Enter them on the next step.",
+                        "success",
+                    )
+                return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
+    else:
+        error = save_upload(
+            application,
+            document_key,
+            upload,
+            upload.filename,
+            spec.get("file_rules") if spec.get("kind") == "sss" else None,
+        )
+    if error:
+        flash(error, "error")
+    return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
+
+
+@role_required(User.ROLE_CITIZEN)
+def remove_document(application_id, document_key):
+    application = _draft_or_404(application_id)
+    if application.application_status != "draft":
+        return redirect(url_for("citizen.apply_confirmation", application_id=application.application_id))
+    values = field_map(application)
+    spec = specification_for(application.service, values)
+    allowed = {item["key"]: item for item in document_rules(spec, values)}
+    document = allowed.get(document_key)
+    if document is None:
+        abort(404)
+    remove_upload(application, document_key)
+    if (spec.get("kind") == "philsys" and document_key == "supporting_id") or (
+        document.get("id_choices") == "dfa" and document_key == "valid_id"
+    ):
+        details = read_details(application)
+        details["checklist"] = [item for item in details["checklist"] if item.get("key") != document_key]
+        if document.get("id_choices") == "dfa" and document_key == "valid_id":
+            write_details(application, details, commit=False)
+            clear_id_autofill(application)
+            db.session.commit()
+        else:
+            write_details(application, details)
+    flash(f"{document['label']} removed.", "success")
+    return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
+
+
+@role_required(User.ROLE_CITIZEN)
+def continue_documents(application_id):
+    application = _draft_or_404(application_id)
+    if application.application_status != "draft":
+        return redirect(url_for("citizen.apply_confirmation", application_id=application.application_id))
+    spec = specification_for(application.service, field_map(application))
+    if spec.get("checklist"):
+        from app.services.philsys_national_id import document_by_key
+
+        selected = document_by_key(
+            field_map(application).get("citizenship"),
+            request.form.get("document_key", ""),
+        )
+        if selected is None:
+            flash("Select a document from the list.", "warning")
+            return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
+        upload = request.files.get("document")
+        matched = next(
+            (item for item in read_checklist(application) if item.get("value") == "matched"),
+            None,
+        )
+        same_file = (
+            matched is not None
+            and matched["key"] == selected["key"]
+            and requirement_for(application, selected["key"]) is not None
+        )
+        if (upload is None or not upload.filename) and same_file:
+            return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+        if upload is None or not upload.filename:
+            flash("Upload a photo or PDF of the document you selected.", "warning")
+            return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
+        error = save_philsys_document(application, selected, upload)
+        if error:
+            flash(error, "error")
+            return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
+        return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+    missing = missing_documents(application, spec)
+    if missing:
+        flash("Upload every required document before you continue.", "warning")
+        return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
+    if spec.get("kind") == "passport" or spec.get("documents_first"):
+        return redirect(url_for("citizen.apply_details", service_id=application.service_id))
+    return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+
+
+@role_required(User.ROLE_CITIZEN)
+def apply_schedule(application_id):
+    application = _draft_or_404(application_id)
+    if application.application_status != "draft":
+        return redirect(url_for("citizen.apply_confirmation", application_id=application.application_id))
+    values = field_map(application)
+    spec = specification_for(application.service, values)
+    if spec.get("kind") != "passport":
+        return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+    if missing_documents(application, spec):
+        flash("Upload every required document before scheduling.", "warning")
+        return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
+    if not passport_details_ready(application, spec):
+        flash("Complete the application details before scheduling.", "warning")
+        return redirect(url_for("citizen.apply_details", service_id=application.service_id))
+    from app.services.passport_scheduling import (
+        LOCATIONS,
+        appointment_for,
+        available_month_calendars,
+        location_by_code,
+        save_appointment,
+    )
+
+    selected_location = request.values.get("location_code") or (appointment_for(application) or {}).get(
+        "location_code"
+    ) or LOCATIONS[0]["code"]
+    if location_by_code(selected_location) is None:
+        selected_location = LOCATIONS[0]["code"]
+
+    if request.method == "POST":
+        error = save_appointment(
+            application,
+            current_user,
+            request.form.get("location_code", ""),
+            request.form.get("appointment_date", ""),
+            request.form.get("appointment_time", ""),
+        )
+        if error:
+            flash(error, "warning")
+        else:
+            return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+
+    context = _common(application, 3)
+    context["locations"] = LOCATIONS
+    context["selected_location"] = selected_location
+    context["calendar_months"] = available_month_calendars(selected_location, application.application_id)
+    context["appointment"] = appointment_for(application)
+    return render_template("applications/apply_schedule.html", **context)
+
+
+@role_required(User.ROLE_CITIZEN)
+def apply_payment(application_id):
+    application = _draft_or_404(application_id)
+    if application.application_status != "draft":
+        return redirect(url_for("citizen.apply_confirmation", application_id=application.application_id))
+    values = field_map(application)
+    spec = specification_for(application.service, values)
+    if spec.get("kind") != "passport":
+        return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+    from app.services.passport_payment import (
+        ONLINE_METHODS,
+        payment_summary,
+        record_demo_payment,
+        start_maya_checkout,
+    )
+    from app.services.passport_scheduling import appointment_for
+
+    if missing_documents(application, spec):
+        flash("Upload every required document before payment.", "warning")
+        return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
+    if not passport_details_ready(application, spec):
+        flash("Complete the application details before payment.", "warning")
+        return redirect(url_for("citizen.apply_details", service_id=application.service_id))
+    if appointment_for(application) is None:
+        flash("Select a demonstration appointment before payment.", "warning")
+        return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
+
+    if request.method == "POST":
+        choice = (request.form.get("payment_choice") or "").strip()
+        online_method = (request.form.get("online_method") or "").strip()
+        if choice == "online" and online_method == "maya":
+            redirect_url, error = start_maya_checkout(application, current_user)
+            if error:
+                flash(error, "warning")
+            else:
+                return redirect(redirect_url)
+        else:
+            error = record_demo_payment(
+                application,
+                current_user,
+                choice,
+                online_method,
+            )
+            if error:
+                flash(error, "warning")
+            else:
+                from app.services.passport_confirmation_pdf import ensure_confirmation_pdf
+
+                ensure_confirmation_pdf(application)
+                flash("Demonstration payment choice saved. No real payment was collected.", "success")
+                return redirect(
+                    url_for("citizen.apply_confirmation", application_id=application.application_id)
+                )
+
+    context = _common(application, 4)
+    context["summary"] = payment_summary(application)
+    context["online_methods"] = ONLINE_METHODS
+    context["maya_sandbox"] = True
+    return render_template("applications/apply_payment.html", **context)
+
+
+@role_required(User.ROLE_CITIZEN)
+def apply_maya_result(application_id):
+    """
+    Return URL after Maya hosted checkout.
+    Payment is never marked paid from the redirect alone — status is verified via Maya APIs.
+    """
+    application = owned_application(current_user.user_id, application_id)
+    if application is None:
+        abort(404)
+    values = field_map(application)
+    spec = specification_for(application.service, values)
+    if spec.get("kind") != "passport":
+        abort(404)
+
+    from app.services.passport_confirmation_pdf import ensure_confirmation_pdf
+    from app.services.passport_payment import latest_payment, verify_maya_payment
+
+    outcome = (request.args.get("outcome") or "").strip().lower()
+    payment = latest_payment(application)
+    if payment is None or payment.payment_method != "maya":
+        flash("No Maya checkout was found for this application.", "warning")
+        return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+
+    status, error = verify_maya_payment(application=application, payment=payment, source="redirect")
+    if error:
+        flash(
+            f"Returned from Maya ({outcome or 'unknown'}), but verification needs a moment: {error}",
+            "warning",
+        )
+        return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+
+    db.session.refresh(application)
+    payment = latest_payment(application)
+
+    if status == "paid" or (payment and payment.payment_status == "paid"):
+        ensure_confirmation_pdf(application)
+        flash("Maya sandbox payment verified as paid.", "success")
+        return redirect(url_for("citizen.apply_confirmation", application_id=application.application_id))
+
+    if status == "failed" or (payment and payment.payment_status == "failed"):
+        flash("Maya sandbox payment failed. You can try Pay Now again.", "warning")
+        return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+
+    if status == "cancelled" or (payment and payment.payment_status == "cancelled"):
+        flash("Maya sandbox checkout was cancelled or expired. You can try again.", "warning")
+        return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+
+    flash(
+        "Maya payment is still processing. Refresh payment after a moment, or wait for the webhook.",
+        "info",
+    )
+    return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+
+
+@role_required(User.ROLE_CITIZEN)
+def apply_review(application_id):
+    application = _draft_or_404(application_id)
+    if application.application_status != "draft":
+        return redirect(url_for("citizen.apply_confirmation", application_id=application.application_id))
+    spec = specification_for(application.service, field_map(application))
+    if spec.get("kind") == "passport":
+        return redirect(url_for("citizen.application_continue", application_id=application.application_id))
+    if spec.get("kind") == "cenomar":
+        from app.services.application_forms import cenomar_incomplete_step
+
+        incomplete = cenomar_incomplete_step(field_map(application))
+        if incomplete:
+            flash("Complete this step before reviewing the CENOMAR request.", "warning")
+            return redirect(url_for("citizen.apply_details", service_id=application.service_id, step=incomplete))
+    missing = missing_documents(application, spec)
+    if not read_fields(application) or missing:
+        flash("Complete the application details and required documents before review.", "warning")
+        return redirect(url_for("citizen.application_continue", application_id=application.application_id))
+    context = _common(application, 4 if spec.get("kind") == "cenomar" else 3)
+    context["fields"] = read_fields(application)
+    context["requirements"] = {item.requirement_name: item for item in application.requirements}
+    context["checklist"] = read_checklist(application)
+    context["terms"] = spec.get("terms") or TERMS_TEXT
+    if spec.get("kind") == "philsys":
+        from app.services.philsys_national_id import readiness_message
+
+        context["checklist_warning"] = readiness_message(
+            field_map(application).get("citizenship"),
+            context["checklist"],
+        )
+    return render_template("applications/apply_review.html", **context)
+
+
+@role_required(User.ROLE_CITIZEN)
+def apply_submit(application_id):
+    application = _draft_or_404(application_id)
+    if request.form.get("accept_terms") != "yes":
+        flash("Confirm the terms before submitting the application.", "warning")
+        return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+    error = submit_application(application, current_user)
+    if error:
+        flash(error, "warning")
+        if specification_for(application.service, field_map(application)).get("kind") == "sss":
+            return redirect(url_for("citizen.application_continue", application_id=application.application_id))
+        return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
+    return redirect(url_for("citizen.apply_confirmation", application_id=application.application_id))
+
+
+@role_required(User.ROLE_CITIZEN)
+def record_sss_tracking(application_id):
+    """Store an SS Number or transaction number the citizen already received from SSS."""
+    application = _draft_or_404(application_id)
+    spec = specification_for(application.service, field_map(application))
+    if spec.get("kind") != "sss" or application.application_status == "draft":
+        abort(404)
+    error = save_sss_tracking(application, current_user, request.form, request.files)
+    if error:
+        flash(error, "warning")
+    else:
+        flash(
+            "The SSS details were recorded. OneGov PH did not receive them from SSS, and this does not mean SSS issued or verified an SS Number.",
+            "success",
+        )
+    return redirect(url_for("citizen.application_detail", application_id=application.application_id))
+
+
+def record_cenomar_tracking(application_id):
+    """Store a PSA reference the citizen already has. This does not submit the request to PSA."""
+    application = _draft_or_404(application_id)
+    spec = specification_for(application.service, field_map(application))
+    if spec.get("kind") != "cenomar" or application.application_status == "draft":
+        abort(404)
+    error = save_cenomar_tracking(application, current_user, request.form)
+    if error:
+        flash(error, "warning")
+    else:
+        flash(
+            "The PSA reference was recorded. OneGov PH did not receive it from PSA, and this does not mean PSA has approved or issued the CENOMAR.",
+            "success",
+        )
+    return redirect(url_for("citizen.application_detail", application_id=application.application_id))
+
+
+@role_required(User.ROLE_CITIZEN)
+def record_philsys_reference(application_id):
+    """Let the owner store a PSA reference later. This does not mark the person registered."""
+    application = _draft_or_404(application_id)
+    spec = specification_for(application.service, field_map(application))
+    if spec.get("kind") != "philsys" or application.application_status == "draft":
+        abort(404)
+    error = save_philsys_reference(application, request.form.get("philsys_reference", ""))
+    if error:
+        flash(error, "warning")
+    else:
+        flash("The PhilSys transaction reference was saved. This does not register you with PhilSys.", "success")
+    return redirect(url_for("citizen.application_detail", application_id=application.application_id))
+
+
+@role_required(User.ROLE_CITIZEN)
+def apply_cancel(application_id):
+    application = owned_application(current_user.user_id, application_id)
+    if application is None:
+        abort(404)
+    if application.application_status == "draft":
+        cancel_draft(application)
+        flash("The draft application was cancelled.", "success")
+        return redirect(url_for("citizen.services"))
+    error = cancel_application(application, current_user, request.form.get("cancellation_reason", ""))
+    if error:
+        flash(error, "warning")
+    else:
+        flash("The application was cancelled. OneGov PH has not withdrawn it from a government agency.", "success")
+    return redirect(url_for("citizen.application_detail", application_id=application.application_id))
+
+
+@role_required(User.ROLE_CITIZEN)
+def apply_confirmation(application_id):
+    application = _draft_or_404(application_id)
+    if application.application_status == "draft":
+        return redirect(url_for("citizen.application_continue", application_id=application.application_id))
+    spec = specification_for(application.service, field_map(application))
+    labels = dict(STATUS_LABELS)
+    labels.update(spec.get("status_labels") or {})
+    context = {
+        "application": application,
+        "service": application.service,
+        "step": spec.get("confirmation_step") or 4,
+        "step_labels": spec.get("step_labels"),
+        "spec": spec,
+        "fields": read_fields(application),
+        "status_labels": labels,
+    }
+    if spec.get("kind") == "passport":
+        from app.services.passport_confirmation_pdf import confirmation_id_for, ensure_confirmation_pdf
+        from app.services.passport_payment import payment_summary
+        from app.services.passport_scheduling import appointment_for
+
+        ensure_confirmation_pdf(application)
+        context["appointment"] = appointment_for(application)
+        context["summary"] = payment_summary(application)
+        context["confirmation_id"] = confirmation_id_for(application)
+    return render_template("applications/apply_confirmation.html", **context)
+
+
+@role_required(User.ROLE_CITIZEN)
+def passport_confirmation_pdf(application_id):
+    application = _draft_or_404(application_id)
+    spec = specification_for(application.service, field_map(application))
+    if spec.get("kind") != "passport" or application.application_status == "draft":
+        abort(404)
+    from app.services.passport_confirmation_pdf import absolute_confirmation_pdf, ensure_confirmation_pdf
+
+    ensure_confirmation_pdf(application)
+    path = absolute_confirmation_pdf(application)
+    if path is None:
+        abort(404)
+    return send_file(
+        path,
+        as_attachment=True,
+        download_name=f"onegov-passport-demo-{application.tracking_number}.pdf",
+    )
+
+
+@role_required(User.ROLE_CITIZEN)
+def application_document(application_id, requirement_id):
+    application = _draft_or_404(application_id)
+    row = next(
+        (item for item in application.requirements if item.requirement_id == requirement_id),
+        None,
+    )
+    path = absolute_upload(row.uploaded_file) if row is not None else None
+    if path is None:
+        abort(404)
+    return send_file(path, as_attachment=False, download_name=row.remarks or path.name)
+
+
+@role_required(User.ROLE_CITIZEN)
+def application_continue(application_id):
+    application = _draft_or_404(application_id)
+    target = continue_target(application)
+    if target == "details":
+        return redirect(url_for("citizen.apply_details", service_id=application.service_id))
+    if target == "documents":
+        return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
+    if target == "schedule":
+        return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
+    if target == "payment":
+        return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+    if target == "review":
+        return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+    return redirect(url_for("citizen.application_detail", application_id=application.application_id))
+
+
+def register(blueprint):
+    rules = (
+        ("/citizen/services/<int:service_id>/apply", apply_details, ["GET", "POST"], "apply_details"),
+        ("/citizen/applications/<int:application_id>/documents", apply_documents, ["GET"], "apply_documents"),
+        (
+            "/citizen/applications/<int:application_id>/documents/continue",
+            continue_documents,
+            ["POST"],
+            "continue_documents",
+        ),
+        (
+            "/citizen/applications/<int:application_id>/documents/<document_key>/remove",
+            remove_document,
+            ["POST"],
+            "remove_document",
+        ),
+        (
+            "/citizen/applications/<int:application_id>/documents/<document_key>",
+            upload_document,
+            ["POST"],
+            "upload_document",
+        ),
+        (
+            "/citizen/applications/<int:application_id>/schedule",
+            apply_schedule,
+            ["GET", "POST"],
+            "apply_schedule",
+        ),
+        (
+            "/citizen/applications/<int:application_id>/payment",
+            apply_payment,
+            ["GET", "POST"],
+            "apply_payment",
+        ),
+        (
+            "/citizen/applications/<int:application_id>/payment/maya/result",
+            apply_maya_result,
+            ["GET"],
+            "apply_maya_result",
+        ),
+        (
+            "/citizen/applications/<int:application_id>/passport-confirmation.pdf",
+            passport_confirmation_pdf,
+            ["GET"],
+            "passport_confirmation_pdf",
+        ),
+        ("/citizen/applications/<int:application_id>/review", apply_review, ["GET"], "apply_review"),
+        ("/citizen/applications/<int:application_id>/submit", apply_submit, ["POST"], "apply_submit"),
+        (
+            "/citizen/applications/<int:application_id>/philsys-reference",
+            record_philsys_reference,
+            ["POST"],
+            "record_philsys_reference",
+        ),
+        (
+            "/citizen/applications/<int:application_id>/cenomar-tracking",
+            record_cenomar_tracking,
+            ["POST"],
+            "record_cenomar_tracking",
+        ),
+        (
+            "/citizen/applications/<int:application_id>/sss-tracking",
+            record_sss_tracking,
+            ["POST"],
+            "record_sss_tracking",
+        ),
+        ("/citizen/applications/<int:application_id>/cancel", apply_cancel, ["POST"], "apply_cancel"),
+        (
+            "/citizen/applications/<int:application_id>/confirmation",
+            apply_confirmation,
+            ["GET"],
+            "apply_confirmation",
+        ),
+        (
+            "/citizen/applications/<int:application_id>/files/<int:requirement_id>",
+            application_document,
+            ["GET"],
+            "application_document",
+        ),
+        (
+            "/citizen/applications/<int:application_id>/continue",
+            application_continue,
+            ["GET"],
+            "application_continue",
+        ),
+    )
+    for path, view, methods, endpoint in rules:
+        blueprint.add_url_rule(path, endpoint=endpoint, view_func=view, methods=methods)

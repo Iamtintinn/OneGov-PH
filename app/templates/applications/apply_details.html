@@ -1,0 +1,646 @@
+{% extends "base.html" %}
+{% block title %}Apply · {{ service.service_name }} · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard{% endblock %}
+{% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
+{% block content %}
+<div class="dash-page site-width">
+    {% if spec.kind in ['passport', 'barangay'] %}
+    {% set modern_step_count = (step_labels|length) if step_labels else (5 if spec.kind == 'passport' else 4) %}
+    {% set next_action = 'scheduling' if spec.kind == 'passport' else 'documents' %}
+    <section class="apply-card pay-shell confirm-shell passport-details-shell" aria-labelledby="apply-heading">
+        {% include "applications/_progress.html" %}
+
+        <header class="pay-hero confirm-hero">
+            <div class="pay-hero-copy">
+                <p class="pay-kicker">{% if spec.kind == 'passport' %}{{ spec.kicker or "Passport demonstration" }}{% else %}{{ spec.department_label or service.department.department_name }}{% endif %}</p>
+                <h1 id="apply-heading" class="passport-details-title">{{ spec.service_title or service.service_name }}</h1>
+                <p class="welcome-text">
+                    {% if spec.kind == 'passport' %}
+                    Review and complete your application details. Fields readable from your uploaded ID are filled in; leave anything missing blank until you enter it.
+                    {% else %}
+                    Enter your applicant and residency details for this barangay clearance request. The barangay still reviews the request and issues the clearance.
+                    {% endif %}
+                </p>
+            </div>
+            <div class="confirm-success-chip passport-step-chip" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+                <span>Step {{ step }} of {{ modern_step_count }}</span>
+            </div>
+        </header>
+
+        <form class="apply-form passport-details-form" method="post" action="{{ url_for('citizen.apply_details', service_id=service.service_id) }}" autocomplete="off" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% if error_items %}
+            <div class="passport-validation-banner" id="passport-validation-banner" role="alert" tabindex="-1">
+                <div class="passport-validation-banner-head">
+                    <strong>Cannot continue to {{ next_action }}</strong>
+                    <span>{{ error_items|length }} issue{{ 's' if error_items|length != 1 else '' }} need{{ '' if error_items|length != 1 else 's' }} fixing</span>
+                </div>
+                <p>Complete or correct the items below, then press Continue again.</p>
+                <ul class="passport-validation-list">
+                    {% for item in error_items %}
+                    <li>
+                        <a href="#{{ item.key }}">{{ item.label }}</a>
+                        <span>{{ item.message }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            <div class="passport-details-layout">
+                <section class="pay-panel confirm-panel confirm-panel--appointment passport-details-main">
+                    <div class="pay-panel-head confirm-panel-head">
+                        <span class="confirm-panel-icon confirm-panel-icon--maroon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4 0-8 2-8 4v2h16v-2c0-2-4-4-8-4z"/></svg>
+                        </span>
+                        <div>
+                            <h2>Your information</h2>
+                            <p>
+                                {% if spec.kind == 'passport' %}
+                                Confirm the details pulled from your ID, then complete any blank fields before scheduling.
+                                {% else %}
+                                Fill in the applicant, residency, and purpose details. Required fields must be complete before you continue.
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    {% if autofilled_labels %}
+                    <p class="passport-autofill-note" role="status">Filled from your uploaded ID: {{ autofilled_labels|join(', ') }}.</p>
+                    {% endif %}
+                    <div class="passport-details-fields">
+                        {% for field in fields %}
+                        {% set current = values[field.key] if field.key in values else (field.default if field.default is defined and field.default is not none else '') %}
+                        {% if field.type != 'hidden' %}
+                        {% if field.section and (loop.first or fields[loop.index0 - 1].type == 'hidden' or field.section != fields[loop.index0 - 1].section) %}
+                        <h3 class="passport-details-section">{{ field.section }}</h3>
+                        {% endif %}
+                        <div class="apply-field{% if field.type == 'textarea' or field.key in ['address', 'permanent_address', 'present_address', 'purpose'] %} apply-field-wide{% endif %}{% if errors.get(field.key) %} has-error{% endif %}">
+                            <label for="{{ field.key }}">{{ field.label }}{% if not field.required %} <span class="optional">(optional)</span>{% endif %}</label>
+                            <p class="field-help" id="{{ field.key }}-help">{{ field.help }}</p>
+                            {% if field.type == 'select' %}
+                            <div class="select-input">
+                                <select id="{{ field.key }}" name="{{ field.key }}" autocomplete="off" {% if field.required %}required{% endif %} aria-describedby="{{ field.key }}-help{% if errors.get(field.key) %} {{ field.key }}-error{% endif %}" aria-invalid="{{ 'true' if errors.get(field.key) else 'false' }}">
+                                    <option value="">{{ field.placeholder or ("Select " ~ field.label|lower) }}</option>
+                                    {% for option in field.options %}
+                                    <option value="{{ option }}" {% if values.get(field.key) == option %}selected{% endif %}>{{ option }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% elif field.type == 'date' %}
+                            <div class="date-input">
+                                <span class="date-input-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+                                        <rect x="3" y="5" width="18" height="16" rx="3"></rect>
+                                        <path d="M3 10h18"></path>
+                                        <path d="M8 3v4"></path>
+                                        <path d="M16 3v4"></path>
+                                    </svg>
+                                </span>
+                                <input id="{{ field.key }}" class="date-input-control" name="{{ field.key }}" type="date" value="{{ current }}" autocomplete="off" {% if field.required %}required{% endif %} aria-describedby="{{ field.key }}-help {{ field.key }}-display{% if errors.get(field.key) %} {{ field.key }}-error{% endif %}" aria-invalid="{{ 'true' if errors.get(field.key) else 'false' }}">
+                            </div>
+                            <p class="date-input-display" id="{{ field.key }}-display" data-empty="Choose a date">{% if current %}{{ current }}{% else %}Choose a date{% endif %}</p>
+                            {% elif field.type == 'textarea' %}
+                            <textarea id="{{ field.key }}" name="{{ field.key }}" maxlength="{{ field.max_length }}" autocomplete="off" {% if field.required %}required{% endif %} aria-describedby="{{ field.key }}-help{% if errors.get(field.key) %} {{ field.key }}-error{% endif %}" aria-invalid="{{ 'true' if errors.get(field.key) else 'false' }}">{{ current }}</textarea>
+                            {% else %}
+                            <div class="text-input">
+                                <input id="{{ field.key }}" name="{{ field.key }}" type="{{ 'email' if field.type == 'email' else ('tel' if field.type == 'tel' else 'text') }}" inputmode="{{ 'numeric' if field.type == 'number' else 'text' }}" value="{{ current }}" maxlength="{{ field.max_length }}" autocomplete="off" {% if field.required %}required{% endif %} aria-describedby="{{ field.key }}-help{% if errors.get(field.key) %} {{ field.key }}-error{% endif %}" aria-invalid="{{ 'true' if errors.get(field.key) else 'false' }}">
+                            </div>
+                            {% endif %}
+                            {% if errors.get(field.key) %}<p class="field-error" id="{{ field.key }}-error">{{ errors[field.key] }}</p>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <aside class="passport-details-side">
+                    <div class="passport-notice-card" role="note">
+                        <div class="passport-notice-top">
+                            <strong>Service summary</strong>
+                        </div>
+                        <dl class="passport-notice-meta">
+                            <div>
+                                <dt>Department</dt>
+                                <dd>{{ spec.department_label or service.department.department_name }}</dd>
+                            </div>
+                            <div>
+                                <dt>Service</dt>
+                                <dd>{{ spec.service_title or service.service_name }}</dd>
+                            </div>
+                            {% if spec.process %}
+                            <div>
+                                <dt>Process</dt>
+                                <dd>{{ spec.process }}</dd>
+                            </div>
+                            {% endif %}
+                            {% if spec.documents %}
+                            <div>
+                                <dt>Needed</dt>
+                                <dd>{% for document in spec.documents %}{{ document.label }}{% if not document.required %} (if required){% endif %}{% if not loop.last %}; {% endif %}{% endfor %}</dd>
+                            </div>
+                            {% endif %}
+                            <div>
+                                <dt>Fee</dt>
+                                <dd>
+                                    {% if spec.fee_note %}
+                                    {{ spec.fee_note }}
+                                    {% elif service.processing_fee and service.processing_fee > 0 %}
+                                    ₱{{ "%.2f"|format(service.processing_fee) }}
+                                    {% else %}
+                                    Shown later
+                                    {% endif %}
+                                </dd>
+                            </div>
+                        </dl>
+                        {% if spec.disclaimer %}
+                        <p class="passport-details-disclaimer">{{ spec.disclaimer }}</p>
+                        {% endif %}
+                    </div>
+
+                    <section class="passport-next-card" aria-labelledby="passport-next-heading">
+                        <h2 id="passport-next-heading">What happens next</h2>
+                        <ol class="confirm-steps passport-details-steps">
+                            {% if spec.kind == 'passport' %}
+                            <li>Choose a demonstration appointment.</li>
+                            <li>Pay with Maya sandbox or onsite.</li>
+                            <li>Download your confirmation PDF.</li>
+                            {% else %}
+                            <li>Upload the required barangay documents.</li>
+                            <li>Review your request before submitting.</li>
+                            <li>Track updates in your OneGov PH account.</li>
+                            {% endif %}
+                        </ol>
+                    </section>
+                </aside>
+            </div>
+
+            <div class="pay-actions apply-actions">
+                {% if spec.kind == 'passport' and application %}
+                <a class="dash-button apply-cancel pay-btn-ghost" href="{{ url_for('citizen.apply_documents', application_id=application.application_id) }}">Back</a>
+                {% endif %}
+                <a class="dash-button apply-cancel pay-btn-ghost" href="{{ url_for('citizen.services') }}">Cancel</a>
+                <button class="dash-button dash-button-apply pay-btn-primary" type="submit">
+                    Continue
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+                </button>
+            </div>
+        </form>
+        {% if error_items %}
+        <script>
+        (function () {
+            var banner = document.getElementById("passport-validation-banner");
+            if (!banner) {
+                return;
+            }
+            banner.focus({ preventScroll: false });
+            banner.scrollIntoView({ behavior: "smooth", block: "center" });
+        })();
+        </script>
+        {% endif %}
+    </section>
+    {% else %}
+    <section class="detail-card apply-card" aria-labelledby="apply-heading">
+        {% include "applications/_progress.html" %}
+        <div class="apply-title-row">
+            <div>
+                <p class="dash-kicker">{{ spec.department_label or service.department.department_name }}</p>
+                <h1 id="apply-heading">{{ spec.service_title or service.service_name }}</h1>
+            </div>
+            <details class="apply-info-menu">
+                <summary aria-label="Application information">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M4 7h16"></path>
+                        <path d="M4 12h16"></path>
+                        <path d="M4 17h16"></path>
+                    </svg>
+                    <span>Details</span>
+                </summary>
+                <div class="apply-info-panel" role="region" aria-label="Application information">
+                    <p>{{ spec.process }}</p>
+                    <p class="field-help">{{ spec.disclaimer or "OneGov PH keeps this request for assistance and tracking. It is not sent to the agency as an official filing." }}</p>
+                    {% include "applications/_office.html" %}
+                    {% if spec.reminders %}
+                    <h2>Before you begin</h2>
+                    <ul class="apply-need-list">
+                        {% for reminder in spec.reminders %}
+                        <li>{{ reminder }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    {% if spec.biometrics %}
+                    <h2>Biometrics</h2>
+                    <p class="field-help">{{ spec.biometrics }}</p>
+                    {% endif %}
+                    {% if spec.requirements %}
+                    <h2>Registration requirements</h2>
+                    <ul class="apply-need-list">
+                        {% for item in spec.requirements %}
+                        <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    {% if spec.eligibility %}
+                    <h2>Eligibility</h2>
+                    <ul class="apply-need-list">
+                        {% for item in spec.eligibility %}
+                        <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    {% if spec.documents %}
+                    <h2>What you need</h2>
+                    <ul class="apply-need-list">
+                        {% for document in spec.documents %}
+                        {% set applies = document.required or (document.required_when and values.get(document.required_when[0]) == document.required_when[1]) %}
+                        <li>{{ document.label }}{% if not applies %} <span class="optional">(if it applies)</span>{% endif %}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    {% if spec.fee_note %}
+                    <p class="empty-note">{{ spec.fee_note }}</p>
+                    {% elif service.processing_fee and service.processing_fee > 0 %}
+                    <p class="empty-note">Listed fee: ₱{{ "%.2f"|format(service.processing_fee) }}. OneGov PH does not collect this payment.</p>
+                    {% else %}
+                    <p class="empty-note">No processing fee is listed for this service.</p>
+                    {% endif %}
+                </div>
+            </details>
+        </div>
+        {% if spec.step_notes and spec.step_notes.get(step) %}<p class="field-help">{{ spec.step_notes[step] }}</p>{% endif %}
+        <form class="apply-form" method="post" action="{{ url_for('citizen.apply_details', service_id=service.service_id) }}" autocomplete="off" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% if spec.kind == 'cenomar' %}<input type="hidden" name="cenomar_step" value="{{ step }}">{% endif %}
+            {% set visible_fields = fields | rejectattr('type', 'equalto', 'hidden') | list %}
+            {% if not visible_fields or not visible_fields[0].section %}
+            <h2>Your information</h2>
+            {% endif %}
+            {% for field in fields %}
+            {% set current = values[field.key] if field.key in values else (field.default if field.default is defined and field.default is not none else '') %}
+            {% if field.type == 'hidden' %}
+            <input type="hidden" name="{{ field.key }}" value="{{ current }}">
+            {% else %}
+            {% if field.section and (loop.first or fields[loop.index0 - 1].type == 'hidden' or field.section != fields[loop.index0 - 1].section) %}
+            <h2>{{ field.section }}</h2>
+            {% endif %}
+            {% set gate = namespace(show=true) %}
+            {% if field.show_rules %}
+                {% for rule in field.show_rules %}
+                    {% if rule.set %}
+                        {% if not values.get(rule.key) %}{% set gate.show = false %}{% endif %}
+                    {% elif values.get(rule.key) != rule.equals %}
+                        {% set gate.show = false %}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+            <div class="apply-field{% if field.type in ['textarea', 'beneficiaries', 'checkbox'] or field.key in ['address', 'permanent_address', 'present_address'] %} apply-field-wide{% endif %}" {% if field.show_rules %}data-show-rules='{{ field.show_rules|tojson }}'{% if not gate.show %} hidden{% endif %}{% endif %}>
+                {% if field.type != 'checkbox' %}<label for="{{ field.key }}">{{ field.label }}{% if not field.required and field.type != 'computed' and field.type != 'output' %} <span class="optional">(optional)</span>{% endif %}</label>{% endif %}
+                <p class="field-help" id="{{ field.key }}-help">{{ field.help }}</p>
+                {% if field.type == 'computed' %}
+                <p class="computed-value" id="{{ field.key }}" data-source="{{ field.source }}" data-calc="{{ field.calc or 'residency' }}" role="status">{{ values.get(field.key) or field.empty }}</p>
+                {% elif field.type == 'output' %}
+                <p class="output-value" id="{{ field.key }}" role="status" {% if field.lookup %}data-source="{{ field.source }}" data-empty="{{ field.empty }}" data-lookup='{{ field.lookup|tojson }}'{% endif %}>{{ current or field.empty }}</p>
+                {% elif field.type == 'checkbox' %}
+                <label class="check-label" for="{{ field.key }}">
+                    <input id="{{ field.key }}" name="{{ field.key }}" type="checkbox" value="yes" {% if current == 'Yes' %}checked{% endif %} {% if field.required %}required{% endif %} aria-describedby="{{ field.key }}-help">
+                    <span>{{ field.label }}</span>
+                </label>
+                {% elif field.type == 'beneficiaries' %}
+                <div id="beneficiary-list" data-married="{{ 'yes' if values.get('civil_status') == 'Married' else 'no' }}">
+                    {% for person in beneficiary_rows(values.get(field.key)) %}
+                    <fieldset class="beneficiary-card">
+                        <h3>Beneficiary {{ loop.index }}</h3>
+                        <label for="beneficiary-name-{{ loop.index }}">Complete name</label>
+                        <input id="beneficiary-name-{{ loop.index }}" name="beneficiary_name" type="text" maxlength="160" autocomplete="off" value="{{ person.name }}">
+                        <label for="beneficiary-relationship-{{ loop.index }}">Relationship</label>
+                        <select id="beneficiary-relationship-{{ loop.index }}" name="beneficiary_relationship" autocomplete="off">
+                            <option value="">Select relationship</option>
+                            {% for option in field.options %}
+                            {% if option != 'Spouse' or values.get('civil_status') == 'Married' %}
+                            <option value="{{ option }}" {% if person.relationship == option %}selected{% endif %}>{{ option }}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                        <label for="beneficiary-birth-{{ loop.index }}">Date of birth</label>
+                        <div class="date-input">
+                            <span class="date-input-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M3 10h18"></path><path d="M8 3v4"></path><path d="M16 3v4"></path></svg>
+                            </span>
+                            <input id="beneficiary-birth-{{ loop.index }}" class="date-input-control" name="beneficiary_birth_date" type="date" value="{{ person.birth_date }}">
+                        </div>
+                        <label for="beneficiary-note-{{ loop.index }}">Other information <span class="optional">(optional)</span></label>
+                        <input id="beneficiary-note-{{ loop.index }}" name="beneficiary_note" type="text" maxlength="200" value="{{ person.note }}">
+                        <button class="dash-button apply-cancel remove-beneficiary" type="button">Remove</button>
+                    </fieldset>
+                    {% endfor %}
+                </div>
+                <button class="dash-button" id="add-beneficiary" type="button">Add beneficiary</button>
+                <template id="beneficiary-template">
+                    <fieldset class="beneficiary-card">
+                        <h3>Beneficiary</h3>
+                        <label>Complete name</label>
+                        <input name="beneficiary_name" type="text" maxlength="160" autocomplete="off">
+                        <label>Relationship</label>
+                        <select name="beneficiary_relationship" autocomplete="off">
+                            <option value="">Select relationship</option>
+                            {% for option in field.options %}
+                            {% if option != 'Spouse' or values.get('civil_status') == 'Married' %}
+                            <option value="{{ option }}">{{ option }}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                        <label>Date of birth</label>
+                        <div class="date-input">
+                            <span class="date-input-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M3 10h18"></path><path d="M8 3v4"></path><path d="M16 3v4"></path></svg>
+                            </span>
+                            <input class="date-input-control" name="beneficiary_birth_date" type="date">
+                        </div>
+                        <label>Other information <span class="optional">(optional)</span></label>
+                        <input name="beneficiary_note" type="text" maxlength="200">
+                        <button class="dash-button apply-cancel remove-beneficiary" type="button">Remove</button>
+                    </fieldset>
+                </template>
+                {% elif field.type == 'textarea' %}
+                <textarea id="{{ field.key }}" name="{{ field.key }}" maxlength="{{ field.max_length }}" autocomplete="off" {% if field.required %}required{% endif %} aria-describedby="{{ field.key }}-help" aria-invalid="{{ 'true' if errors.get(field.key) else 'false' }}">{{ current }}</textarea>
+                {% elif field.type == 'select' %}
+                <div class="select-input">
+                    <select id="{{ field.key }}" name="{{ field.key }}" autocomplete="off" {% if field.required %}required{% endif %} aria-describedby="{{ field.key }}-help" aria-invalid="{{ 'true' if errors.get(field.key) else 'false' }}">
+                        <option value="">{{ field.placeholder or ("Select " ~ field.label|lower) }}</option>
+                        {% for option in field.options %}
+                        <option value="{{ option }}" {% if values.get(field.key) == option %}selected{% endif %}>{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% elif field.type == 'date' %}
+                <div class="date-input">
+                    <span class="date-input-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <rect x="3" y="5" width="18" height="16" rx="3"></rect>
+                            <path d="M3 10h18"></path>
+                            <path d="M8 3v4"></path>
+                            <path d="M16 3v4"></path>
+                        </svg>
+                    </span>
+                    <input id="{{ field.key }}" class="date-input-control" name="{{ field.key }}" type="date" value="{{ current }}" autocomplete="off" {% if field.required %}required{% endif %} aria-describedby="{{ field.key }}-help {{ field.key }}-display" aria-invalid="{{ 'true' if errors.get(field.key) else 'false' }}">
+                </div>
+                <p class="date-input-display" id="{{ field.key }}-display" data-empty="Choose a date">{% if current %}{{ current }}{% else %}Choose a date{% endif %}</p>
+                {% else %}
+                <div class="text-input{% if field.type == 'email' %} text-input-email{% elif field.key in ['contact_number', 'mobile_number'] %} text-input-phone{% endif %}">
+                    {% if field.type == 'email' or field.key in ['contact_number', 'mobile_number'] %}
+                    <span class="text-input-icon" aria-hidden="true">
+                        {% if field.type == 'email' %}
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 7 9-7"/></svg>
+                        {% else %}
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6.5 4.5 9 7l-1.8 1.8a13 13 0 0 0 8 8L17 15l2.5 2.5-1 2a3 3 0 0 1-3.2 1.6C8.6 19.4 4.6 15.4 2.9 8.7A3 3 0 0 1 4.5 5.5Z"/></svg>
+                        {% endif %}
+                    </span>
+                    {% endif %}
+                    <input id="{{ field.key }}" name="{{ field.key }}" type="{{ 'text' if field.type == 'number' else field.type }}" inputmode="{{ 'decimal' if field.key in ['height_cm', 'weight_kg'] else ('numeric' if field.type == 'number' or field.key in ['zip_code', 'postal_code', 'home_zip', 'existing_ss_number', 'spouse_member_ss_number'] else 'text') }}" value="{{ current }}" maxlength="{{ field.max_length }}" autocomplete="off" {% if field.required %}required{% endif %} aria-describedby="{{ field.key }}-help" aria-invalid="{{ 'true' if errors.get(field.key) else 'false' }}">
+                </div>
+                {% endif %}
+                {% if errors.get(field.key) %}<p class="field-error">{{ errors[field.key] }}</p>{% endif %}
+            </div>
+            {% endif %}
+            {% endfor %}
+            {% if spec.kind == 'cenomar' and step == 3 %}
+            <p class="field-help">Check the requesting party and delivery details above, then continue to review the full request.</p>
+            {% endif %}
+            <div class="apply-actions">
+                {% if spec.kind == 'cenomar' and step > 1 %}
+                <a class="dash-button apply-cancel" href="{{ url_for('citizen.apply_details', service_id=service.service_id, step=step - 1) }}">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg>
+                    Back
+                </a>
+                {% else %}
+                <a class="dash-button apply-cancel" href="{{ url_for('citizen.services') }}">Cancel</a>
+                {% endif %}
+                <button class="dash-button dash-button-apply" type="submit">
+                    Continue
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+                </button>
+            </div>
+        </form>
+    </section>
+    {% endif %}
+</div>
+<script>
+(function () {
+    function formatDateLabel(value) {
+        if (!value) {
+            return "";
+        }
+        var parts = value.split("-");
+        if (parts.length !== 3) {
+            return value;
+        }
+        var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        var month = months[Number(parts[1]) - 1];
+        if (!month) {
+            return value;
+        }
+        return Number(parts[2]) + " " + month + " " + parts[0];
+    }
+    document.querySelectorAll(".date-input-control").forEach(function (input) {
+        var display = document.getElementById(input.id + "-display");
+        var sync = function () {
+            if (!display) {
+                return;
+            }
+            var label = formatDateLabel(input.value);
+            display.textContent = label || display.getAttribute("data-empty") || "Choose a date";
+            display.classList.toggle("has-value", !!label);
+        };
+        input.addEventListener("change", sync);
+        input.addEventListener("input", sync);
+        sync();
+    });
+})();
+</script>
+{% if fields|selectattr('type', 'equalto', 'computed')|list %}
+<script>
+function residencyLength(value) {
+    if (!value) {
+        return "Enter the date you started living at this address.";
+    }
+    var started = new Date(value + "T00:00:00");
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (isNaN(started.getTime()) || started > today) {
+        return "Enter a date that is not in the future.";
+    }
+    var years = today.getFullYear() - started.getFullYear();
+    var months = today.getMonth() - started.getMonth();
+    if (today.getDate() < started.getDate()) {
+        months -= 1;
+    }
+    if (months < 0) {
+        years -= 1;
+        months += 12;
+    }
+    var parts = [];
+    if (years > 0) {
+        parts.push(years === 1 ? "1 year" : years + " years");
+    }
+    if (months > 0) {
+        parts.push(months === 1 ? "1 month" : months + " months");
+    }
+    return parts.length ? parts.join(" and ") : "Less than 1 month";
+}
+{% if fields|selectattr('calc', 'equalto', 'age')|list %}
+function ageYears(value) {
+    if (!value) {
+        return null;
+    }
+    var born = new Date(value + "T00:00:00");
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (isNaN(born.getTime()) || born > today || born.getFullYear() < 1900) {
+        return null;
+    }
+    var years = today.getFullYear() - born.getFullYear();
+    var beforeBirthday = today.getMonth() < born.getMonth() || (today.getMonth() === born.getMonth() && today.getDate() < born.getDate());
+    if (beforeBirthday) {
+        years -= 1;
+    }
+    return years;
+}
+function ageText(value) {
+    if (!value) {
+        return "Enter your date of birth.";
+    }
+    var years = ageYears(value);
+    if (years === null) {
+        return "Enter a real date of birth that is not in the future.";
+    }
+    var label = years === 1 ? "1 year" : years + " years";
+    if (years < 60) {
+        return label + ". You must be 60 or older to continue.";
+    }
+    return label + ". You meet the age requirement.";
+}
+{% endif %}
+document.querySelectorAll(".computed-value").forEach(function (output) {
+    var source = document.getElementById(output.getAttribute("data-source"));
+    if (!source) {
+        return;
+    }
+    var calc = output.getAttribute("data-calc") || "residency";
+    var update = function () {
+        var text = calc === "age" && typeof ageText === "function" ? ageText(source.value) : residencyLength(source.value);
+        output.textContent = text;
+        output.classList.toggle("is-blocked", calc === "age" && ageYears(source.value) !== null && ageYears(source.value) < 60);
+    };
+    source.addEventListener("input", update);
+    source.addEventListener("change", update);
+    if (source.value) {
+        update();
+    }
+});
+var applyForm = document.querySelector("form.apply-form");
+var ageOutput = document.querySelector('[data-calc="age"]');
+if (applyForm && ageOutput) {
+    applyForm.addEventListener("submit", function (event) {
+        var birth = document.getElementById("date_of_birth");
+        var years = birth ? ageYears(birth.value) : null;
+        var existing = document.getElementById("age-block");
+        if (existing) {
+            existing.remove();
+        }
+        if (years === null || years < 60) {
+            event.preventDefault();
+            var note = document.createElement("p");
+            note.id = "age-block";
+            note.className = "field-error";
+            note.setAttribute("role", "alert");
+            note.textContent = years === null
+                ? "Enter a real date of birth that is not in the future."
+                : "You are not eligible to continue. A Senior Citizen ID is for a person who is 60 years old or older.";
+            ageOutput.insertAdjacentElement("afterend", note);
+        }
+    });
+}
+</script>
+{% endif %}
+{% if fields|selectattr('lookup')|list %}
+<script>
+document.querySelectorAll(".output-value[data-lookup]").forEach(function (output) {
+    var source = document.getElementById(output.getAttribute("data-source"));
+    if (!source) {
+        return;
+    }
+    var lookup = JSON.parse(output.getAttribute("data-lookup"));
+    var update = function () {
+        output.textContent = lookup[source.value] || output.getAttribute("data-empty");
+    };
+    source.addEventListener("change", update);
+    if (source.value) {
+        update();
+    }
+});
+</script>
+{% endif %}
+{% if fields|selectattr('show_rules')|list %}
+<script>
+function matchesShowRules(form, rules) {
+    return rules.every(function (rule) {
+        var source = form.querySelector('[name="' + rule.key + '"]');
+        var value = source ? source.value : "";
+        if (rule.set) {
+            return !!value;
+        }
+        return value === rule.equals;
+    });
+}
+function toggleConditionalFields(form) {
+    form.querySelectorAll("[data-show-rules]").forEach(function (field) {
+        var rules = JSON.parse(field.getAttribute("data-show-rules"));
+        field.hidden = !matchesShowRules(form, rules);
+    });
+    form.querySelectorAll("h2").forEach(function (heading) {
+        var sibling = heading.nextElementSibling;
+        var anyVisible = false;
+        while (sibling && sibling.tagName !== "H2") {
+            if (sibling.classList.contains("apply-field") && !sibling.hidden) {
+                anyVisible = true;
+            }
+            sibling = sibling.nextElementSibling;
+        }
+        heading.hidden = !anyVisible;
+    });
+}
+document.querySelectorAll("form.apply-form").forEach(function (form) {
+    if (!form.querySelector("[data-show-rules]")) {
+        return;
+    }
+    toggleConditionalFields(form);
+    form.addEventListener("change", function () {
+        toggleConditionalFields(form);
+    });
+});
+</script>
+{% endif %}
+{% if fields|selectattr('type', 'equalto', 'beneficiaries')|list %}
+<script>
+var beneficiaryList = document.getElementById("beneficiary-list");
+var addBeneficiary = document.getElementById("add-beneficiary");
+var beneficiaryTemplate = document.getElementById("beneficiary-template");
+function bindBeneficiary(card) {
+    var remove = card.querySelector(".remove-beneficiary");
+    if (!remove) {
+        return;
+    }
+    remove.addEventListener("click", function () {
+        card.remove();
+    });
+}
+if (beneficiaryList && addBeneficiary && beneficiaryTemplate) {
+    beneficiaryList.querySelectorAll(".beneficiary-card").forEach(bindBeneficiary);
+    addBeneficiary.addEventListener("click", function () {
+        var card = beneficiaryTemplate.content.firstElementChild.cloneNode(true);
+        beneficiaryList.appendChild(card);
+        bindBeneficiary(card);
+    });
+}
+</script>
+{% endif %}
+{% endblock %}

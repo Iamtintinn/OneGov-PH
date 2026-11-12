@@ -44,12 +44,22 @@ def create_app():
 
     @application.before_request
     def protect_post_requests():
+        # Maya webhooks are server-to-server POSTs without a browser CSRF token.
+        if request.path.startswith("/webhooks/"):
+            return
         if request.method == "POST":
             validate_csrf()
 
     @application.context_processor
     def inject_csrf():
         return {"csrf_token": generate_csrf_token}
+
+    @application.errorhandler(413)
+    def request_too_large(_error):
+        return render_template(
+            "errors/413.html",
+            message="The file is larger than 16 MB. Choose a smaller PDF, JPG, or PNG.",
+        ), 413
 
     @application.errorhandler(400)
     def bad_request(error):

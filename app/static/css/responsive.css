@@ -4,21 +4,284 @@
     .summary { grid-template-columns: 1fr; }
 
     h1 { font-size: 2rem; }
+
+    .site-footer {
+        font-size: 0.92rem;
+        line-height: 1.55;
+    }
+
+    .site-footer .site-width {
+        padding: 1.35rem 0 1.65rem;
+    }
 }
 
 @media (max-width: 640px) {
     .site-width { width: min(1120px, calc(100% - 1.5rem)); }
 
-    .header-row {
-        align-items: flex-start;
-        flex-direction: column;
-        gap: 0.75rem;
-        padding: 0.7rem 0;
+    .site-footer {
+        font-size: 0.86rem;
+        line-height: 1.55;
     }
 
-    .brand-logo { height: 92px; }
+    .site-footer .site-width {
+        padding: 1.2rem 0 1.5rem;
+    }
 
-    .site-nav { flex-wrap: wrap; gap: 0.85rem 1.1rem; }
+    body:has(.login-screen) .site-footer .site-width {
+        padding: 1.1rem 0 1.4rem;
+    }
 
-    input { font-size: 1rem; }
+    .citizen-dashboard .site-width {
+        padding-left: 1.15rem;
+        padding-right: 1.15rem;
+    }
+
+    .citizen-dashboard .dash-page {
+        padding-left: 0;
+    }
+
+    .citizen-dashboard .site-footer .site-width {
+        padding-inline: 1.1rem;
+    }
+
+    .header-row {
+        align-items: center;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        min-height: 0;
+        padding: 0.4rem 0;
+    }
+
+    .brand-logo { height: 64px; }
+
+    .site-nav { flex-wrap: wrap; gap: 0.85rem 1rem; }
+
+    .login-screen {
+        align-items: flex-start;
+        min-height: calc(100vh - 120px);
+        padding: 1.15rem 0 1.75rem;
+    }
+
+    .register-screen {
+        align-items: center;
+        min-height: 0;
+        padding: 0.75rem 0 0.5rem;
+    }
+
+    .login-wrap { width: min(420px, calc(100% - 1.5rem)); }
+
+    .register-wrap { width: min(680px, calc(100% - 1.25rem)); }
+
+    .register-grid {
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+            "first last"
+            "middle middle"
+            "email contact"
+            "password confirm";
+    }
+
+    .login-card { padding: 0.95rem 0.9rem 1rem; }
+
+    .login-card h1 { font-size: 1.35rem; }
+
+    .register-wrap .login-card h1 { font-size: 1.28rem; }
+
+    input,
+    .login-card input { font-size: 1rem; }
+
+    .register-wrap .login-card input {
+        font-size: 0.95rem;
+        padding: 0.4rem 0.55rem;
+    }
+}
+
+@media (max-width: 980px) {
+    .dash-sidebar {
+        top: 0;
+        bottom: 0;
+        width: min(300px, 88vw);
+        padding-top: 1.85rem;
+        transform: translateX(-105%);
+    }
+
+    body.sidebar-open .dash-sidebar {
+        transform: none;
+        z-index: 50;
+    }
+
+    body.sidebar-open .sidebar-backdrop { z-index: 45; }
+
+    .citizen-dashboard .header-main,
+    .citizen-dashboard main,
+    .citizen-dashboard .site-footer { margin-left: 0; }
+
+    .schedule-location-form {
+        grid-template-columns: 1fr;
+        width: 100%;
+        margin-inline: 0;
+    }
+
+    .schedule-center {
+        width: min(56rem, 100%);
+    }
+
+    .schedule-popover {
+        left: 50% !important;
+        top: 50% !important;
+        transform: translate(-50%, -50%);
+        width: min(20rem, calc(100vw - 1.5rem));
+    }
+
+    .sidebar-toggle {
+        display: inline-flex;
+        width: 44px;
+        padding: 0;
+    }
+
+    .dash-nav {
+        gap: 0.55rem;
+        min-height: 0;
+        padding: 0.55rem 0;
+    }
+
+    .citizen-dashboard .header-main--compact .dash-nav {
+        min-height: 3.25rem;
+        padding: 0.45rem 0;
+    }
+
+    .dash-search { width: min(18rem, 100%); }
+    .dash-search .dash-button { flex: 0 0 auto; }
+
+    .stat-grid,
+    .shortcut-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .service-grid,
+    .service-grid-modern { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .apply-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .apply-card,
+    .detail-card.apply-card {
+        width: min(960px, 100%);
+    }
+
+    .menu-panel { width: min(280px, calc(100vw - 1.5rem)); }
+    .section-heading { flex-wrap: wrap; }
+
+    .document-split,
+    .payment-split {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 700px) {
+    .documents-content {
+        padding-left: 0.85rem;
+    }
+
+    .document-card-split {
+        padding: 1rem;
+    }
+
+    .document-split-side,
+    .payment-split-side {
+        padding: 0.9rem 1rem;
+    }
+
+    .schedule-weekdays,
+    .schedule-week,
+    .schedule-calendar {
+        gap: 0.28rem;
+    }
+
+    .schedule-weekdays {
+        padding: 0.4rem 0.55rem 0.1rem;
+    }
+
+    .schedule-calendar {
+        padding: 0.2rem 0.55rem 0.7rem;
+    }
+
+    .schedule-day,
+    .schedule-day.is-empty {
+        height: 3.7rem;
+        min-height: 3.7rem;
+        max-height: 3.7rem;
+        border-radius: 8px;
+    }
+
+    .schedule-day-number {
+        font-size: 0.82rem;
+    }
+
+    .schedule-month-header {
+        padding: 0.55rem 0.65rem;
+    }
+
+    .schedule-month-header h3 {
+        font-size: 0.95rem;
+    }
+
+    .welcome-card { align-items: stretch; flex-direction: column; }
+    .welcome-card .dash-button { width: 100%; }
+    .dash-search-below,
+    .services-controls,
+    .services-controls .dash-search,
+    .services-hero { width: 100%; }
+    .services-hero { flex-direction: column; align-items: stretch; }
+    .services-controls .dash-search { margin-left: 0; }
+    .citizen-dashboard h1 { font-size: 1.6rem; }
+    .dash-page { padding: 1rem 0 2.25rem; }
+    .stat-grid,
+    .shortcut-grid,
+    .service-grid,
+    .service-grid-modern { grid-template-columns: 1fr; }
+    .profile-label { display: none; }
+    .dash-brand-name { font-size: 1rem; }
+    .dash-logo { height: 48px; }
+    .service-actions,
+    .service-tile-actions { align-items: stretch; }
+    .service-actions .dash-button,
+    .service-tile-actions .dash-button { width: 100%; }
+    .apply-title-row { flex-wrap: wrap; }
+    .apply-form {
+        grid-template-columns: 1fr;
+        gap: 0.85rem;
+    }
+    .apply-card,
+    .detail-card.apply-card,
+    .apply-card-wide {
+        width: 100%;
+        max-width: none;
+    }
+    .apply-info-panel,
+    .service-menu-panel {
+        right: 0;
+        left: auto;
+        width: min(20rem, calc(100vw - 2rem));
+    }
+
+    .app-table thead { display: none; }
+    .app-table,
+    .app-table tbody,
+    .app-table tr,
+    .app-table td { display: block; width: 100%; }
+    .app-table tr {
+        border-bottom: 1px solid var(--dash-line, #e1e6ee);
+        padding: 0.35rem 0;
+    }
+    .app-table td {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 0.35rem 1rem;
+        border-bottom: 0;
+        padding: 0.35rem 0.85rem;
+        overflow-wrap: anywhere;
+    }
+    .app-table td::before {
+        content: attr(data-label);
+        font-weight: 700;
+        color: var(--dash-navy, #103456);
+    }
 }

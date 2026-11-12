@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+{% block title %}Application {{ application.tracking_number }} · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard{% endblock %}
+{% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
+{% block content %}
+<div class="dash-page site-width">
+    <section class="detail-card" aria-labelledby="application-heading">
+        <p class="dash-kicker">Your application</p>
+        {% if spec and spec.disclaimer %}<p class="field-help">{{ spec.disclaimer }}</p>{% endif %}
+        {% if spec and spec.biometrics %}<p class="field-help">{{ spec.biometrics }}</p>{% endif %}
+        <h1 id="application-heading">{{ spec.service_title if spec and spec.service_title else application.service.service_name }}</h1>
+        <dl class="detail-list">
+            <div>
+                <dt>{% if spec and spec.reference_label %}{{ spec.reference_label }}{% else %}Application ID{% endif %}</dt>
+                <dd>{{ application.tracking_number }}</dd>
+            </div>
+            <div>
+                <dt>Service name</dt>
+                <dd>{{ application.service.service_name }}</dd>
+            </div>
+            <div>
+                <dt>Department</dt>
+                <dd>{{ spec.department_label if spec and spec.department_label else application.department.department_name }}</dd>
+            </div>
+            <div>
+                <dt>Date submitted</dt>
+                <dd>{{ application.submission_date.strftime("%d %b %Y") }}</dd>
+            </div>
+            <div>
+                <dt>Current status</dt>
+                <dd>{% set labels = status_labels_for(application.service, application) %}{% with status=application.application_status, labels=labels %}{% include "applications/_status.html" %}{% endwith %}</dd>
+            </div>
+            <div>
+                <dt>Payment</dt>
+                <dd>{% if application.payment_status %}{% with status=application.payment_status, labels=payment_status_labels %}{% include "applications/_status.html" %}{% endwith %}{% else %}No payment recorded{% endif %}</dd>
+            </div>
+            <div>
+                <dt>Last updated</dt>
+                <dd>{{ application.last_updated.strftime("%d %b %Y, %I:%M %p") }}</dd>
+            </div>
+            {% if application.cancellation_reason %}
+            <div>
+                <dt>Cancellation reason</dt>
+                <dd>{{ application.cancellation_reason }}</dd>
+            </div>
+            {% endif %}
+        </dl>
+        {% include "applications/_office.html" %}
+        {% if spec and spec.fee_note %}<p class="empty-note">{{ spec.fee_note }}</p>{% endif %}
+        {% if spec and spec.kind == 'passport' and passport_appointment %}
+        <h2>Demonstration appointment</h2>
+        <p class="notice notice-warning">Demonstration Appointment – Not an Official DFA Appointment</p>
+        <dl class="detail-list">
+            {% if passport_confirmation_id %}
+            <div>
+                <dt>Confirmation ID</dt>
+                <dd>{{ passport_confirmation_id }}</dd>
+            </div>
+            {% endif %}
+            <div>
+                <dt>Location</dt>
+                <dd>{{ passport_appointment.location_label }}</dd>
+            </div>
+            <div>
+                <dt>Date</dt>
+                <dd>{{ passport_appointment.appointment_date }}</dd>
+            </div>
+            <div>
+                <dt>Time</dt>
+                <dd>{{ passport_appointment.appointment_time }}</dd>
+            </div>
+            {% if passport_summary and passport_summary.payment %}
+            <div>
+                <dt>Payment reference</dt>
+                <dd class="pay-mono">{{ passport_summary.payment.payment_reference }}</dd>
+            </div>
+            <div>
+                <dt>Payment status</dt>
+                <dd>
+                    <span class="pay-status-pill pay-status-pill--{{ passport_summary.status_key or passport_summary.payment.payment_status }}">
+                        {{ passport_summary.status_label }}
+                    </span>
+                </dd>
+            </div>
+            <div>
+                <dt>Amount</dt>
+                <dd>{{ passport_summary.amount_display }}</dd>
+            </div>
+            {% endif %}
+        </dl>
+        {% if passport_confirmation_id %}
+        <p><a class="dash-button" href="{{ url_for('citizen.passport_confirmation_pdf', application_id=application.application_id) }}">Download PDF confirmation</a></p>
+        {% endif %}
+        {% endif %}
+        {% if detail_fields %}
+        <h2>Application details</h2>
+        <dl class="detail-list">
+            {% set shown = namespace(keys=[]) %}
+            {% for field in detail_fields %}
+            {% if spec and spec.kind == 'cenomar' and field.key in ['psa_reference', 'psa_application_date', 'psa_payment_status', 'psa_payment_date', 'psa_expected_delivery', 'psa_recorded_status'] %}
+            {% elif spec and spec.kind == 'sss' and (field.key in spec.private_keys or field.key in shown.keys or not show_saved_answer(spec, detail_fields, field.key)) %}
+            {% else %}
+            {% if spec and spec.kind == 'sss' %}{% set shown.keys = shown.keys + [field.key] %}{% endif %}
+            <div>
+                <dt>{{ field.label }}</dt>
+                <dd>{% if field.key == 'beneficiaries' %}{% set people = beneficiary_rows(field.value) %}{% if people %}{% for person in people %}{{ loop.index }}. {{ person.name }} — {{ person.relationship }} — born {{ person.birth_date }}{% if person.note %} — {{ person.note }}{% endif %}{% if not loop.last %}<br>{% endif %}{% endfor %}{% else %}None added{% endif %}{% else %}{{ field.value or "Not provided" }}{% endif %}</dd>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </dl>
+        {% endif %}
+        {% if detail_checklist and spec and spec.checklist %}
+        <h2>Uploaded document</h2>
+        <p class="field-help">The photo check compared the words on the file with the selected document. PSA has not validated it.</p>
+        <ul class="apply-need-list">
+            {% for item in detail_checklist %}
+            {% set row = requirements.get(item.key) %}
+            <li>
+                {{ item.label }}:
+                {% if item.value == "matched" and row and row.uploaded_file %}
+                photo matches this document —
+                <a href="{{ url_for('citizen.application_document', application_id=application.application_id, requirement_id=row.requirement_id) }}">{{ item.filename or row.remarks or "View file" }}</a>
+                {% else %}
+                Not uploaded
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% if detail_documents %}
+        <h2>Documents</h2>
+        <ul class="apply-need-list">
+            {% for document in detail_documents %}
+            {% set row = requirements.get(document.key) %}
+            <li>
+                {{ document.label }}:
+                {% if row and row.uploaded_file %}
+                <a href="{{ url_for('citizen.application_document', application_id=application.application_id, requirement_id=row.requirement_id) }}">{{ row.remarks or 'View file' }}</a>
+                {% if spec.kind == 'philsys' and document.key == 'supporting_id' %}
+                {% for item in detail_checklist if item.key == 'supporting_id' and item.value == 'matched' %}
+                — selected {{ item.label }}. This title check is not PSA acceptance.
+                {% endfor %}
+                {% endif %}
+                {% if spec.kind == 'passport' and document.key == 'valid_id' %}
+                {% for item in detail_checklist if item.key == 'valid_id' and item.value == 'matched' %}
+                — selected {{ item.label }}. This title check is not DFA acceptance.
+                {% endfor %}
+                {% endif %}
+                {% else %}
+                Not uploaded
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% if spec and spec.kind == 'sss' and application.application_status != 'draft' %}
+        {% set saved = namespace(path='', number='', transaction='', registered='', recorded='', issued='', documents='') %}
+        {% for field in detail_fields %}
+        {% if field.key == 'sss_path' %}{% set saved.path = field.value %}{% endif %}
+        {% if field.key == 'ss_number' %}{% set saved.number = field.value %}{% endif %}
+        {% if field.key == 'sss_transaction_number' %}{% set saved.transaction = field.value %}{% endif %}
+        {% if field.key == 'sss_registration_date' %}{% set saved.registered = field.value %}{% endif %}
+        {% if field.key == 'sss_recorded_status' %}{% set saved.recorded = field.value %}{% endif %}
+        {% if field.key == 'sss_issue_date' %}{% set saved.issued = field.value %}{% endif %}
+        {% if field.key == 'sss_document_status' %}{% set saved.documents = field.value %}{% endif %}
+        {% endfor %}
+        <h2>{{ spec.official_heading }}</h2>
+        <p>{{ spec.official_text }}</p>
+        <p><a class="dash-button" href="{{ spec.official_url }}" target="_blank" rel="noopener noreferrer">{{ spec.official_action }}</a></p>
+        <p class="field-help">Opening this link does not change the OneGov PH status. The status above is the OneGov PH record, not a status sent by SSS.</p>
+        {% if saved.path == 'First-time SS Number registration' %}
+        <h2>SSS details you recorded</h2>
+        <p class="field-help">Enter the SS Number, transaction number, or document status only after SSS gives them to you. Saving these details does not mean SSS changed the OneGov PH status.</p>
+        <form class="apply-form" method="post" enctype="multipart/form-data" action="{{ url_for('citizen.record_sss_tracking', application_id=application.application_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="apply-field">
+                <label for="ss_number">SS Number</label>
+                <p class="field-help">Enter the 10-digit number from SSS. Dashes are optional. OneGov PH does not create this number.</p>
+                <input id="ss_number" name="ss_number" type="text" inputmode="numeric" maxlength="14" autocomplete="off" value="{{ saved.number }}">
+            </div>
+            <div class="apply-field">
+                <label for="sss_transaction_number">SSS transaction number</label>
+                <input id="sss_transaction_number" name="sss_transaction_number" type="text" maxlength="40" autocomplete="off" value="{{ saved.transaction }}">
+            </div>
+            <div class="apply-field">
+                <label for="sss_registration_date">Registration date</label>
+                <input id="sss_registration_date" name="sss_registration_date" type="date" value="{{ saved.registered }}">
+            </div>
+            <div class="apply-field">
+                <label for="sss_issue_date">Date of SS Number issuance <span class="optional">(optional)</span></label>
+                <input id="sss_issue_date" name="sss_issue_date" type="date" value="{{ saved.issued }}">
+            </div>
+            <div class="apply-field">
+                <label for="sss_document_status">Supporting document submission status <span class="optional">(optional)</span></label>
+                <p class="field-help">Record whether you submitted the document on the official SSS channel. A file saved here was not sent to SSS.</p>
+                <select id="sss_document_status" name="sss_document_status">
+                    <option value="">Not recorded</option>
+                    {% for option in spec.document_statuses %}
+                    <option value="{{ option }}" {% if saved.documents == option %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="apply-field">
+                <label for="sss_recorded_status">SSS status you recorded <span class="optional">(optional)</span></label>
+                <p class="field-help">Choose the status you saw on the official channel. This is not a status SSS sent to OneGov PH.</p>
+                <select id="sss_recorded_status" name="sss_recorded_status">
+                    <option value="">Not recorded</option>
+                    {% for option in spec.recorded_statuses %}
+                    <option value="{{ option }}" {% if saved.recorded == option %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="apply-field">
+                <label for="ss_number_slip">SS Number slip <span class="optional">(optional)</span></label>
+                <input id="ss_number_slip" name="ss_number_slip" type="file" accept=".pdf,.jpg,.jpeg,application/pdf,image/jpeg">
+            </div>
+            <div class="apply-field">
+                <label for="transaction_number_slip">Transaction number slip <span class="optional">(optional)</span></label>
+                <input id="transaction_number_slip" name="transaction_number_slip" type="file" accept=".pdf,.jpg,.jpeg,application/pdf,image/jpeg">
+            </div>
+            <div class="apply-field">
+                <label for="e1_e6_form">E-1/E-6 personal record form <span class="optional">(optional)</span></label>
+                <input id="e1_e6_form" name="e1_e6_form" type="file" accept=".pdf,.jpg,.jpeg,application/pdf,image/jpeg">
+            </div>
+            <button class="dash-button" type="submit">Save SSS details</button>
+        </form>
+        {% set slips = [('ss_number_slip', 'SS Number slip'), ('transaction_number_slip', 'Transaction number slip'), ('e1_e6_form', 'E-1/E-6 personal record form')] %}
+        <ul class="apply-need-list">
+            {% for key, label in slips %}
+            {% set row = requirements.get(key) %}
+            <li>{{ label }}: {% if row and row.uploaded_file %}<a href="{{ url_for('citizen.application_document', application_id=application.application_id, requirement_id=row.requirement_id) }}">{{ row.remarks or 'View file' }}</a>{% else %}Not uploaded{% endif %}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% endif %}
+        {% if spec and spec.kind == 'cenomar' and application.application_status != 'draft' %}
+        {% set saved = namespace(reference='', application_date='', payment='', payment_date='', delivery='', recorded='') %}
+        {% for field in detail_fields %}
+        {% if field.key == 'psa_reference' %}{% set saved.reference = field.value %}{% endif %}
+        {% if field.key == 'psa_application_date' %}{% set saved.application_date = field.value %}{% endif %}
+        {% if field.key == 'psa_payment_status' %}{% set saved.payment = field.value %}{% endif %}
+        {% if field.key == 'psa_payment_date' %}{% set saved.payment_date = field.value %}{% endif %}
+        {% if field.key == 'psa_expected_delivery' %}{% set saved.delivery = field.value %}{% endif %}
+        {% if field.key == 'psa_recorded_status' %}{% set saved.recorded = field.value %}{% endif %}
+        {% endfor %}
+        <h2>Official PSA application</h2>
+        <p>Complete the application and payment on PSA Serbilis. OneGov PH does not send this request to PSA.</p>
+        <p><a class="dash-button" href="{{ spec.official_url }}" target="_blank" rel="noopener noreferrer">Apply through the official PSA channel</a></p>
+        <h2>PSA details you recorded</h2>
+        <p class="field-help">Enter the reference number PSA already gave you. Saving these details does not mean PSA has changed the status in OneGov PH.</p>
+        <form class="apply-form" method="post" action="{{ url_for('citizen.record_cenomar_tracking', application_id=application.application_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="apply-field">
+                <label for="psa_reference">PSA reference number</label>
+                <p class="field-help">Enter the 16-digit reference from the official PSA channel.</p>
+                <input id="psa_reference" name="psa_reference" type="text" inputmode="numeric" maxlength="16" autocomplete="off" value="{{ saved.reference }}">
+            </div>
+            <div class="apply-field">
+                <label for="psa_application_date">Application date</label>
+                <input id="psa_application_date" name="psa_application_date" type="date" value="{{ saved.application_date }}">
+            </div>
+            <div class="apply-field">
+                <label for="psa_payment_status">Payment status</label>
+                <p class="field-help">Record a payment only if you already made it through an official PSA channel. OneGov PH does not collect or confirm it.</p>
+                <select id="psa_payment_status" name="psa_payment_status">
+                    <option value="">Select payment status</option>
+                    {% for option in spec.psa_payment_options %}
+                    <option value="{{ option }}" {% if saved.payment == option %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="apply-field">
+                <label for="psa_payment_date">Payment date <span class="optional">(optional)</span></label>
+                <input id="psa_payment_date" name="psa_payment_date" type="date" value="{{ saved.payment_date }}">
+            </div>
+            <div class="apply-field">
+                <label for="psa_expected_delivery">Expected delivery information <span class="optional">(optional)</span></label>
+                <input id="psa_expected_delivery" name="psa_expected_delivery" type="text" maxlength="200" value="{{ saved.delivery }}">
+            </div>
+            <div class="apply-field">
+                <label for="psa_recorded_status">PSA status you recorded <span class="optional">(optional)</span></label>
+                <p class="field-help">Choose the status shown on the official channel. Leave this blank if you have not checked it.</p>
+                <select id="psa_recorded_status" name="psa_recorded_status">
+                    <option value="">Not recorded</option>
+                    {% for option in spec.psa_recorded_statuses %}
+                    <option value="{{ option }}" {% if saved.recorded == option %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button class="dash-button" type="submit">Save PSA details</button>
+        </form>
+        {% endif %}
+        {% if spec and spec.kind == 'philsys' and application.application_status != 'draft' %}
+        {% set reference_field = detail_fields | selectattr('key', 'equalto', 'philsys_reference') | list %}
+        <h2>PhilSys transaction reference</h2>
+        <p class="field-help">Enter the reference number only after PSA gives it to you. Saving it does not mark this request as Registered.</p>
+        <form class="apply-form" method="post" action="{{ url_for('citizen.record_philsys_reference', application_id=application.application_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="apply-field">
+                <label for="philsys_reference">PhilSys transaction reference number <span class="optional">(optional)</span></label>
+                <input id="philsys_reference" name="philsys_reference" type="text" maxlength="40" autocomplete="off" value="{{ reference_field[0].value if reference_field else '' }}">
+            </div>
+            <button class="dash-button" type="submit">Save reference number</button>
+        </form>
+        {% endif %}
+        {% if application.application_status not in ['draft', 'cancelled', 'completed', 'rejected'] %}
+        <h2>Cancel this application</h2>
+        <p class="notice notice-warning">Cancelling stops tracking in OneGov PH. It does not withdraw a request from a government agency, and it does not create a refund.</p>
+        <form class="apply-form cancel-form" method="post" action="{{ url_for('citizen.apply_cancel', application_id=application.application_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="apply-field">
+                <label for="cancellation_reason">Reason for cancellation</label>
+                <p class="field-help" id="cancel-help">Say why you want to stop this application. This reason is saved on your record.</p>
+                <textarea id="cancellation_reason" name="cancellation_reason" maxlength="500" required aria-describedby="cancel-help"></textarea>
+            </div>
+            <button class="dash-button apply-cancel" id="cancel-application" type="submit">Cancel application</button>
+        </form>
+        {% endif %}
+        <div class="apply-actions">
+            {% if application.application_status == 'draft' %}
+            <a class="dash-button" href="{{ url_for('citizen.application_continue', application_id=application.application_id) }}">Continue application</a>
+            {% endif %}
+            <a class="dash-button apply-cancel" href="{{ url_for('citizen.tracking') }}">Track application</a>
+            <a class="dash-button apply-cancel" href="{{ url_for('citizen.applications') }}">Back to my applications</a>
+        </div>
+    </section>
+</div>
+<script>
+var cancelForm = document.querySelector(".cancel-form");
+if (cancelForm) {
+    cancelForm.addEventListener("submit", function () {
+        var reason = document.getElementById("cancellation_reason");
+        var button = document.getElementById("cancel-application");
+        if (!reason.value.trim()) {
+            return;
+        }
+        button.disabled = true;
+        button.classList.add("is-busy");
+        button.textContent = "Cancelling...";
+    });
+}
+</script>
+{% endblock %}

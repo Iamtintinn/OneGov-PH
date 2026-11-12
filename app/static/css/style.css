@@ -18,11 +18,17 @@
 body {
     margin: 0;
     min-height: 100vh;
+    display: flex;
+    flex-direction: column;
     color: var(--text);
     background: var(--page);
     font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     font-size: 1.0625rem;
     line-height: 1.5;
+}
+
+main {
+    flex: 1 0 auto;
 }
 
 a { color: var(--blue); }
@@ -123,8 +129,12 @@ a { color: var(--blue); }
 }
 
 .notice-success { border-color: var(--ok); background: var(--ok-bg); color: var(--ok); }
-.notice-warning,
-.notice-error { border-color: #8a6500; background: var(--warn-bg); }
+.notice-warning { border-color: #8a6500; background: var(--warn-bg); color: #5c4500; }
+.notice-error {
+    border-color: #9b2c3a;
+    background: #f8e9ec;
+    color: #7a2430;
+}
 
 .page { padding: 2.25rem 0 3.5rem; }
 
@@ -150,12 +160,23 @@ h2 { margin: 0 0 0.75rem; font-size: 1.25rem; color: var(--navy); }
 .lede { max-width: 42rem; color: var(--muted); margin-top: 0; }
 
 .site-footer {
+    margin-top: auto;
     border-top: 1px solid var(--line);
     color: var(--muted);
     font-size: 0.95rem;
+    line-height: 1.55;
+    text-align: center;
 }
 
-.site-footer .site-width { padding: 1.25rem 0 2rem; }
+.site-footer p {
+    margin: 0 auto;
+    max-width: min(68rem, 100%);
+    width: 100%;
+}
+
+.site-footer .site-width {
+    padding: 1.5rem 0 1.85rem;
+}
 
 input:focus,
 button:focus,

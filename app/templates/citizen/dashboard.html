@@ -1,21 +1,170 @@
 {% extends "base.html" %}
 {% block title %}Citizen dashboard · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard{% endblock %}
+{% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
 {% block content %}
-<section class="page">
-    <div class="site-width">
-        <p class="kicker">Citizen</p>
-        <h1>Welcome, {{ current_user.first_name }}</h1>
-        <p class="lede">You are signed in to the OneGov PH website. Service requests will be listed on this page.</p>
-        <dl class="summary">
-            <div>
-                <dt>Name</dt>
-                <dd>{{ current_user.full_name }}</dd>
-            </div>
-            <div>
-                <dt>Role</dt>
-                <dd>{{ current_user.role_label }}</dd>
-            </div>
-        </dl>
-    </div>
-</section>
+<div class="dash-page site-width">
+    <section class="welcome-card" aria-labelledby="welcome-heading">
+        <div>
+            <p class="dash-kicker">Citizen dashboard</p>
+            <h1 id="welcome-heading">Hello, {{ current_user.first_name }}</h1>
+            <p class="welcome-text">See your applications and the government services currently available through OneGov PH.</p>
+        </div>
+        <a class="dash-button dash-button-apply" href="{{ url_for('citizen.services') }}">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            Apply for a Government Service
+        </a>
+    </section>
+    <form class="dash-search dash-search-below" method="get" action="{{ url_for('citizen.services') }}" role="search">
+        <label class="visually-hidden" for="service-query">Search government services</label>
+        <input id="service-query" name="q" type="search" value="{{ service_query|default('') }}" placeholder="Search government services" maxlength="80" autocomplete="off">
+        <button class="dash-button" type="submit">Search</button>
+    </form>
+
+    <section class="dash-section" aria-labelledby="summary-heading">
+        <h2 id="summary-heading">Application summary</h2>
+        <div class="stat-grid">
+            <article class="stat-card stat-total">
+                <h3>Total applications</h3>
+                <p class="stat-value">{{ summary.total }}</p>
+                <p class="stat-note">Every application on your account, including rejected and cancelled.</p>
+            </article>
+            <article class="stat-card stat-pending">
+                <h3>Pending applications</h3>
+                <p class="stat-value">{{ summary.pending }}</p>
+                <p class="stat-note">Pending, under review, documents required, or waiting for payment.</p>
+            </article>
+            <article class="stat-card stat-progress">
+                <h3>Applications in progress</h3>
+                <p class="stat-value">{{ summary.in_progress }}</p>
+                <p class="stat-note">Approved, paid, scheduled, processing, or ready for release.</p>
+            </article>
+            <article class="stat-card stat-done">
+                <h3>Completed applications</h3>
+                <p class="stat-value">{{ summary.completed }}</p>
+                <p class="stat-note">Applications marked completed.</p>
+            </article>
+        </div>
+    </section>
+
+    <section class="dash-section" aria-labelledby="quick-heading">
+        <h2 id="quick-heading">Quick access</h2>
+        <div class="shortcut-grid">
+            <a class="shortcut" href="{{ url_for('citizen.services') }}">
+                <span class="shortcut-title">Browse Government Services</span>
+                <span class="shortcut-text">Open the services in the current catalog.</span>
+            </a>
+            <a class="shortcut" href="{{ url_for('citizen.applications') }}">
+                <span class="shortcut-title">My Applications</span>
+                <span class="shortcut-text">Review the applications on your account.</span>
+            </a>
+            <a class="shortcut" href="{{ url_for('citizen.tracking') }}">
+                <span class="shortcut-title">Track Applications</span>
+                <span class="shortcut-text">Check the current status of a recent application.</span>
+            </a>
+            <a class="shortcut" href="{{ url_for('citizen.notifications') }}">
+                <span class="shortcut-title">Notifications</span>
+                <span class="shortcut-text">
+                    {% if unread_notification_count %}
+                    {{ unread_notification_count }} unread
+                    {% else %}
+                    No unread notifications
+                    {% endif %}
+                </span>
+            </a>
+        </div>
+    </section>
+
+    <section class="dash-section" id="government-services" aria-labelledby="services-heading">
+        <div class="section-heading">
+            <h2 id="services-heading">Featured government services</h2>
+            <a href="{{ url_for('citizen.services') }}">View all services</a>
+        </div>
+        {% if service_query %}
+        <p class="search-result" role="status">Showing services matching “{{ service_query }}”.</p>
+        {% endif %}
+        {% if services %}
+        <div class="service-grid">
+            {% for service in services %}
+            <article class="service-card">
+                <p class="dash-kicker">{{ service.department.department_name }}</p>
+                <h3>{{ service.service_name }}</h3>
+                <p>{{ service.description or "No description is listed for this service." }}</p>
+                <div class="service-actions">
+                    <details class="service-details">
+                        <summary>View details</summary>
+                        <dl>
+                            <div>
+                                <dt>Department</dt>
+                                <dd>{{ service.department.department_name }}{% if service.department.department_description %} — {{ service.department.department_description }}{% endif %}</dd>
+                            </div>
+                            <div>
+                                <dt>Processing fee</dt>
+                                <dd>{% if service.service_name == "Barangay Clearance" %}Depends on your local barangay. OneGov PH does not collect this payment.{% elif service.service_name == "Certificate of Residency" %}Depends on the issuing barangay or city. OneGov PH does not collect this payment.{% elif service.service_name == "Senior Citizen ID" %}No processing fee is listed for standard new issuance. Confirm any fee with your OSCA office.{% elif service.service_name == "NBI Clearance Application Monitoring" %}Listed Clearance Fee: ₱130.00. Additional electronic payment service charges may apply. Payment must be completed through official NBI payment channels. OneGov PH does not collect this payment.{% elif service.service_name == "CENOMAR" %}The PSA charges the official fee. Confirm the current amount and pay through an authorized PSA channel. OneGov PH does not collect this payment.{% elif service.service_name.startswith("SS Number") %}No SSS registration processing fee. OneGov PH does not collect a payment.{% else %}₱{{ "%.2f"|format(service.processing_fee) }}{% endif %}</dd>
+                            </div>
+                            <div>
+                                <dt>Estimated time</dt>
+                                <dd>{{ service.estimated_processing_time or "Not listed" }}</dd>
+                            </div>
+                            <div>
+                                <dt>Requirements</dt>
+                                <dd>{{ service.service_requirements or "No requirements are listed for this service." }}</dd>
+                            </div>
+                        </dl>
+                    </details>
+                    {% if service.service_name in applicable_service_names %}
+                    <a class="dash-button dash-button-apply" href="{{ url_for('citizen.apply_details', service_id=service.service_id) }}">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                        Apply now
+                    </a>
+                    {% else %}
+                    <button class="dash-button dash-button-secondary" type="button" disabled>Apply now</button>
+                    {% endif %}
+                </div>
+                {% if service.service_name not in applicable_service_names %}
+                <p class="unavailable">Applications for this service cannot be submitted on the website yet.</p>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-state" role="status">No services in the catalog match that search.</p>
+        {% endif %}
+    </section>
+
+    <section class="dash-section" id="my-applications" aria-labelledby="applications-heading">
+        <h2 id="applications-heading">Recent applications</h2>
+        {% if applications %}
+        <div class="table-wrap">
+            <table class="app-table">
+                <caption class="visually-hidden">Your five most recent applications</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Application ID</th>
+                        <th scope="col">Service name</th>
+                        <th scope="col">Department</th>
+                        <th scope="col">Date submitted</th>
+                        <th scope="col">Current status</th>
+                        <th scope="col">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for application in applications %}
+                    <tr>
+                        <td data-label="Application ID">{{ application.tracking_number }}</td>
+                        <td data-label="Service name">{{ application.service.service_name }}</td>
+                        <td data-label="Department">{{ application.department.department_name }}</td>
+                        <td data-label="Date submitted">{{ application.submission_date.strftime("%d %b %Y") }}</td>
+                        <td data-label="Current status">{% set labels = status_labels_for(application.service, application) %}{% with status=application.application_status, labels=labels %}{% include "applications/_status.html" %}{% endwith %}</td>
+                        <td data-label="Action">{% if application.application_status == 'draft' %}<a href="{{ url_for('citizen.application_continue', application_id=application.application_id) }}">Continue</a>{% else %}<a href="{{ url_for('citizen.application_detail', application_id=application.application_id) }}">View details</a>{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="empty-state" role="status">You have not submitted any applications yet.</p>
+        {% endif %}
+    </section>
+</div>
 {% endblock %}

@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% block title %}Payment · {{ service.service_name }} · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard{% endblock %}
+{% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
+{% block content %}
+<div class="dash-page site-width">
+    <section class="apply-card payment-page pay-shell" aria-labelledby="payment-heading">
+        {% include "applications/_progress.html" %}
+
+        <header class="pay-hero">
+            <div class="pay-hero-copy">
+                <p class="pay-kicker">Secure payment</p>
+                <h1 id="payment-heading">Complete your payment</h1>
+                <p class="welcome-text">Review the fee summary, choose a payment method, and continue. Maya uses Checkout sandbox; other options are demonstration records only.</p>
+            </div>
+            <div class="pay-secure-chip" title="Encrypted session">
+                <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18"><path fill="currentColor" d="M12 2a5 5 0 0 0-5 5v2H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 7V7a3 3 0 1 1 6 0v2H9zm3 4a1.5 1.5 0 0 1 .75 2.8V18h-1.5v-2.2A1.5 1.5 0 0 1 12 13z"/></svg>
+                <span>Protected checkout</span>
+            </div>
+        </header>
+
+        {% if summary.payment %}
+        <div class="pay-status-banner pay-status-banner--{{ summary.status_key or summary.payment.payment_status }}" role="status">
+            <span class="pay-status-pill pay-status-pill--{{ summary.status_key or summary.payment.payment_status }}">{{ summary.status_label or summary.payment.payment_status }}</span>
+            <div class="pay-status-banner-copy">
+                <strong>Transaction {{ summary.payment.payment_reference }}</strong>
+                <span>
+                    {% if summary.method_label %}{{ summary.method_label }} · {% endif %}
+                    {% if summary.status_key == 'processing' %}Awaiting confirmation from the payment provider.{% elif summary.status_key == 'paid' %}Payment verified successfully.{% elif summary.status_key == 'failed' %}Payment did not complete. You can try another method.{% elif summary.status_key == 'cancelled' %}Payment was cancelled. You can start again.{% else %}Current payment record for this application.{% endif %}
+                </span>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="pay-layout">
+            <div class="pay-main">
+                <form class="payment-form pay-form" method="post" action="{{ url_for('citizen.apply_payment', application_id=application.application_id) }}" id="payment-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <section class="pay-panel" aria-labelledby="pay-channel-heading">
+                        <div class="pay-panel-head">
+                            <h2 id="pay-channel-heading">Payment channel</h2>
+                            <p>Choose how you want to settle the application fee.</p>
+                        </div>
+                        <div class="pay-channel-grid" role="radiogroup" aria-label="Payment channel">
+                            <label class="pay-channel-card">
+                                <input type="radio" name="payment_choice" value="online" checked>
+                                <span class="pay-channel-body">
+                                    <span class="pay-channel-icon pay-channel-icon--online" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-5l-3 3v-3H6a2 2 0 0 1-2-2V6zm3 3v2h10V9H7z"/></svg>
+                                    </span>
+                                    <span class="pay-channel-text">
+                                        <strong>Pay online</strong>
+                                        <small>Digital wallets and banking options</small>
+                                    </span>
+                                </span>
+                            </label>
+                            <label class="pay-channel-card">
+                                <input type="radio" name="payment_choice" value="onsite">
+                                <span class="pay-channel-body">
+                                    <span class="pay-channel-icon pay-channel-icon--onsite" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 2 3 7v2h18V7l-9-5zm-7 9v8H3v2h18v-2h-2v-8h-2v8h-4v-8H9v8H5v-8H5z"/></svg>
+                                    </span>
+                                    <span class="pay-channel-text">
+                                        <strong>Pay onsite</strong>
+                                        <small>Settle at the appointment office</small>
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="pay-panel" id="online-methods" aria-labelledby="pay-method-heading">
+                        <div class="pay-panel-head">
+                            <h2 id="pay-method-heading">Online method</h2>
+                            <p>Select a provider. Only Maya redirects to a live sandbox checkout.</p>
+                        </div>
+                        <div class="pay-method-grid" role="radiogroup" aria-label="Online payment method">
+                            <label class="pay-method-card">
+                                <input type="radio" name="online_method" value="maya" checked>
+                                <span class="pay-method-body">
+                                    <span class="pay-method-logo pay-method-logo--maya">
+                                        <img src="{{ url_for('static', filename='images/maya-logo.svg') }}" alt="" width="72" height="21">
+                                    </span>
+                                    <span class="pay-method-copy">
+                                        <strong>Maya</strong>
+                                        <small>Hosted checkout with server-side verification</small>
+                                    </span>
+                                    <span class="pay-method-check" aria-hidden="true"></span>
+                                </span>
+                            </label>
+                            <label class="pay-method-card">
+                                <input type="radio" name="online_method" value="gcash">
+                                <span class="pay-method-body">
+                                    <span class="pay-method-logo pay-method-logo--gcash">
+                                        <img src="{{ url_for('static', filename='images/gcash-logo.svg') }}" alt="" width="78" height="19">
+                                    </span>
+                                    <span class="pay-method-copy">
+                                        <strong>GCash</strong>
+                                        <small>Demonstration payment record only</small>
+                                    </span>
+                                    <span class="pay-method-check" aria-hidden="true"></span>
+                                </span>
+                            </label>
+                            <label class="pay-method-card">
+                                <input type="radio" name="online_method" value="online_banking">
+                                <span class="pay-method-body">
+                                    <span class="pay-method-logo pay-method-logo--bank" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 3 3 8v2h18V8l-9-5zm-7 9v7H3v2h18v-2h-2v-7h-2v7h-4v-7H9v7H5v-7H5z"/></svg>
+                                    </span>
+                                    <span class="pay-method-copy">
+                                        <strong>Online banking</strong>
+                                        <small>Demonstration payment record only</small>
+                                    </span>
+                                    <span class="pay-method-check" aria-hidden="true"></span>
+                                </span>
+                            </label>
+                        </div>
+                        <p class="pay-inline-help" id="maya-help">Pay Now opens Maya hosted checkout. Payment is marked paid only after OneGov PH verifies the result.</p>
+                    </section>
+
+                    <p class="pay-inline-help" id="onsite-help" hidden>Onsite payment stays pending until a staff demonstration marks it paid. No real fee is collected here.</p>
+                </form>
+            </div>
+
+            <aside class="pay-aside" aria-label="Payment summary">
+                <div class="pay-summary">
+                    <div class="pay-summary-top">
+                        <h2>Payment summary</h2>
+                        <span class="pay-summary-badge">Due now</span>
+                    </div>
+
+                    <dl class="pay-summary-meta">
+                        <div>
+                            <dt>Application type</dt>
+                            <dd>{{ summary.application_type or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Location</dt>
+                            <dd>{{ summary.appointment.location_label if summary.appointment else "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Schedule</dt>
+                            <dd>
+                                {% if summary.appointment %}
+                                {{ summary.appointment.appointment_date }} · {{ summary.appointment.appointment_time }}
+                                {% else %}
+                                —
+                                {% endif %}
+                            </dd>
+                        </div>
+                    </dl>
+
+                    <div class="pay-summary-breakdown">
+                        <div class="pay-line">
+                            <span>Application fee</span>
+                            <strong>{{ summary.application_fee_display }}</strong>
+                        </div>
+                        <div class="pay-line">
+                            <span>Processing fee</span>
+                            <strong>{{ summary.processing_fee_display }}</strong>
+                        </div>
+                        <div class="pay-line pay-line--total">
+                            <span>Total amount</span>
+                            <strong>{{ summary.amount_display }}</strong>
+                        </div>
+                    </div>
+
+                    {% if summary.payment %}
+                    <div class="pay-summary-txn">
+                        <div class="pay-line">
+                            <span>Method</span>
+                            <strong>{{ summary.method_label or summary.payment.payment_method }}</strong>
+                        </div>
+                        <div class="pay-line">
+                            <span>Status</span>
+                            <strong><span class="pay-status-pill pay-status-pill--{{ summary.status_key or summary.payment.payment_status }}">{{ summary.status_label }}</span></strong>
+                        </div>
+                        <div class="pay-line">
+                            <span>Reference</span>
+                            <strong class="pay-mono">{{ summary.payment.payment_reference }}</strong>
+                        </div>
+                        {% if summary.checkout_id %}
+                        <div class="pay-line">
+                            <span>Checkout ID</span>
+                            <strong class="pay-mono">{{ summary.checkout_id }}</strong>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <ul class="pay-trust-list">
+                        <li>Amount is calculated on the server</li>
+                        <li>Card and wallet details are never stored here</li>
+                        <li>Sandbox / demo payments only</li>
+                    </ul>
+                </div>
+            </aside>
+        </div>
+
+        <div class="pay-actions apply-actions">
+            <a class="dash-button apply-cancel pay-btn-secondary" href="{{ url_for('citizen.apply_schedule', application_id=application.application_id) }}">Back</a>
+            <button class="dash-button pay-btn-primary" type="submit" form="payment-form" id="payment-submit">Pay Now</button>
+            <form method="post" action="{{ url_for('citizen.apply_cancel', application_id=application.application_id) }}" onsubmit="return confirm('Cancel this application? The information and files you entered will be removed.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="dash-button apply-cancel pay-btn-ghost" type="submit">Cancel application</button>
+            </form>
+        </div>
+    </section>
+</div>
+<script>
+(function () {
+    var onlineBox = document.getElementById("online-methods");
+    var onsiteHelp = document.getElementById("onsite-help");
+    var mayaHelp = document.getElementById("maya-help");
+    var submitBtn = document.getElementById("payment-submit");
+    var methodInputs = document.querySelectorAll('input[name="online_method"]');
+
+    function selectedMethod() {
+        var checked = document.querySelector('input[name="online_method"]:checked');
+        return checked ? checked.value : "";
+    }
+
+    function sync() {
+        var choice = document.querySelector('input[name="payment_choice"]:checked');
+        var online = choice && choice.value === "online";
+        var method = selectedMethod();
+        var maya = online && method === "maya";
+        onlineBox.hidden = !online;
+        onsiteHelp.hidden = online;
+        mayaHelp.hidden = !maya;
+        methodInputs.forEach(function (input) {
+            input.disabled = !online;
+            input.required = online;
+        });
+        if (maya) {
+            submitBtn.textContent = "Pay Now";
+        } else if (online) {
+            submitBtn.textContent = "Confirm payment";
+        } else {
+            submitBtn.textContent = "Continue";
+        }
+    }
+
+    document.querySelectorAll('input[name="payment_choice"]').forEach(function (input) {
+        input.addEventListener("change", sync);
+    });
+    methodInputs.forEach(function (input) {
+        input.addEventListener("change", sync);
+    });
+    sync();
+})();
+</script>
+{% endblock %}

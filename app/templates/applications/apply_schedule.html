@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+{% block title %}Scheduling · {{ service.service_name }} · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard{% endblock %}
+{% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
+{% block content %}
+<div class="dash-page site-width schedule-wrap">
+    <section class="apply-card apply-card-wide schedule-page" aria-labelledby="schedule-heading">
+        {% include "applications/_progress.html" %}
+        <h1 id="schedule-heading">Schedule an appointment</h1>
+        <p class="welcome-text">Choose a location, then pick an open date and time.</p>
+
+        <form class="schedule-location-form" method="get" action="{{ url_for('citizen.apply_schedule', application_id=application.application_id) }}">
+            <label for="location_code">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+                Appointment location
+            </label>
+            <select id="location_code" name="location_code" onchange="this.form.submit()">
+                {% for location in locations %}
+                <option value="{{ location.code }}" {% if location.code == selected_location %}selected{% endif %}>{{ location.label }}</option>
+                {% endfor %}
+            </select>
+        </form>
+
+        <form class="schedule-booking-form" method="post" action="{{ url_for('citizen.apply_schedule', application_id=application.application_id) }}" id="schedule-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="location_code" value="{{ selected_location }}">
+            <input type="hidden" name="appointment_date" id="appointment_date" value="{{ appointment.appointment_date if appointment else '' }}" required>
+            <input type="hidden" name="appointment_time" id="appointment_time" value="{{ appointment.appointment_time if appointment else '' }}" required>
+
+            <div class="schedule-center" data-month-pager>
+                <div class="schedule-section-title">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 3v4"/><path d="M16 3v4"/></svg>
+                    <h2>Available dates</h2>
+                </div>
+
+                <div class="schedule-month schedule-month-hero" id="schedule-month">
+                    <header class="schedule-month-header">
+                        <button class="schedule-nav-button" type="button" id="calendar-prev" aria-label="Previous month">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg>
+                        </button>
+                        <h3 id="calendar-month-title">{{ calendar_months[0].title if calendar_months else '' }}</h3>
+                        <button class="schedule-nav-button" type="button" id="calendar-next" aria-label="Next month">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+                        </button>
+                    </header>
+
+                    <div class="schedule-legend" aria-hidden="true">
+                        <span><i class="legend-dot is-free"></i> Open</span>
+                        <span><i class="legend-dot is-closed"></i> Unavailable</span>
+                        <span><i class="legend-dot is-picked"></i> Selected</span>
+                    </div>
+
+                    <div class="schedule-weekdays" aria-hidden="true">
+                        <span>Sun</span>
+                        <span>Mon</span>
+                        <span>Tue</span>
+                        <span>Wed</span>
+                        <span>Thu</span>
+                        <span>Fri</span>
+                        <span>Sat</span>
+                    </div>
+
+                    {% for month in calendar_months %}
+                    <div
+                        class="schedule-calendar"
+                        role="grid"
+                        aria-label="{{ month.title }} calendar"
+                        data-month-panel
+                        data-month-key="{{ month.key }}"
+                        data-month-title="{{ month.title }}"
+                        {% if not loop.first %}hidden{% endif %}
+                    >
+                        {% for week in month.weeks %}
+                        <div class="schedule-week" role="row">
+                            {% for day in week %}
+                            {% if day.in_month %}
+                            <button
+                                type="button"
+                                class="schedule-day{% if day.selectable %} is-free{% else %} is-unavailable{% endif %}{% if appointment and appointment.appointment_date == day.date %} is-selected{% endif %}"
+                                data-date="{{ day.date }}"
+                                data-label="{{ day.label }}"
+                                data-slots="{{ day.open_slots|join(',') }}"
+                                {% if not day.selectable %}disabled{% endif %}
+                                aria-label="{{ day.label }}{% if day.selectable %} available{% else %} unavailable{% endif %}"
+                                aria-pressed="{{ 'true' if appointment and appointment.appointment_date == day.date else 'false' }}"
+                                aria-haspopup="dialog"
+                            >
+                                <span class="schedule-day-number">{{ day.day_number }}</span>
+                            </button>
+                            {% else %}
+                            <span class="schedule-day is-empty" aria-hidden="true"></span>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="schedule-chip" id="schedule-summary" hidden>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 12 4 4L19 7"/></svg>
+                    <p class="schedule-chip-value">
+                        <span id="summary-location"></span>
+                        · <span id="summary-date"></span>
+                        · <span id="summary-time"></span>
+                    </p>
+                </div>
+            </div>
+        </form>
+    </section>
+
+    <div class="schedule-page-actions">
+        <div class="apply-actions">
+            <a class="dash-button apply-cancel" href="{{ url_for('citizen.apply_documents', application_id=application.application_id) }}">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg>
+                Back
+            </a>
+            <button class="dash-button dash-button-apply" type="submit" form="schedule-form" id="schedule-continue">
+                Continue to payment
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+        </div>
+        <form method="post" action="{{ url_for('citizen.apply_cancel', application_id=application.application_id) }}" onsubmit="return confirm('Cancel this application? The information and files you entered will be removed.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="dash-button apply-cancel" type="submit">Cancel application</button>
+        </form>
+    </div>
+</div>
+
+<div class="schedule-popover-backdrop" id="schedule-popover-backdrop" hidden></div>
+<div
+    class="schedule-popover"
+    id="schedule-popover"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="schedule-popover-title"
+    hidden
+>
+    <div class="schedule-popover-header">
+        <div>
+            <p class="schedule-popover-kicker">Available times</p>
+            <h2 id="schedule-popover-title">Select a time</h2>
+        </div>
+        <button class="schedule-popover-close" type="button" id="schedule-popover-close" aria-label="Close time options">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg>
+        </button>
+    </div>
+    <p class="field-help" id="slot-help">Choose a demonstration time slot.</p>
+    <div class="schedule-slots" id="schedule-slots" role="group" aria-describedby="slot-help"></div>
+    <button class="dash-button dash-button-apply schedule-popover-confirm" type="button" id="schedule-popover-confirm" disabled>
+        Use this time
+    </button>
+</div>
+
+<script>
+(function () {
+    var dateInput = document.getElementById("appointment_date");
+    var timeInput = document.getElementById("appointment_time");
+    var slotsBox = document.getElementById("schedule-slots");
+    var summary = document.getElementById("schedule-summary");
+    var summaryDate = document.getElementById("summary-date");
+    var summaryTime = document.getElementById("summary-time");
+    var summaryLocation = document.getElementById("summary-location");
+    var slotHelp = document.getElementById("slot-help");
+    var popover = document.getElementById("schedule-popover");
+    var backdrop = document.getElementById("schedule-popover-backdrop");
+    var popoverTitle = document.getElementById("schedule-popover-title");
+    var popoverClose = document.getElementById("schedule-popover-close");
+    var popoverConfirm = document.getElementById("schedule-popover-confirm");
+    var monthBox = document.getElementById("schedule-month");
+    var locationLabel = {{ (locations|selectattr('code', 'equalto', selected_location)|list|first).label|tojson }};
+    var days = document.querySelectorAll(".schedule-day[data-date]");
+    var panels = Array.prototype.slice.call(document.querySelectorAll("[data-month-panel]"));
+    var title = document.getElementById("calendar-month-title");
+    var prevButton = document.getElementById("calendar-prev");
+    var nextButton = document.getElementById("calendar-next");
+    var monthIndex = 0;
+    var activeDay = null;
+    var pendingTime = "";
+
+    function friendlyDate(value, fallbackLabel) {
+        if (fallbackLabel) {
+            return fallbackLabel;
+        }
+        if (!value) {
+            return "";
+        }
+        var parts = value.split("-");
+        if (parts.length !== 3) {
+            return value;
+        }
+        var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        var weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        var parsed = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        if (isNaN(parsed.getTime())) {
+            return value;
+        }
+        return weekdays[parsed.getDay()] + ", " + parsed.getDate() + " " + months[parsed.getMonth()] + " " + parsed.getFullYear();
+    }
+
+    function showMonth(index) {
+        if (!panels.length) {
+            return;
+        }
+        monthIndex = Math.max(0, Math.min(panels.length - 1, index));
+        panels.forEach(function (panel, panelIndex) {
+            var active = panelIndex === monthIndex;
+            panel.hidden = !active;
+            panel.classList.toggle("is-active", active);
+            panel.setAttribute("aria-hidden", active ? "false" : "true");
+        });
+        if (title) {
+            title.textContent = panels[monthIndex].getAttribute("data-month-title") || "";
+        }
+        if (prevButton) {
+            prevButton.disabled = monthIndex <= 0;
+        }
+        if (nextButton) {
+            nextButton.disabled = monthIndex >= panels.length - 1;
+        }
+        closePopover();
+    }
+
+    function positionPopover(anchor) {
+        if (!popover || !anchor) {
+            return;
+        }
+        var rect = anchor.getBoundingClientRect();
+        var popWidth = Math.min(280, window.innerWidth - 24);
+        var left = rect.right + 12;
+        var top = rect.top;
+        if (left + popWidth > window.innerWidth - 12) {
+            left = rect.left - popWidth - 12;
+        }
+        if (left < 12) {
+            left = Math.max(12, (window.innerWidth - popWidth) / 2);
+        }
+        var estimatedHeight = 280;
+        if (top + estimatedHeight > window.innerHeight - 12) {
+            top = Math.max(12, window.innerHeight - estimatedHeight - 12);
+        }
+        popover.style.width = popWidth + "px";
+        popover.style.left = left + "px";
+        popover.style.top = top + "px";
+    }
+
+    function openPopover(anchor, dateValue, label, openSlots, selectedTime) {
+        activeDay = anchor;
+        pendingTime = selectedTime || "";
+        popoverTitle.textContent = friendlyDate(dateValue, label);
+        if (slotHelp) {
+            slotHelp.textContent = openSlots.length
+                ? "Choose a time for this date."
+                : "No open demonstration slots for this date.";
+        }
+        renderSlots(openSlots, pendingTime);
+        popoverConfirm.disabled = !pendingTime;
+        backdrop.hidden = false;
+        popover.hidden = false;
+        positionPopover(anchor);
+        window.setTimeout(function () {
+            popoverConfirm.focus();
+        }, 0);
+    }
+
+    function closePopover() {
+        popover.hidden = true;
+        backdrop.hidden = true;
+        activeDay = null;
+        pendingTime = "";
+    }
+
+    function renderSlots(openSlots, selectedTime) {
+        slotsBox.innerHTML = "";
+        openSlots.forEach(function (slot) {
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = "schedule-slot" + (slot === selectedTime ? " is-selected" : "");
+            button.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/></svg><span>' + slot + "</span>";
+            button.setAttribute("aria-pressed", slot === selectedTime ? "true" : "false");
+            button.addEventListener("click", function () {
+                pendingTime = slot;
+                popoverConfirm.disabled = false;
+                Array.prototype.forEach.call(slotsBox.querySelectorAll(".schedule-slot"), function (item) {
+                    var match = item === button;
+                    item.classList.toggle("is-selected", match);
+                    item.setAttribute("aria-pressed", match ? "true" : "false");
+                });
+            });
+            slotsBox.appendChild(button);
+        });
+    }
+
+    function applySelection(dateValue, label, timeValue) {
+        dateInput.value = dateValue;
+        timeInput.value = timeValue;
+        summaryLocation.textContent = locationLabel;
+        summaryDate.textContent = friendlyDate(dateValue, label);
+        summaryTime.textContent = timeValue;
+        summary.hidden = false;
+        days.forEach(function (item) {
+            var selected = item.getAttribute("data-date") === dateValue;
+            item.classList.toggle("is-selected", selected);
+            item.setAttribute("aria-pressed", selected ? "true" : "false");
+        });
+        closePopover();
+    }
+
+    if (prevButton) {
+        prevButton.addEventListener("click", function () {
+            showMonth(monthIndex - 1);
+        });
+    }
+    if (nextButton) {
+        nextButton.addEventListener("click", function () {
+            showMonth(monthIndex + 1);
+        });
+    }
+
+    days.forEach(function (day) {
+        day.addEventListener("click", function () {
+            if (day.disabled) {
+                return;
+            }
+            var dateValue = day.getAttribute("data-date");
+            var openSlots = (day.getAttribute("data-slots") || "").split(",").filter(Boolean);
+            var selectedTime = dateInput.value === dateValue ? timeInput.value : "";
+            days.forEach(function (item) {
+                item.classList.toggle("is-selected", item === day);
+                item.setAttribute("aria-pressed", item === day ? "true" : "false");
+            });
+            openPopover(day, dateValue, day.getAttribute("data-label"), openSlots, selectedTime);
+        });
+    });
+
+    popoverClose.addEventListener("click", closePopover);
+    backdrop.addEventListener("click", closePopover);
+    popoverConfirm.addEventListener("click", function () {
+        if (!activeDay || !pendingTime) {
+            return;
+        }
+        applySelection(
+            activeDay.getAttribute("data-date"),
+            activeDay.getAttribute("data-label"),
+            pendingTime
+        );
+    });
+
+    window.addEventListener("resize", function () {
+        if (!popover.hidden && activeDay) {
+            positionPopover(activeDay);
+        }
+    });
+    window.addEventListener("scroll", function () {
+        if (!popover.hidden && activeDay) {
+            positionPopover(activeDay);
+        }
+    }, true);
+
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !popover.hidden) {
+            closePopover();
+        }
+    });
+
+    showMonth(0);
+
+    if (dateInput.value && timeInput.value) {
+        var selected = Array.prototype.find.call(days, function (day) {
+            return day.getAttribute("data-date") === dateInput.value;
+        });
+        if (selected) {
+            summaryLocation.textContent = locationLabel;
+            summaryDate.textContent = friendlyDate(dateInput.value, selected.getAttribute("data-label"));
+            summaryTime.textContent = timeInput.value;
+            summary.hidden = false;
+            var selectedMonth = dateInput.value.slice(0, 7);
+            var selectedIndex = panels.findIndex(function (panel) {
+                return panel.getAttribute("data-month-key") === selectedMonth;
+            });
+            showMonth(selectedIndex >= 0 ? selectedIndex : 0);
+        }
+    } else if (dateInput.value) {
+        var selectedOnly = Array.prototype.find.call(days, function (day) {
+            return day.getAttribute("data-date") === dateInput.value;
+        });
+        if (selectedOnly) {
+            var monthKey = dateInput.value.slice(0, 7);
+            var monthIdx = panels.findIndex(function (panel) {
+                return panel.getAttribute("data-month-key") === monthKey;
+            });
+            showMonth(monthIdx >= 0 ? monthIdx : 0);
+        }
+    }
+
+    document.getElementById("schedule-form").addEventListener("submit", function (event) {
+        if (!dateInput.value || !timeInput.value) {
+            event.preventDefault();
+            alert("Select a demonstration date and time before continuing.");
+        }
+    });
+})();
+</script>
+{% endblock %}

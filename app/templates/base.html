@@ -8,10 +8,12 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/payment.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
     <a class="skip-link" href="#content">Skip to content</a>
+    {% block site_header %}
     <header class="site-header">
         <div class="gov-bar">
             <div class="site-width">Republic of the Philippines</div>
@@ -36,6 +38,7 @@
             </div>
         </div>
     </header>
+    {% endblock %}
     <main id="content">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -50,7 +53,7 @@
     </main>
     <footer class="site-footer">
         <div class="site-width">
-            <p>OneGov PH is a government services website. Passwords are stored as secure hashes.</p>
+            <p>OneGov PH is an independent government services platform prototype developed for demonstration purposes. Your account credentials are protected using secure password hashing. All application and payment activities are simulated.</p>
         </div>
     </footer>
 </body>

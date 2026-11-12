@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}Government services · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard services-page{% endblock %}
+{% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
+{% block content %}
+<div class="dash-page site-width">
+    <section class="services-shell" aria-labelledby="services-heading">
+        <header class="services-hero">
+            <div class="services-hero-copy">
+                <p class="dash-kicker">Service catalog</p>
+                <h1 id="services-heading">Government services</h1>
+                <p class="welcome-text">Browse active OneGov PH services, filter by category, and start an application when it is ready.</p>
+            </div>
+            <form class="services-controls" method="get" action="{{ url_for('citizen.services') }}">
+                <div class="service-sort">
+                    <label class="service-sort-label" for="service-category">Show</label>
+                    <select id="service-category" name="category" onchange="this.form.submit()">
+                        <option value="">All services</option>
+                        <option value="id" {% if service_category == 'id' %}selected{% endif %}>ID</option>
+                        <option value="clearance" {% if service_category == 'clearance' %}selected{% endif %}>Clearance</option>
+                        <option value="certificate" {% if service_category == 'certificate' %}selected{% endif %}>Certificate</option>
+                    </select>
+                </div>
+                <div class="dash-search">
+                    <label class="visually-hidden" for="service-query">Search government services</label>
+                    <input id="service-query" name="q" type="search" value="{{ service_query|default('') }}" placeholder="Search government services" maxlength="80" autocomplete="off">
+                    <button class="dash-button" type="submit">Search</button>
+                </div>
+            </form>
+        </header>
+
+        {% if service_query %}
+        <p class="search-result" role="status">Showing services matching “{{ service_query }}”. <a href="{{ url_for('citizen.services', category=service_category or none) }}">View all services</a></p>
+        {% endif %}
+
+        {% if services %}
+        <div class="service-grid service-grid-modern">
+            {% for service in services %}
+            {% set can_apply = service.service_name in applicable_service_names %}
+            {% set service_key = service.service_name|lower %}
+            {% if 'passport' in service_key %}
+                {% set tile_tone = 'passport' %}
+            {% elif 'nbi' in service_key or 'clearance' in service_key %}
+                {% set tile_tone = 'clearance' %}
+            {% elif 'certificate' in service_key or 'cenomar' in service_key or 'residency' in service_key %}
+                {% set tile_tone = 'certificate' %}
+            {% elif 'barangay' in service_key %}
+                {% set tile_tone = 'local' %}
+            {% elif 'sss' in service_key or 'senior' in service_key or 'national id' in service_key or 'philsys' in service_key %}
+                {% set tile_tone = 'id' %}
+            {% else %}
+                {% set tile_tone = 'general' %}
+            {% endif %}
+            <article class="service-tile service-tile--{{ tile_tone }}{% if can_apply %} is-ready{% else %} is-locked{% endif %}">
+                <div class="service-tile-top">
+                    <span class="service-tile-icon" aria-hidden="true">
+                        {% if tile_tone == 'passport' %}
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 3a3 3 0 1 0 3 3 3 3 0 0 0-3-3zm-6 9.2c.9-1.8 2.8-3.2 6-3.2s5.1 1.4 6 3.2V18H6z"/></svg>
+                        {% elif tile_tone == 'clearance' %}
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 1 3 5v6c0 5.5 3.8 10.7 9 12 5.2-1.3 9-6.5 9-12V5l-9-4zm-1.2 13.7-3.3-3.3 1.4-1.4 1.9 1.9 4.3-4.3 1.4 1.4-5.7 5.7z"/></svg>
+                        {% elif tile_tone == 'certificate' %}
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm1 15H9v-2h6v2zm0-4H9v-2h6v2zm-1-5V3.5L18.5 8H14z"/></svg>
+                        {% elif tile_tone == 'local' %}
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 2 3 7v2h18V7l-9-5zM5 10v9H3v2h18v-2h-2v-9h-2v9h-4v-9H9v9H5v-9z"/></svg>
+                        {% elif tile_tone == 'id' %}
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm-9 5.5A2.5 2.5 0 1 1 8.5 12 2.5 2.5 0 0 1 11 9.5zM5 17.2c.8-1.7 2.5-2.7 4.5-2.7s3.7 1 4.5 2.7V18H5zm14-1.2h-4v-1.5h4zm0-3h-4V10h4z"/></svg>
+                        {% else %}
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm4 4v2h8V8zm0 4v2h5v-2z"/></svg>
+                        {% endif %}
+                    </span>
+                    <details class="service-menu">
+                        <summary aria-label="Service details for {{ service.service_name }}">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M4 7h16"></path>
+                                <path d="M4 12h16"></path>
+                                <path d="M4 17h16"></path>
+                            </svg>
+                        </summary>
+                        <div class="service-menu-panel" role="region" aria-label="Details for {{ service.service_name }}">
+                            <p class="service-menu-kicker">{{ service.department.department_name }}</p>
+                            <h3>{{ service.service_name }}</h3>
+                            <p>{{ service.description or "No description is listed for this service." }}</p>
+                            {% if service.service_name == "Passport Application Assistance and Tracking" %}
+                            <p class="service-menu-note">OneGov PH is an independent portfolio demonstration. This platform is not affiliated with or authorized by the Department of Foreign Affairs (DFA). All appointment schedules, payments, confirmations, and tracking records are simulated.</p>
+                            {% endif %}
+                            <dl>
+                                <div>
+                                    <dt>Processing fee</dt>
+                                    <dd>{% if service.service_name == "Barangay Clearance" %}Depends on your local barangay. OneGov PH does not collect this payment.{% elif service.service_name == "Certificate of Residency" %}Depends on the issuing barangay or city. OneGov PH does not collect this payment.{% elif service.service_name == "Senior Citizen ID" %}No processing fee is listed for standard new issuance. Confirm any fee with your OSCA office.{% elif service.service_name == "NBI Clearance Application Monitoring" %}Listed Clearance Fee: ₱130.00. Additional electronic payment service charges may apply. Payment must be completed through official NBI payment channels. OneGov PH does not collect this payment.{% elif service.service_name == "CENOMAR" %}The PSA charges the official fee. Confirm the current amount and pay through an authorized PSA channel. OneGov PH does not collect this payment.{% elif service.service_name.startswith("SS Number") %}No SSS registration processing fee. OneGov PH does not collect a payment.{% elif service.service_name == "Passport Application Assistance and Tracking" %}Listed fee: ₱950.00 for new applications and ₱650.00 for renewals (demonstration amounts). OneGov PH does not collect a real payment.{% else %}₱{{ "%.2f"|format(service.processing_fee) }}{% endif %}</dd>
+                                </div>
+                                <div>
+                                    <dt>Estimated time</dt>
+                                    <dd>{{ service.estimated_processing_time or "Not listed" }}</dd>
+                                </div>
+                                <div>
+                                    <dt>What you need</dt>
+                                    <dd>{{ service.service_requirements or "No requirements are listed for this service." }}</dd>
+                                </div>
+                            </dl>
+                        </div>
+                    </details>
+                </div>
+                <p class="service-tile-office">{{ service.department.department_name }}</p>
+                <h2>{{ service.service_name }}</h2>
+                <p class="service-tile-copy">{{ service.description or "No description is listed for this service." }}</p>
+                <div class="service-tile-meta">
+                    {% if can_apply %}
+                    <span class="service-pill service-pill-ready"><i></i>Ready to apply</span>
+                    {% else %}
+                    <span class="service-pill service-pill-wait"><i></i>Coming soon</span>
+                    {% endif %}
+                    {% if service.estimated_processing_time %}
+                    <span class="service-pill service-pill-time">
+                        <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 11H7v-2h4V7h2z"/></svg>
+                        {{ service.estimated_processing_time }}
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="service-tile-progress" aria-hidden="true"><span></span></div>
+                <div class="service-tile-actions">
+                    {% if can_apply %}
+                    <a class="dash-button dash-button-apply" href="{{ url_for('citizen.apply_details', service_id=service.service_id) }}">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                        Apply now
+                    </a>
+                    {% else %}
+                    <button class="dash-button dash-button-secondary" type="button" disabled>Apply now</button>
+                    {% endif %}
+                </div>
+                {% if not can_apply %}
+                <p class="unavailable">Applications for this service cannot be submitted on the website yet.</p>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-state" role="status">{% if service_query %}No services in the catalog match that search.{% elif service_category == 'id' %}No government ID services are listed.{% elif service_category == 'certificate' %}No certificate services are listed.{% elif service_category == 'clearance' %}No clearance services are listed.{% else %}No services are listed.{% endif %}</p>
+        {% endif %}
+    </section>
+</div>
+<script>
+document.querySelectorAll(".service-menu").forEach(function (menu) {
+    menu.addEventListener("toggle", function () {
+        if (!menu.open) {
+            return;
+        }
+        document.querySelectorAll(".service-menu[open]").forEach(function (other) {
+            if (other !== menu) {
+                other.open = false;
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

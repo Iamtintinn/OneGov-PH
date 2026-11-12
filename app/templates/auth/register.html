@@ -1,48 +1,56 @@
 {% extends "base.html" %}
 {% block title %}Register · OneGov PH{% endblock %}
 {% block content %}
-<section class="login-screen">
+<section class="login-screen register-screen">
     <div class="login-backdrop" aria-hidden="true"></div>
     <div class="login-wrap register-wrap">
         <div class="login-card">
             <p class="kicker">Citizen registration</p>
             <h1>Create a citizen account</h1>
-            <p class="lede">This page registers a citizen account only. Department personnel and system administrators receive their accounts from an authorized office.</p>
+            <p class="lede">Citizen accounts only. Department and administrator accounts are issued by an authorized office.</p>
             <form class="login-form" method="post" action="{{ url_for('auth.register') }}" novalidate>
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 {% if errors %}
                 <p class="form-error" role="alert">Please correct the highlighted fields.</p>
                 {% endif %}
-                <div class="name-row">
-                    <div>
+                <div class="register-grid">
+                    <div class="field field-first">
                         <label for="first_name">First name</label>
                         <input id="first_name" name="first_name" autocomplete="given-name" value="{{ form.first_name }}" required aria-invalid="{{ 'true' if errors.first_name else 'false' }}">
                         {% if errors.first_name %}<p class="field-error">{{ errors.first_name }}</p>{% endif %}
                     </div>
-                    <div>
+                    <div class="field field-middle">
                         <label for="middle_name">Middle name <span class="optional">(optional)</span></label>
                         <input id="middle_name" name="middle_name" autocomplete="additional-name" value="{{ form.middle_name }}" aria-invalid="{{ 'true' if errors.middle_name else 'false' }}">
                         {% if errors.middle_name %}<p class="field-error">{{ errors.middle_name }}</p>{% endif %}
                     </div>
-                    <div>
+                    <div class="field field-last">
                         <label for="last_name">Last name</label>
                         <input id="last_name" name="last_name" autocomplete="family-name" value="{{ form.last_name }}" required aria-invalid="{{ 'true' if errors.last_name else 'false' }}">
                         {% if errors.last_name %}<p class="field-error">{{ errors.last_name }}</p>{% endif %}
                     </div>
+                    <div class="field field-email">
+                        <label for="email">Email address</label>
+                        <input id="email" name="email" type="email" autocomplete="email" spellcheck="false" value="{{ form.email }}" required aria-invalid="{{ 'true' if errors.email else 'false' }}">
+                        {% if errors.email %}<p class="field-error">{{ errors.email }}</p>{% endif %}
+                    </div>
+                    <div class="field field-contact">
+                        <label for="contact_number">Contact number</label>
+                        <input id="contact_number" name="contact_number" type="tel" autocomplete="tel" inputmode="tel" value="{{ form.contact_number }}" required aria-invalid="{{ 'true' if errors.contact_number else 'false' }}">
+                        {% if errors.contact_number %}<p class="field-error">{{ errors.contact_number }}</p>{% endif %}
+                    </div>
+                    <div class="field field-password">
+                        <label for="password">Password</label>
+                        <input id="password" name="password" type="password" autocomplete="new-password" required aria-invalid="{{ 'true' if errors.password else 'false' }}">
+                        {% if errors.password %}<p class="field-error">{{ errors.password }}</p>{% endif %}
+                    </div>
+                    <div class="field field-confirm">
+                        <label for="confirm_password">Confirm password</label>
+                        <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required aria-invalid="{{ 'true' if errors.confirm_password else 'false' }}">
+                        {% if errors.confirm_password %}<p class="field-error">{{ errors.confirm_password }}</p>{% endif %}
+                    </div>
                 </div>
-                <label for="email">Email address</label>
-                <input id="email" name="email" type="email" autocomplete="email" spellcheck="false" value="{{ form.email }}" required aria-invalid="{{ 'true' if errors.email else 'false' }}">
-                {% if errors.email %}<p class="field-error">{{ errors.email }}</p>{% endif %}
-                <label for="contact_number">Contact number</label>
-                <input id="contact_number" name="contact_number" type="tel" autocomplete="tel" inputmode="tel" value="{{ form.contact_number }}" required aria-invalid="{{ 'true' if errors.contact_number else 'false' }}">
-                {% if errors.contact_number %}<p class="field-error">{{ errors.contact_number }}</p>{% endif %}
-                <label for="password">Password</label>
-                <input id="password" name="password" type="password" autocomplete="new-password" required aria-invalid="{{ 'true' if errors.password else 'false' }}">
                 <p class="hint">Use 8 to 128 characters, with at least one letter and one number.</p>
-                {% if errors.password %}<p class="field-error">{{ errors.password }}</p>{% endif %}
-                <label for="confirm_password">Confirm password</label>
-                <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required aria-invalid="{{ 'true' if errors.confirm_password else 'false' }}">
-                {% if errors.confirm_password %}<p class="field-error">{{ errors.confirm_password }}</p>{% endif %}
                 <button class="submit" type="submit">Create citizen account</button>
                 <p class="form-links">Already registered? <a href="{{ url_for('auth.login') }}">Log in</a>.</p>
             </form>

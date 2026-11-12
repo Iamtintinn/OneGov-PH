@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}My applications · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard{% endblock %}
+{% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
+{% block content %}
+<div class="dash-page site-width">
+    <section class="dash-section" aria-labelledby="applications-heading">
+        <p class="dash-kicker">Your requests</p>
+        <h1 id="applications-heading">My applications</h1>
+        {% if applications %}
+        <div class="table-wrap">
+            <table class="app-table">
+                <caption class="visually-hidden">Applications submitted on your account</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Application ID</th>
+                        <th scope="col">Service name</th>
+                        <th scope="col">Department</th>
+                        <th scope="col">Date submitted</th>
+                        <th scope="col">Current status</th>
+                        <th scope="col">Payment</th>
+                        <th scope="col">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for application in applications %}
+                    <tr>
+                        <td data-label="Application ID">{{ application.tracking_number }}</td>
+                        <td data-label="Service name">{{ application.service.service_name }}</td>
+                        <td data-label="Department">{{ application.department.department_name }}</td>
+                        <td data-label="Date submitted">{{ application.submission_date.strftime("%d %b %Y") }}</td>
+                        <td data-label="Current status">{% set labels = status_labels_for(application.service, application) %}{% with status=application.application_status, labels=labels %}{% include "applications/_status.html" %}{% endwith %}</td>
+                        <td data-label="Payment">{% if application.payment_status %}{% with status=application.payment_status, labels=payment_status_labels %}{% include "applications/_status.html" %}{% endwith %}{% else %}No payment recorded{% endif %}</td>
+                        <td data-label="Action">{% if application.application_status == 'draft' %}<a href="{{ url_for('citizen.application_continue', application_id=application.application_id) }}">Continue</a>{% else %}<a href="{{ url_for('citizen.application_detail', application_id=application.application_id) }}">View details</a>{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="empty-state" role="status">You have not submitted any applications yet.</p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

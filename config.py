@@ -27,3 +27,10 @@ class Config:
     REMEMBER_COOKIE_HTTPONLY = True
     REMEMBER_COOKIE_SAMESITE = "Lax"
     REMEMBER_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "0") == "1"
+
+    # Maya Checkout — sandbox only for this portfolio project.
+    MAYA_ENVIRONMENT = os.getenv("MAYA_ENVIRONMENT", "sandbox").strip().lower()
+    MAYA_PUBLIC_KEY = os.getenv("MAYA_PUBLIC_KEY", "").strip()
+    MAYA_SECRET_KEY = os.getenv("MAYA_SECRET_KEY", "").strip()
+    MAYA_API_URL = os.getenv("MAYA_API_URL", "https://pg-sandbox.paymaya.com").strip().rstrip("/")
+    MAYA_WEBHOOK_BASE_URL = os.getenv("MAYA_WEBHOOK_BASE_URL", "").strip().rstrip("/")
