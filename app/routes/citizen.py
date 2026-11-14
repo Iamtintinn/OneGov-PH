@@ -290,6 +290,8 @@ def application_detail(application_id):
     passport_appointment = None
     passport_summary = None
     passport_confirmation_id = None
+    barangay_summary = None
+    barangay_confirmation_id = None
     if spec and spec.get("kind") == "passport":
         from app.services.passport_confirmation_pdf import confirmation_id_for
         from app.services.passport_payment import payment_summary
@@ -299,6 +301,55 @@ def application_detail(application_id):
         passport_summary = payment_summary(application)
         if application.application_status != "draft":
             passport_confirmation_id = confirmation_id_for(application)
+    elif spec and spec.get("kind") in {"barangay", "residency"}:
+        from app.services.barangay_confirmation_pdf import confirmation_id_for
+        from app.services.barangay_payment import payment_summary
+
+        barangay_summary = payment_summary(application)
+        if application.application_status != "draft":
+            barangay_confirmation_id = confirmation_id_for(application)
+    elif spec and spec.get("kind") == "senior":
+        from app.services.senior_confirmation_pdf import confirmation_id_for
+        from app.services.senior_payment import payment_summary
+
+        barangay_summary = payment_summary(application)
+        if application.application_status != "draft":
+            barangay_confirmation_id = confirmation_id_for(application)
+    elif spec and spec.get("kind") == "nbi":
+        from app.services.nbi_confirmation_pdf import confirmation_id_for
+        from app.services.nbi_payment import payment_summary
+
+        barangay_summary = payment_summary(application)
+        if application.application_status != "draft":
+            barangay_confirmation_id = confirmation_id_for(application)
+    elif spec and spec.get("kind") == "birth":
+        from app.services.birth_confirmation_pdf import confirmation_id_for
+        from app.services.birth_payment import payment_summary
+
+        barangay_summary = payment_summary(application)
+        if application.application_status != "draft":
+            barangay_confirmation_id = confirmation_id_for(application)
+    elif spec and spec.get("kind") == "cenomar":
+        from app.services.cenomar_confirmation_pdf import confirmation_id_for
+        from app.services.cenomar_payment import payment_summary
+
+        barangay_summary = payment_summary(application)
+        if application.application_status != "draft":
+            barangay_confirmation_id = confirmation_id_for(application)
+    elif spec and spec.get("kind") == "philsys":
+        from app.services.philsys_confirmation_pdf import confirmation_id_for
+        from app.services.philsys_payment import payment_summary
+
+        barangay_summary = payment_summary(application)
+        if application.application_status != "draft":
+            barangay_confirmation_id = confirmation_id_for(application)
+    elif spec and spec.get("kind") == "sss":
+        from app.services.sss_confirmation_pdf import confirmation_id_for
+        from app.services.sss_payment import payment_summary
+
+        barangay_summary = payment_summary(application)
+        if application.application_status != "draft":
+            barangay_confirmation_id = confirmation_id_for(application)
     return render_template(
         "applications/application_details.html",
         application=application,
@@ -312,6 +363,8 @@ def application_detail(application_id):
         passport_appointment=passport_appointment,
         passport_summary=passport_summary,
         passport_confirmation_id=passport_confirmation_id,
+        barangay_summary=barangay_summary,
+        barangay_confirmation_id=barangay_confirmation_id,
     )
 
 

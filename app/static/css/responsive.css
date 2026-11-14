@@ -168,9 +168,30 @@
     .section-heading { flex-wrap: wrap; }
 
     .document-split,
-    .payment-split {
+    .payment-split,
+    .barangay-docs-layout.document-split {
         grid-template-columns: 1fr;
         gap: 1rem;
+    }
+
+    .barangay-docs-other {
+        grid-template-columns: 1fr;
+    }
+
+    .document-upload-list,
+    .document-upload-list--senior {
+        grid-template-columns: 1fr;
+    }
+
+    .document-upload-row {
+        grid-template-columns: 1fr;
+        gap: 0.65rem;
+    }
+}
+
+@media (max-width: 1100px) and (min-width: 961px) {
+    .documents-modern-layout.barangay-docs-layout {
+        grid-template-columns: minmax(12rem, 14rem) minmax(0, 1fr);
     }
 }
 

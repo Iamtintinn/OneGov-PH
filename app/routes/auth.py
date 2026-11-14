@@ -10,10 +10,21 @@ from app.utils.validators import clean_text, normalize_email, validate_registrat
 auth_bp = Blueprint("auth", __name__)
 
 
+def _safe_next_url(raw):
+    """Allow only same-site relative paths (used after Maya QRPh return)."""
+    candidate = (raw or "").strip()
+    if not candidate.startswith("/") or candidate.startswith("//"):
+        return None
+    if "\\" in candidate or "://" in candidate:
+        return None
+    return candidate
+
+
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
+    next_url = _safe_next_url(request.values.get("next"))
     if current_user.is_authenticated:
-        return redirect(url_for(home_endpoint_for_role(current_user.role)))
+        return redirect(next_url or url_for(home_endpoint_for_role(current_user.role)))
 
     email = ""
     error = None
@@ -30,9 +41,9 @@ def login():
                 error = "This account is disabled. Contact OneGov PH support."
             else:
                 establish_session(user)
-                return redirect(url_for(home_endpoint_for_role(user.role)))
+                return redirect(next_url or url_for(home_endpoint_for_role(user.role)))
 
-    return render_template("auth/login.html", email=email, error=error)
+    return render_template("auth/login.html", email=email, error=error, next_url=next_url)
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])

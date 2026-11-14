@@ -34,3 +34,6 @@ class Config:
     MAYA_SECRET_KEY = os.getenv("MAYA_SECRET_KEY", "").strip()
     MAYA_API_URL = os.getenv("MAYA_API_URL", "https://pg-sandbox.paymaya.com").strip().rstrip("/")
     MAYA_WEBHOOK_BASE_URL = os.getenv("MAYA_WEBHOOK_BASE_URL", "").strip().rstrip("/")
+    # Public origin used for Maya success/failure/cancel redirects (QRPh-friendly).
+    # Prefer an HTTPS tunnel (ngrok) over localhost so wallet/QR returns keep working.
+    MAYA_PUBLIC_BASE_URL = os.getenv("MAYA_PUBLIC_BASE_URL", "").strip().rstrip("/")

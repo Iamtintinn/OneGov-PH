@@ -4,12 +4,353 @@
 {% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
 {% block content %}
 <div class="dash-page site-width">
+    {% if spec.kind in ['barangay', 'residency', 'senior', 'nbi', 'birth', 'sss'] %}
+    {% set modern_doc_steps = (step_labels|length) if step_labels else (5 if spec.kind in ['barangay', 'residency', 'sss'] else 4) %}
+    <section class="apply-card pay-shell confirm-shell documents-modern-shell" aria-labelledby="documents-heading">
+        {% include "applications/_progress.html" %}
+
+        <header class="pay-hero confirm-hero">
+            <div class="pay-hero-copy">
+                <p class="pay-kicker">{{ spec.kicker or spec.department_label or service.department.department_name }}</p>
+                <h1 id="documents-heading">Upload documents</h1>
+                <p class="welcome-text">
+                    {% if spec.kind == 'senior' %}
+                    Upload the files OSCA needs for this Senior Citizen ID request. Required items stay in one list; conditional files appear only when they apply.
+                    {% elif spec.kind == 'nbi' %}
+                    Upload the required files for your selected NBI application type. Government IDs use the searchable list when shown.
+                    {% elif spec.kind == 'birth' %}
+                    Upload the required files for your selected birth certificate request type. Government IDs use the searchable list when shown.
+                    {% elif spec.kind == 'residency' %}
+                    Upload every required file for your selected residency purpose. The checklist changes with the application type you chose.
+                    {% elif spec.kind == 'sss' %}
+                    Upload one primary government ID when you can. If you cannot, Section B asks for two alternative identification documents. Files saved here are not submitted to SSS.
+                    {% else %}
+                    Upload every required file for your selected clearance purpose. The checklist changes with the application type you chose.
+                    {% endif %}
+                </p>
+            </div>
+            <div class="confirm-success-chip passport-step-chip" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+                <span>Step {{ step }} of {{ modern_doc_steps }}</span>
+            </div>
+        </header>
+
+        <div class="barangay-docs-layout document-split documents-modern-layout">
+            <aside class="document-split-side barangay-docs-notice" aria-label="Upload guidelines">
+                <h3>Upload guidelines</h3>
+                <ul class="document-guide-list">
+                    <li>Accepted formats: PDF, JPG, JPEG, PNG</li>
+                    <li>Maximum file size: 16 MB</li>
+                    <li>Upload one clear, readable copy of each required document</li>
+                    <li>Keep the full page or ID in frame with printed details visible</li>
+                    <li>Avoid blur, glare, cropped edges, or edited images</li>
+                </ul>
+            </aside>
+            <div class="document-split-main barangay-docs-secondary">
+                {% if spec.kind in ['barangay', 'residency'] %}
+                {% for document in documents if document.id_choices == 'barangay' %}
+                {% set row = requirements.get(document.key) %}
+                {% set picker_match = (id_picker_matches or {}).get(document.key) or (id_picker_match if document.key == 'valid_id' else none) %}
+                {% set picker_id = 'id-picker-' ~ document.key %}
+                <article class="detail-card document-card barangay-docs-id-card{% if row and row.uploaded_file %} is-uploaded{% elif document.required %} is-needed{% else %} is-optional{% endif %}">
+                    <h2>{{ document.label }}</h2>
+                    <p class="document-state">{% if document.required %}Required{% else %}Optional{% endif %} · {% if row and row.uploaded_file %}Uploaded{% else %}Missing{% endif %}</p>
+                    {% if row and row.uploaded_file %}
+                    <p class="document-file">File: {{ row.remarks or 'Uploaded file' }}</p>
+                    {% if picker_match and picker_match.label %}
+                    <p class="field-help">Selected: {{ picker_match.label }}</p>
+                    {% endif %}
+                    {% set lower = (row.uploaded_file or '')|lower %}
+                    {% if lower.endswith('.jpg') or lower.endswith('.jpeg') or lower.endswith('.png') %}
+                    <img class="document-preview" src="{{ url_for('citizen.application_document', application_id=application.application_id, requirement_id=row.requirement_id) }}" alt="Preview of {{ document.label }}">
+                    {% else %}
+                    <a href="{{ url_for('citizen.application_document', application_id=application.application_id, requirement_id=row.requirement_id) }}">View uploaded PDF</a>
+                    {% endif %}
+                    {% endif %}
+                    <form class="upload-form upload-form-passport" method="post" enctype="multipart/form-data" action="{{ url_for('citizen.upload_document', application_id=application.application_id, document_key=document.key) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="upload-field">
+                            <label id="{{ picker_id }}-label" for="{{ picker_id }}-trigger">Select ID type</label>
+                            <p class="field-help" id="{{ picker_id }}-help">Choose one ID, then upload a clear copy of that same ID.</p>
+                            <div class="id-picker" data-id-picker>
+                                <button
+                                    class="id-picker-trigger"
+                                    id="{{ picker_id }}-trigger"
+                                    type="button"
+                                    aria-haspopup="listbox"
+                                    aria-expanded="false"
+                                    aria-controls="{{ picker_id }}-panel"
+                                    aria-describedby="{{ picker_id }}-help"
+                                >
+                                    <span class="id-picker-trigger-label">{% if picker_match and picker_match.document_key %}{{ picker_match.label }}{% else %}Select a valid government ID{% endif %}</span>
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="id-picker-panel" id="{{ picker_id }}-panel" hidden>
+                                    <div class="id-picker-search-wrap">
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                                        <input
+                                            class="id-picker-search"
+                                            id="{{ picker_id }}-search"
+                                            type="text"
+                                            placeholder="Type to search ID…"
+                                            autocomplete="off"
+                                            spellcheck="false"
+                                            aria-label="Search valid government ID"
+                                            aria-controls="{{ picker_id }}-list"
+                                            aria-autocomplete="list"
+                                        >
+                                    </div>
+                                    <div class="id-picker-list" id="{{ picker_id }}-list" role="listbox" aria-labelledby="{{ picker_id }}-label">
+                                        {% for group in id_picker_groups %}
+                                        <p class="id-picker-group" data-group-title>{{ group.title }}</p>
+                                        {% for choice in group["items"] %}
+                                        <button
+                                            class="id-picker-option{% if picker_match and picker_match.document_key == choice.key %} is-selected{% endif %}"
+                                            type="button"
+                                            role="option"
+                                            data-value="{{ choice.key }}"
+                                            data-label="{{ choice.label }}"
+                                            data-search="{{ choice.key }} {{ choice.label }} {{ choice.markers|join(' ') }}"
+                                            aria-selected="{{ 'true' if picker_match and picker_match.document_key == choice.key else 'false' }}"
+                                        >{{ choice.label }}</button>
+                                        {% endfor %}
+                                        {% endfor %}
+                                    </div>
+                                    <p class="id-picker-empty" hidden>No matching ID found.</p>
+                                </div>
+                                <input
+                                    class="id-picker-value"
+                                    type="hidden"
+                                    id="{{ picker_id }}-type"
+                                    name="id_type"
+                                    value="{{ picker_match.document_key if picker_match and picker_match.document_key else '' }}"
+                                    required
+                                >
+                            </div>
+                        </div>
+                        <div id="{{ picker_id }}-file" class="passport-upload upload-field id-picker-file{% if not (picker_match and picker_match.document_key) %} is-collapsed{% endif %}">
+                            <label for="file-{{ document.key }}">{% if row and row.uploaded_file %}Replace file{% else %}Upload the selected ID{% endif %}</label>
+                            <input id="file-{{ document.key }}" name="document" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" {% if not (picker_match and picker_match.document_key) %}disabled{% else %}required{% endif %}>
+                            <p class="upload-progress" hidden role="status">Uploading…</p>
+                            <div class="upload-actions">
+                                <button class="dash-button" type="submit" {% if not (picker_match and picker_match.document_key) %}disabled{% endif %}>{% if row and row.uploaded_file %}Replace{% else %}Upload{% endif %}</button>
+                                {% if row and row.uploaded_file %}
+                                <button class="dash-button apply-cancel" type="submit" form="remove-document-{{ document.key }}">Remove file</button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </form>
+                    {% if row and row.uploaded_file %}
+                    <form id="remove-document-{{ document.key }}" method="post" action="{{ url_for('citizen.remove_document', application_id=application.application_id, document_key=document.key) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    </form>
+                    {% endif %}
+                </article>
+                {% endfor %}
+                {% endif %}
+
+                <section class="document-upload-panel" aria-label="Supporting documents">
+                    <div class="document-upload-panel-head">
+                        <h2>{% if spec.kind in ['barangay', 'residency'] %}Other documents{% elif spec.kind in ['senior', 'nbi', 'birth', 'sss'] %}Document checklist{% else %}Required uploads{% endif %}</h2>
+                        <p>{% if spec.kind == 'senior' %}Select a valid government ID from the searchable list, then upload the files that apply. Representative and transfer files appear only when you chose Yes in application details.{% elif spec.kind == 'nbi' %}Select a valid government ID from the searchable list, then upload that ID and a second government-issued ID.{% elif spec.kind == 'birth' %}Select a valid government ID from the searchable list, then upload that same ID. The authorization letter appears only when you chose Yes for a representative.{% elif spec.kind == 'sss' %}Section A accepts one primary government ID. Section B appears only when you cannot provide a primary ID, and then two different alternative documents are required.{% elif spec.kind in ['barangay', 'residency'] %}Upload the remaining required files for your selected application type.{% else %}Upload each file in the shared list below.{% endif %}</p>
+                    </div>
+                    {% if spec.kind in ['senior', 'nbi', 'birth', 'sss'] %}
+                    <div class="document-upload-list document-upload-list--senior{% if spec.kind == 'birth' %} document-upload-list--birth{% endif %}">
+                        {% for document in documents if (not document.required_when) or document.required or (requirements.get(document.key) and requirements.get(document.key).uploaded_file) %}
+                        {% set row = requirements.get(document.key) %}
+                        {% set status_label = document.status_label or ('Required' if document.required else ('Conditional' if document.required_when or document.required_unless else 'Optional')) %}
+                        {% set use_id_picker = document.id_choices in ['barangay', 'sss', 'sss_alt'] %}
+                        {% set picker_match = (id_picker_matches or {}).get(document.key) if use_id_picker else none %}
+                        {% set picker_id = 'id-picker-' ~ document.key %}
+                        {% set picker_groups = id_picker_alt_groups if document.id_choices == 'sss_alt' else id_picker_groups %}
+                        <article class="document-upload-row document-upload-row--senior{% if row and row.uploaded_file %} is-uploaded{% elif document.required %} is-needed{% else %} is-optional{% endif %}{% if use_id_picker %} has-id-picker document-upload-row--id{% elif spec.kind == 'birth' %} document-upload-row--full{% endif %}">
+                            <div class="document-upload-copy">
+                                <div class="document-upload-title">
+                                    <h3>{{ document.label }}</h3>
+                                    <span class="document-status-pill document-status-pill--{{ status_label|lower }}">{{ status_label }}</span>
+                                </div>
+                                <p class="document-state">{% if row and row.uploaded_file %}Uploaded{% else %}Missing{% endif %}</p>
+                                <p class="field-help">{{ document.help }}</p>
+                                {% if row and row.uploaded_file %}
+                                <p class="document-file">File: {{ row.remarks or 'Uploaded file' }}{% if use_id_picker and picker_match and picker_match.label %} · {{ picker_match.label }}{% endif %}</p>
+                                {% set lower = (row.uploaded_file or '')|lower %}
+                                {% if lower.endswith('.jpg') or lower.endswith('.jpeg') or lower.endswith('.png') %}
+                                <img class="document-preview" src="{{ url_for('citizen.application_document', application_id=application.application_id, requirement_id=row.requirement_id) }}" alt="Preview of {{ document.label }}">
+                                {% else %}
+                                <a href="{{ url_for('citizen.application_document', application_id=application.application_id, requirement_id=row.requirement_id) }}">View uploaded PDF</a>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                            {% if use_id_picker %}
+                            <form class="upload-form upload-form-passport document-upload-form" method="post" enctype="multipart/form-data" action="{{ url_for('citizen.upload_document', application_id=application.application_id, document_key=document.key) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <div class="upload-field">
+                                    <label id="{{ picker_id }}-label" for="{{ picker_id }}-trigger">Select ID type</label>
+                                    <p class="field-help" id="{{ picker_id }}-help">Choose one ID, then upload a clear copy of that same ID.</p>
+                                    <div class="id-picker" data-id-picker>
+                                        <button
+                                            class="id-picker-trigger"
+                                            id="{{ picker_id }}-trigger"
+                                            type="button"
+                                            aria-haspopup="listbox"
+                                            aria-expanded="false"
+                                            aria-controls="{{ picker_id }}-panel"
+                                            aria-describedby="{{ picker_id }}-help"
+                                        >
+                                            <span class="id-picker-trigger-label">{% if picker_match and picker_match.document_key %}{{ picker_match.label }}{% else %}Select a valid government ID{% endif %}</span>
+                                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="id-picker-panel" id="{{ picker_id }}-panel" hidden>
+                                            <div class="id-picker-search-wrap">
+                                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                                                <input
+                                                    class="id-picker-search"
+                                                    id="{{ picker_id }}-search"
+                                                    type="text"
+                                                    placeholder="Type to search ID…"
+                                                    autocomplete="off"
+                                                    spellcheck="false"
+                                                    aria-label="Search valid government ID"
+                                                    aria-controls="{{ picker_id }}-list"
+                                                    aria-autocomplete="list"
+                                                >
+                                            </div>
+                                            <div class="id-picker-list" id="{{ picker_id }}-list" role="listbox" aria-labelledby="{{ picker_id }}-label">
+                                                {% for group in picker_groups %}
+                                                <p class="id-picker-group" data-group-title>{{ group.title }}</p>
+                                                {% for choice in group["items"] %}
+                                                <button
+                                                    class="id-picker-option{% if picker_match and picker_match.document_key == choice.key %} is-selected{% endif %}"
+                                                    type="button"
+                                                    role="option"
+                                                    data-value="{{ choice.key }}"
+                                                    data-label="{{ choice.label }}"
+                                                    data-search="{{ choice.key }} {{ choice.label }} {{ choice.markers|join(' ') }}"
+                                                    aria-selected="{{ 'true' if picker_match and picker_match.document_key == choice.key else 'false' }}"
+                                                >{{ choice.label }}</button>
+                                                {% endfor %}
+                                                {% endfor %}
+                                            </div>
+                                            <p class="id-picker-empty" hidden>No matching ID found.</p>
+                                        </div>
+                                        <input
+                                            class="id-picker-value"
+                                            type="hidden"
+                                            id="{{ picker_id }}-type"
+                                            name="id_type"
+                                            value="{{ picker_match.document_key if picker_match and picker_match.document_key else '' }}"
+                                            required
+                                        >
+                                    </div>
+                                </div>
+                                <div id="{{ picker_id }}-file" class="passport-upload upload-field id-picker-file{% if not (picker_match and picker_match.document_key) %} is-collapsed{% endif %}">
+                                    <label for="file-{{ document.key }}">{% if row and row.uploaded_file %}Replace file{% else %}Upload the selected ID{% endif %}</label>
+                                    <input id="file-{{ document.key }}" name="document" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" {% if not (picker_match and picker_match.document_key) %}disabled{% else %}required{% endif %}>
+                                    <p class="upload-progress" hidden role="status">Uploading…</p>
+                                    <div class="upload-actions">
+                                        <button class="dash-button" type="submit" {% if not (picker_match and picker_match.document_key) %}disabled{% endif %}>{% if row and row.uploaded_file %}Replace{% else %}Upload{% endif %}</button>
+                                        {% if row and row.uploaded_file %}
+                                        <button class="dash-button apply-cancel" type="submit" form="remove-document-{{ document.key }}">Remove</button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </form>
+                            {% else %}
+                            <form class="upload-form upload-form-passport document-upload-form" method="post" enctype="multipart/form-data" action="{{ url_for('citizen.upload_document', application_id=application.application_id, document_key=document.key) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <div class="upload-field">
+                                    <label for="file-{{ document.key }}">{% if row and row.uploaded_file %}Replace file{% else %}{% if document.key == 'authorization' %}Upload authorization letter{% else %}Choose file{% endif %}{% endif %}</label>
+                                    {% if document.key == 'authorization' %}
+                                    <p class="field-help">PDF or photo of the signed letter or proof of relationship.</p>
+                                    {% endif %}
+                                    <input id="file-{{ document.key }}" name="document" type="file" accept="{{ spec.upload_accept or '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png' }}" required>
+                                    <p class="upload-progress" hidden role="status">Uploading…</p>
+                                    <div class="upload-actions">
+                                        <button class="dash-button" type="submit">{% if row and row.uploaded_file %}Replace{% else %}Upload{% endif %}</button>
+                                        {% if row and row.uploaded_file %}
+                                        <button class="dash-button apply-cancel" type="submit" form="remove-document-{{ document.key }}">Remove</button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </form>
+                            {% endif %}
+                            {% if row and row.uploaded_file %}
+                            <form id="remove-document-{{ document.key }}" method="post" action="{{ url_for('citizen.remove_document', application_id=application.application_id, document_key=document.key) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            </form>
+                            {% endif %}
+                        </article>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="document-upload-list">
+                        {% for document in documents if (spec.kind not in ['barangay', 'residency'] or document.id_choices != 'barangay') and (document.required or (requirements.get(document.key) and requirements.get(document.key).uploaded_file) or not document.required_when) %}
+                        {% set row = requirements.get(document.key) %}
+                        <article class="document-upload-row{% if row and row.uploaded_file %} is-uploaded{% elif document.required %} is-needed{% else %} is-optional{% endif %}">
+                            <div class="document-upload-copy">
+                                <div class="document-upload-title">
+                                    <h3>{{ document.label }}</h3>
+                                    <span class="document-state">{% if document.required %}Required{% else %}Optional{% endif %} · {% if row and row.uploaded_file %}Uploaded{% else %}Missing{% endif %}</span>
+                                </div>
+                                <p class="field-help">{{ document.help }}</p>
+                                {% if row and row.uploaded_file %}
+                                <p class="document-file">File: {{ row.remarks or 'Uploaded file' }}</p>
+                                {% set lower = (row.uploaded_file or '')|lower %}
+                                {% if lower.endswith('.jpg') or lower.endswith('.jpeg') or lower.endswith('.png') %}
+                                <img class="document-preview" src="{{ url_for('citizen.application_document', application_id=application.application_id, requirement_id=row.requirement_id) }}" alt="Preview of {{ document.label }}">
+                                {% else %}
+                                <a href="{{ url_for('citizen.application_document', application_id=application.application_id, requirement_id=row.requirement_id) }}">View uploaded PDF</a>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                            <form class="upload-form document-upload-form" method="post" enctype="multipart/form-data" action="{{ url_for('citizen.upload_document', application_id=application.application_id, document_key=document.key) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <div class="upload-field">
+                                    <label for="file-{{ document.key }}">{% if row and row.uploaded_file %}Replace file{% else %}Choose file{% endif %}</label>
+                                    <input id="file-{{ document.key }}" name="document" type="file" accept="{{ spec.upload_accept or '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png' }}" required>
+                                    <p class="upload-progress" hidden role="status">Uploading…</p>
+                                    <div class="upload-actions">
+                                        <button class="dash-button" type="submit">{% if row and row.uploaded_file %}Replace{% else %}Upload{% endif %}</button>
+                                        {% if row and row.uploaded_file %}
+                                        <button class="dash-button apply-cancel" type="submit" form="remove-document-{{ document.key }}">Remove</button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </form>
+                            {% if row and row.uploaded_file %}
+                            <form id="remove-document-{{ document.key }}" method="post" action="{{ url_for('citizen.remove_document', application_id=application.application_id, document_key=document.key) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            </form>
+                            {% endif %}
+                        </article>
+                        {% else %}
+                        <p class="empty-note">No supporting documents are required for this request yet.</p>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </section>
+            </div>
+        </div>
+
+        <div class="pay-actions apply-actions">
+            <a class="dash-button apply-cancel pay-btn-ghost" href="{% if spec.kind == 'passport' and spec.type_first %}{{ url_for('citizen.apply_type', service_id=service.service_id) }}{% elif spec.kind in ['barangay', 'residency', 'senior', 'nbi', 'birth'] and spec.type_first %}{{ url_for('citizen.apply_details', service_id=service.service_id) }}{% elif spec.documents_back_step %}{{ url_for('citizen.apply_details', service_id=service.service_id, step=spec.documents_back_step) }}{% else %}{{ url_for('citizen.apply_details', service_id=service.service_id) }}{% endif %}">Back</a>
+            <form method="post" action="{{ url_for('citizen.apply_cancel', application_id=application.application_id) }}" onsubmit="return confirm('Cancel this application? The information and files you entered will be removed.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="dash-button apply-cancel pay-btn-ghost" type="submit">Cancel</button>
+            </form>
+            <form method="post" action="{{ url_for('citizen.continue_documents', application_id=application.application_id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="dash-button dash-button-apply pay-btn-primary" type="submit">Continue</button>
+            </form>
+        </div>
+    </section>
+    {% else %}
     <section class="apply-card documents-page" aria-labelledby="documents-heading">
         <div class="documents-content">
         {% include "applications/_progress.html" %}
         <p class="dash-kicker">{{ spec.kicker or spec.department_label or service.department.department_name }}</p>
         <h1 id="documents-heading">{% if spec.kind == 'passport' %}Upload a valid ID{% else %}Upload documents{% endif %}</h1>
-        {% if spec.kind != 'passport' %}
+        {% if spec.kind not in ['passport'] %}
         <p class="welcome-text">{{ spec.upload_intro or "Upload a PDF, JPG, JPEG, or PNG for each required document. Each file must be 16 MB or smaller. You can replace or remove a file before you continue." }}</p>
         {% endif %}
         {% if spec.document_examples %}
@@ -20,14 +361,14 @@
             {% endfor %}
         </ul>
         {% endif %}
-        {% if spec.disclaimer and spec.kind != 'passport' %}<p class="field-help">{{ spec.disclaimer }}</p>{% endif %}
-        {% if missing %}
-        <p class="field-error" role="status">Still needed: {{ missing|join(', ') }}.</p>
+        {% if spec.disclaimer and spec.kind not in ['passport'] %}
+        <p class="field-help">{{ spec.disclaimer }}</p>
         {% endif %}
         <div class="document-list{% if spec.kind == 'passport' %} document-list-passport{% endif %}">
             {% for document in documents %}
             {% set row = requirements.get(document.key) %}
-            {% if spec.kind == 'passport' and document.id_choices == 'dfa' %}
+            {% set use_id_picker = spec.kind == 'passport' and document.id_choices == 'dfa' %}
+            {% if use_id_picker %}
             <article class="detail-card document-card document-card-split{% if row and row.uploaded_file %} is-uploaded{% elif document.required %} is-needed{% else %} is-optional{% endif %}">
                 <div class="document-split">
                     <aside class="document-split-side" aria-label="Upload guidelines">
@@ -49,8 +390,8 @@
                         <p class="document-state">{% if document.required %}Required{% else %}Optional{% endif %} · {% if row and row.uploaded_file %}Uploaded{% else %}Missing{% endif %}</p>
                         {% if row and row.uploaded_file %}
                         <p class="document-file">File: {{ row.remarks or 'Uploaded file' }}</p>
-                        {% if passport_id_match and passport_id_match.value == 'matched' %}
-                        <p class="field-help">Matched: {{ passport_id_match.label }}</p>
+                        {% if id_picker_match and id_picker_match.label %}
+                        <p class="field-help">{% if id_picker_match.value == 'matched' %}Matched{% else %}Selected{% endif %}: {{ id_picker_match.label }}</p>
                         {% endif %}
                         {% set lower = (row.uploaded_file or '')|lower %}
                         {% if lower.endswith('.jpg') or lower.endswith('.jpeg') or lower.endswith('.png') %}
@@ -75,7 +416,7 @@
                                         aria-controls="passport-id-panel"
                                         aria-describedby="passport-id-help"
                                     >
-                                        <span class="id-picker-trigger-label">{% if passport_id_match and passport_id_match.document_key %}{{ passport_id_match.label }}{% else %}Select a valid government ID{% endif %}</span>
+                                        <span class="id-picker-trigger-label">{% if id_picker_match and id_picker_match.document_key %}{{ id_picker_match.label }}{% else %}Select a valid government ID{% endif %}</span>
                                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
                                     </button>
                                     <div class="id-picker-panel" id="passport-id-panel" hidden>
@@ -94,17 +435,17 @@
                                             >
                                         </div>
                                         <div class="id-picker-list" id="passport-id-list" role="listbox" aria-labelledby="passport-id-label">
-                                            {% for group in passport_id_groups %}
+                                            {% for group in id_picker_groups %}
                                             <p class="id-picker-group" data-group-title>{{ group.title }}</p>
                                             {% for choice in group["items"] %}
                                             <button
-                                                class="id-picker-option{% if passport_id_match and passport_id_match.document_key == choice.key %} is-selected{% endif %}"
+                                                class="id-picker-option{% if id_picker_match and id_picker_match.document_key == choice.key %} is-selected{% endif %}"
                                                 type="button"
                                                 role="option"
                                                 data-value="{{ choice.key }}"
                                                 data-label="{{ choice.label }}"
                                                 data-search="{{ choice.key }} {{ choice.label }} {{ choice.markers|join(' ') }}"
-                                                aria-selected="{{ 'true' if passport_id_match and passport_id_match.document_key == choice.key else 'false' }}"
+                                                aria-selected="{{ 'true' if id_picker_match and id_picker_match.document_key == choice.key else 'false' }}"
                                             >{{ choice.label }}</button>
                                             {% endfor %}
                                             {% endfor %}
@@ -115,17 +456,17 @@
                                         type="hidden"
                                         id="passport-id-type"
                                         name="id_type"
-                                        value="{{ passport_id_match.document_key if passport_id_match and passport_id_match.document_key else '' }}"
+                                        value="{{ id_picker_match.document_key if id_picker_match and id_picker_match.document_key else '' }}"
                                         required
                                     >
                                 </div>
                             </div>
-                            <div id="passport-id-file" class="passport-upload upload-field{% if not (passport_id_match and passport_id_match.document_key) %} is-collapsed{% endif %}">
+                            <div id="passport-id-file" class="passport-upload upload-field{% if not (id_picker_match and id_picker_match.document_key) %} is-collapsed{% endif %}">
                                 <label for="file-{{ document.key }}">{% if row and row.uploaded_file %}Replace file{% else %}Upload the selected ID{% endif %}</label>
-                                <input id="file-{{ document.key }}" name="document" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" {% if not (passport_id_match and passport_id_match.document_key) %}disabled{% else %}required{% endif %}>
+                                <input id="file-{{ document.key }}" name="document" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" {% if not (id_picker_match and id_picker_match.document_key) %}disabled{% else %}required{% endif %}>
                                 <p class="upload-progress" hidden role="status">Uploading…</p>
                                 <div class="upload-actions">
-                                    <button class="dash-button" type="submit" {% if not (passport_id_match and passport_id_match.document_key) %}disabled{% endif %}>{% if row and row.uploaded_file %}Replace{% else %}Upload{% endif %}</button>
+                                    <button class="dash-button" type="submit" {% if not (id_picker_match and id_picker_match.document_key) %}disabled{% endif %}>{% if row and row.uploaded_file %}Replace{% else %}Upload{% endif %}</button>
                                     {% if row and row.uploaded_file %}
                                     <button class="dash-button apply-cancel" type="submit" form="remove-document-{{ document.key }}">Remove file</button>
                                     {% endif %}
@@ -179,7 +520,7 @@
         </div>
         </div>
         <div class="apply-actions">
-            <a class="dash-button apply-cancel" href="{% if spec.kind == 'passport' or spec.documents_first %}{{ url_for('citizen.services') }}{% elif spec.documents_back_step %}{{ url_for('citizen.apply_details', service_id=service.service_id, step=spec.documents_back_step) }}{% else %}{{ url_for('citizen.apply_details', service_id=service.service_id) }}{% endif %}">Back</a>
+            <a class="dash-button apply-cancel" href="{% if spec.kind == 'passport' and spec.type_first %}{{ url_for('citizen.apply_type', service_id=service.service_id) }}{% elif spec.kind == 'passport' or spec.documents_first %}{{ url_for('citizen.services') }}{% elif spec.documents_back_step %}{{ url_for('citizen.apply_details', service_id=service.service_id, step=spec.documents_back_step) }}{% else %}{{ url_for('citizen.apply_details', service_id=service.service_id) }}{% endif %}">Back</a>
             <form method="post" action="{{ url_for('citizen.apply_cancel', application_id=application.application_id) }}" onsubmit="return confirm('Cancel this application? The information and files you entered will be removed.');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="dash-button apply-cancel" type="submit">Cancel</button>
@@ -190,48 +531,10 @@
             </form>
         </div>
     </section>
+    {% endif %}
 </div>
 <script>
 (function () {
-    var picker = document.querySelector("[data-id-picker]");
-    var passportIdType = document.getElementById("passport-id-type");
-    var passportIdFile = document.getElementById("passport-id-file");
-    if (!picker || !passportIdType || !passportIdFile) {
-        return;
-    }
-
-    var trigger = document.getElementById("passport-id-trigger");
-    var panel = document.getElementById("passport-id-panel");
-    var search = document.getElementById("passport-id-search");
-    var list = document.getElementById("passport-id-list");
-    var empty = picker.querySelector(".id-picker-empty");
-    var triggerLabel = trigger.querySelector(".id-picker-trigger-label");
-    var groups = Array.prototype.slice.call(list.querySelectorAll("[data-group-title]"));
-    var options = Array.prototype.slice.call(list.querySelectorAll(".id-picker-option"));
-    var originalNodes = Array.prototype.slice.call(list.childNodes);
-    var passportFileInput = passportIdFile.querySelector('input[type="file"]');
-    var passportUploadButton = passportIdFile.querySelector('button[type="submit"]');
-    var activeOption = null;
-
-    options.forEach(function (option, index) {
-        option.setAttribute("data-order", String(index));
-    });
-
-    var syncPassportUpload = function () {
-        var chosen = !!passportIdType.value;
-        passportIdFile.classList.toggle("is-collapsed", !chosen);
-        if (passportFileInput) {
-            passportFileInput.disabled = !chosen;
-            passportFileInput.required = chosen;
-            if (!chosen) {
-                passportFileInput.value = "";
-            }
-        }
-        if (passportUploadButton) {
-            passportUploadButton.disabled = !chosen;
-        }
-    };
-
     var escapeHtml = function (value) {
         return String(value || "")
             .replace(/&/g, "&amp;")
@@ -325,200 +628,251 @@
         return safeLabel.replace(pattern, "<mark>$1</mark>");
     };
 
-    var setActiveOption = function (option) {
-        if (activeOption) {
-            activeOption.classList.remove("is-active");
+    var initIdPicker = function (picker) {
+        var form = picker.closest("form");
+        var trigger = picker.querySelector(".id-picker-trigger");
+        var panel = picker.querySelector(".id-picker-panel");
+        var search = picker.querySelector(".id-picker-search");
+        var list = picker.querySelector(".id-picker-list");
+        var empty = picker.querySelector(".id-picker-empty");
+        var idType = picker.querySelector(".id-picker-value, #passport-id-type, input[name='id_type']");
+        var idFile = (form && (
+            form.querySelector(".id-picker-file")
+            || form.querySelector("#passport-id-file")
+            || form.querySelector(".passport-upload.upload-field")
+        )) || null;
+        if (!trigger || !panel || !search || !list || !idType) {
+            return;
         }
-        activeOption = option || null;
-        if (activeOption) {
-            activeOption.classList.add("is-active");
-            if (typeof activeOption.scrollIntoView === "function") {
+
+        var triggerLabel = trigger.querySelector(".id-picker-trigger-label");
+        var groups = Array.prototype.slice.call(list.querySelectorAll("[data-group-title]"));
+        var options = Array.prototype.slice.call(list.querySelectorAll(".id-picker-option"));
+        var originalNodes = Array.prototype.slice.call(list.childNodes);
+        var fileInput = idFile ? idFile.querySelector('input[type="file"]') : null;
+        var uploadButton = idFile ? idFile.querySelector('button[type="submit"]') : null;
+        var activeOption = null;
+
+        options.forEach(function (option, index) {
+            option.setAttribute("data-order", String(index));
+        });
+
+        var syncUpload = function () {
+            var chosen = !!idType.value;
+            if (idFile) {
+                idFile.classList.toggle("is-collapsed", !chosen);
+            }
+            if (fileInput) {
+                fileInput.disabled = !chosen;
+                fileInput.required = chosen;
+                if (!chosen) {
+                    fileInput.value = "";
+                }
+            }
+            if (uploadButton) {
+                uploadButton.disabled = !chosen;
+            }
+        };
+
+        var setActiveOption = function (option) {
+            if (activeOption) {
+                activeOption.classList.remove("is-active");
+            }
+            activeOption = option || null;
+            if (activeOption) {
+                activeOption.classList.add("is-active");
+                if (typeof activeOption.scrollIntoView === "function") {
+                    activeOption.scrollIntoView({ block: "nearest" });
+                }
+            }
+        };
+
+        var restoreOriginalOrder = function () {
+            originalNodes.forEach(function (node) {
+                list.appendChild(node);
+                if (node.nodeType === 1 && node.hasAttribute && node.hasAttribute("data-group-title")) {
+                    node.hidden = false;
+                }
+            });
+            groups.forEach(function (group) {
+                group.hidden = false;
+            });
+        };
+
+        var filterOptions = function (query) {
+            var needle = String(query || "").trim();
+            var ranked = [];
+
+            options.forEach(function (option) {
+                var result = scoreMatch(option, needle);
+                option.classList.remove("is-active");
+                if (!needle) {
+                    option.hidden = false;
+                    option.innerHTML = escapeHtml(option.getAttribute("data-label") || "");
+                    return;
+                }
+                if (result.matched) {
+                    option.hidden = false;
+                    option.innerHTML = highlightLabel(option.getAttribute("data-label") || "", needle);
+                    ranked.push({ option: option, score: result.score });
+                } else {
+                    option.hidden = true;
+                    option.innerHTML = escapeHtml(option.getAttribute("data-label") || "");
+                }
+            });
+
+            if (!needle) {
+                restoreOriginalOrder();
+                if (empty) {
+                    empty.hidden = true;
+                }
+                setActiveOption(null);
+                return;
+            }
+
+            groups.forEach(function (group) {
+                group.hidden = true;
+            });
+
+            ranked.sort(function (a, b) {
+                if (b.score !== a.score) {
+                    return b.score - a.score;
+                }
+                return Number(a.option.getAttribute("data-order")) - Number(b.option.getAttribute("data-order"));
+            });
+
+            ranked.forEach(function (item) {
+                list.appendChild(item.option);
+            });
+
+            if (empty) {
+                empty.hidden = ranked.length > 0;
+            }
+
+            setActiveOption(ranked.length ? ranked[0].option : null);
+            list.scrollTop = 0;
+            if (activeOption && typeof activeOption.scrollIntoView === "function") {
                 activeOption.scrollIntoView({ block: "nearest" });
             }
-        }
-    };
+        };
 
-    var restoreOriginalOrder = function () {
-        originalNodes.forEach(function (node) {
-            list.appendChild(node);
-            if (node.nodeType === 1 && node.hasAttribute && node.hasAttribute("data-group-title")) {
-                node.hidden = false;
+        var setOpen = function (open) {
+            panel.hidden = !open;
+            trigger.setAttribute("aria-expanded", open ? "true" : "false");
+            picker.classList.toggle("is-open", open);
+            if (open) {
+                search.value = "";
+                filterOptions("");
+                window.setTimeout(function () {
+                    search.focus();
+                    search.select();
+                }, 0);
             }
-        });
-        groups.forEach(function (group) {
-            group.hidden = false;
-        });
-    };
+        };
 
-    var filterOptions = function (query) {
-        var needle = String(query || "").trim();
-        var ranked = [];
-
-        options.forEach(function (option) {
-            var result = scoreMatch(option, needle);
-            option.classList.remove("is-active");
-            if (!needle) {
-                option.hidden = false;
-                option.innerHTML = escapeHtml(option.getAttribute("data-label") || "");
-                return;
+        var selectOption = function (option) {
+            var value = option.getAttribute("data-value") || "";
+            var label = option.getAttribute("data-label") || "Select a valid government ID";
+            idType.value = value;
+            if (triggerLabel) {
+                triggerLabel.textContent = label;
             }
-            if (result.matched) {
-                option.hidden = false;
-                option.innerHTML = highlightLabel(option.getAttribute("data-label") || "", needle);
-                ranked.push({ option: option, score: result.score });
-            } else {
-                option.hidden = true;
-                option.innerHTML = escapeHtml(option.getAttribute("data-label") || "");
-            }
-        });
-
-        if (!needle) {
-            restoreOriginalOrder();
-            if (empty) {
-                empty.hidden = true;
-            }
-            setActiveOption(null);
-            return;
-        }
-
-        groups.forEach(function (group) {
-            group.hidden = true;
-        });
-
-        ranked.sort(function (a, b) {
-            if (b.score !== a.score) {
-                return b.score - a.score;
-            }
-            return Number(a.option.getAttribute("data-order")) - Number(b.option.getAttribute("data-order"));
-        });
-
-        ranked.forEach(function (item) {
-            list.appendChild(item.option);
-        });
-
-        if (empty) {
-            empty.hidden = ranked.length > 0;
-        }
-
-        setActiveOption(ranked.length ? ranked[0].option : null);
-        list.scrollTop = 0;
-        if (activeOption && typeof activeOption.scrollIntoView === "function") {
-            activeOption.scrollIntoView({ block: "nearest" });
-        }
-    };
-
-    var setOpen = function (open) {
-        panel.hidden = !open;
-        trigger.setAttribute("aria-expanded", open ? "true" : "false");
-        picker.classList.toggle("is-open", open);
-        if (open) {
-            search.value = "";
-            filterOptions("");
-            window.setTimeout(function () {
-                search.focus();
-                search.select();
-            }, 0);
-        }
-    };
-
-    var selectOption = function (option) {
-        var value = option.getAttribute("data-value") || "";
-        var label = option.getAttribute("data-label") || "Select a valid government ID";
-        passportIdType.value = value;
-        triggerLabel.textContent = label;
-        options.forEach(function (item) {
-            var selected = item === option;
-            item.classList.toggle("is-selected", selected);
-            item.setAttribute("aria-selected", selected ? "true" : "false");
-            item.innerHTML = escapeHtml(item.getAttribute("data-label") || "");
-        });
-        setOpen(false);
-        syncPassportUpload();
-        passportIdType.dispatchEvent(new Event("change", { bubbles: true }));
-    };
-
-    trigger.addEventListener("click", function (event) {
-        event.preventDefault();
-        setOpen(panel.hidden);
-    });
-
-    var onSearch = function () {
-        filterOptions(search.value);
-    };
-
-    search.addEventListener("input", onSearch);
-    search.addEventListener("keyup", onSearch);
-    search.addEventListener("search", onSearch);
-
-    search.addEventListener("keydown", function (event) {
-        if (event.key === "Escape") {
-            event.preventDefault();
-            setOpen(false);
-            trigger.focus();
-            return;
-        }
-        if (event.key === "Enter") {
-            event.preventDefault();
-            if (activeOption && !activeOption.hidden) {
-                selectOption(activeOption);
-            }
-            return;
-        }
-        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-            event.preventDefault();
-            var visible = Array.prototype.slice.call(list.querySelectorAll(".id-picker-option")).filter(function (option) {
-                return !option.hidden;
+            options.forEach(function (item) {
+                var selected = item === option;
+                item.classList.toggle("is-selected", selected);
+                item.setAttribute("aria-selected", selected ? "true" : "false");
+                item.innerHTML = escapeHtml(item.getAttribute("data-label") || "");
             });
-            if (!visible.length) {
-                return;
-            }
-            var currentIndex = activeOption ? visible.indexOf(activeOption) : -1;
-            var nextIndex = event.key === "ArrowDown"
-                ? Math.min(visible.length - 1, currentIndex + 1)
-                : Math.max(0, currentIndex <= 0 ? 0 : currentIndex - 1);
-            setActiveOption(visible[nextIndex] || visible[0]);
-        }
-    });
+            setOpen(false);
+            syncUpload();
+            idType.dispatchEvent(new Event("change", { bubbles: true }));
+        };
 
-    options.forEach(function (option) {
-        option.addEventListener("mouseenter", function () {
-            setActiveOption(option);
+        trigger.addEventListener("click", function (event) {
+            event.preventDefault();
+            setOpen(panel.hidden);
         });
-        option.addEventListener("click", function () {
-            selectOption(option);
-        });
-        option.addEventListener("keydown", function (event) {
-            if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                selectOption(option);
-            }
+
+        var onSearch = function () {
+            filterOptions(search.value);
+        };
+
+        search.addEventListener("input", onSearch);
+        search.addEventListener("keyup", onSearch);
+        search.addEventListener("search", onSearch);
+
+        search.addEventListener("keydown", function (event) {
             if (event.key === "Escape") {
                 event.preventDefault();
                 setOpen(false);
                 trigger.focus();
+                return;
+            }
+            if (event.key === "Enter") {
+                event.preventDefault();
+                if (activeOption && !activeOption.hidden) {
+                    selectOption(activeOption);
+                }
+                return;
+            }
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                var visible = Array.prototype.slice.call(list.querySelectorAll(".id-picker-option")).filter(function (option) {
+                    return !option.hidden;
+                });
+                if (!visible.length) {
+                    return;
+                }
+                var currentIndex = activeOption ? visible.indexOf(activeOption) : -1;
+                var nextIndex = event.key === "ArrowDown"
+                    ? Math.min(visible.length - 1, currentIndex + 1)
+                    : Math.max(0, currentIndex <= 0 ? 0 : currentIndex - 1);
+                setActiveOption(visible[nextIndex] || visible[0]);
             }
         });
-    });
 
-    document.addEventListener("click", function (event) {
-        if (!picker.contains(event.target)) {
-            setOpen(false);
-        }
-    });
+        options.forEach(function (option) {
+            option.addEventListener("mouseenter", function () {
+                setActiveOption(option);
+            });
+            option.addEventListener("click", function () {
+                selectOption(option);
+            });
+            option.addEventListener("keydown", function (event) {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    selectOption(option);
+                }
+                if (event.key === "Escape") {
+                    event.preventDefault();
+                    setOpen(false);
+                    trigger.focus();
+                }
+            });
+        });
 
-    document.addEventListener("keydown", function (event) {
-        if (event.key === "Escape" && !panel.hidden) {
-            setOpen(false);
-            trigger.focus();
-        }
-    });
+        document.addEventListener("click", function (event) {
+            if (!picker.contains(event.target)) {
+                setOpen(false);
+            }
+        });
 
-    syncPassportUpload();
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape" && !panel.hidden) {
+                setOpen(false);
+                trigger.focus();
+            }
+        });
+
+        syncUpload();
+    };
+
+    Array.prototype.slice.call(document.querySelectorAll("[data-id-picker]")).forEach(initIdPicker);
 })();
 
 document.querySelectorAll(".upload-form").forEach(function (form) {
     form.addEventListener("submit", function (event) {
-        var idType = form.querySelector("#passport-id-type");
+        var idType = form.querySelector(".id-picker-value, #passport-id-type, input[name='id_type']");
         if (idType && !idType.value) {
             event.preventDefault();
             alert("Select a valid government ID before uploading.");

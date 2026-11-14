@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Application type · {{ service.service_name }} · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard{% endblock %}
+{% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
+{% block content %}
+{% set modern_step_count = (step_labels|length) if step_labels else 7 %}
+<div class="dash-page site-width">
+    <section class="apply-card pay-shell confirm-shell passport-details-shell" aria-labelledby="type-heading">
+        {% include "applications/_progress.html" %}
+
+        <header class="pay-hero confirm-hero">
+            <div class="pay-hero-copy">
+                <p class="pay-kicker">{{ spec.kicker or "Application type" }}</p>
+                <h1 id="type-heading" class="passport-details-title">Select application type</h1>
+                <p class="welcome-text">
+                    {{ type_intro or "Choose the application type that matches your situation. Physical document requirements depend on this choice." }}
+                </p>
+            </div>
+            <div class="confirm-success-chip passport-step-chip" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+                <span>Step {{ step }} of {{ modern_step_count }}</span>
+            </div>
+        </header>
+
+        <form class="apply-form passport-details-form" method="post" action="{{ url_for('citizen.apply_type', service_id=service.service_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% if error %}
+            <p class="field-error" role="alert">{{ error }}</p>
+            {% endif %}
+
+            <section class="pay-panel confirm-panel confirm-panel--appointment" aria-labelledby="type-list-heading">
+                <div class="pay-panel-head confirm-panel-head">
+                    <span class="confirm-panel-icon confirm-panel-icon--maroon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"/></svg>
+                    </span>
+                    <div>
+                        <h2 id="type-list-heading">{{ type_heading or "Application types" }}</h2>
+                        <p>Select one type to continue.</p>
+                    </div>
+                </div>
+
+                <div class="passport-type-grid" role="radiogroup" aria-labelledby="type-list-heading">
+                    {% for option in type_options %}
+                    <label class="passport-type-card{% if selected_type == option.key %} is-selected{% endif %}">
+                        <input
+                            type="radio"
+                            name="application_type"
+                            value="{{ option.key }}"
+                            {% if selected_type == option.key %}checked{% endif %}
+                            required
+                        >
+                        <span class="passport-type-card-body">
+                            <strong>{{ option.title }}</strong>
+                            <small>{{ option.help }}</small>
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <div class="pay-actions apply-actions">
+                <a class="dash-button apply-cancel pay-btn-ghost" href="{{ url_for('citizen.services') }}">Cancel</a>
+                <button class="dash-button dash-button-apply pay-btn-primary" type="submit">
+                    {{ continue_label or "Continue" }}
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+                </button>
+            </div>
+        </form>
+    </section>
+</div>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<style>
+.passport-type-grid {
+    display: grid;
+    gap: 0.85rem;
+}
+.passport-type-card {
+    display: block;
+    margin: 0;
+    border: 1px solid rgba(20, 40, 70, 0.12);
+    border-radius: 14px;
+    background: #fff;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.passport-type-card:hover,
+.passport-type-card:focus-within,
+.passport-type-card.is-selected {
+    border-color: rgba(120, 24, 48, 0.45);
+    box-shadow: 0 0 0 3px rgba(120, 24, 48, 0.08);
+}
+.passport-type-card input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+.passport-type-card-body {
+    display: grid;
+    gap: 0.35rem;
+    padding: 1rem 1.1rem;
+}
+.passport-type-card-body strong {
+    color: #142846;
+    font-size: 1rem;
+    line-height: 1.35;
+}
+.passport-type-card-body small {
+    color: #5b6675;
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+@media (min-width: 900px) {
+    .passport-type-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+</style>
+<script>
+document.querySelectorAll(".passport-type-card input").forEach(function (input) {
+    input.addEventListener("change", function () {
+        document.querySelectorAll(".passport-type-card").forEach(function (card) {
+            card.classList.toggle("is-selected", card.querySelector("input").checked);
+        });
+    });
+});
+</script>
+{% endblock %}

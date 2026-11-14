@@ -1,5 +1,6 @@
 from app.models.application import Application, ApplicationEvent, ApplicationRequirement
 from app.models.department import Department
+from app.models.nbi_appointment import NbiAppointment
 from app.models.notification import Notification
 from app.models.passport_appointment import PassportAppointment
 from app.models.payment import Payment
@@ -11,6 +12,7 @@ __all__ = [
     "ApplicationEvent",
     "ApplicationRequirement",
     "Department",
+    "NbiAppointment",
     "Notification",
     "PassportAppointment",
     "Payment",

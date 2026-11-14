@@ -32,9 +32,10 @@ LOCATIONS = (
 TIME_SLOTS = ("08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00")
 VISIBLE_MONTHS = 4  # current month plus the next 3 months
 
+DEFAULT_DEMO_FEE = Decimal("1150.00")
 DEMO_FEES = {
-    "New": Decimal("1150.00"),
-    "Renewal": Decimal("1150.00"),
+    "New": DEFAULT_DEMO_FEE,
+    "Renewal": DEFAULT_DEMO_FEE,
 }
 
 
@@ -47,7 +48,8 @@ def location_by_code(code):
 
 
 def demo_fee(application_type):
-    return DEMO_FEES.get(str(application_type or "").strip(), DEMO_FEES["New"])
+    cleaned = str(application_type or "").strip()
+    return DEMO_FEES.get(cleaned, DEFAULT_DEMO_FEE)
 
 
 def _add_months(value, months):

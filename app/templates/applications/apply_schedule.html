@@ -7,7 +7,17 @@
     <section class="apply-card apply-card-wide schedule-page" aria-labelledby="schedule-heading">
         {% include "applications/_progress.html" %}
         <h1 id="schedule-heading">Schedule an appointment</h1>
-        <p class="welcome-text">Choose a location, then pick an open date and time.</p>
+        <p class="welcome-text">
+            {% if spec.kind == 'nbi' %}
+            Choose an NBI demonstration location, then pick an open date and time. This is not an official NBI booking.
+            {% elif spec.kind == 'philsys' %}
+            Choose a PSA PhilSys demonstration registration center, then pick an open date and time. This is not an official PhilSys booking.
+            {% elif spec.kind == 'senior' %}
+            Choose an OSCA demonstration location, then pick an open date and time. This is not an official OSCA booking.
+            {% else %}
+            Choose a location, then pick an open date and time.
+            {% endif %}
+        </p>
 
         <form class="schedule-location-form" method="get" action="{{ url_for('citizen.apply_schedule', application_id=application.application_id) }}">
             <label for="location_code">
@@ -111,7 +121,7 @@
 
     <div class="schedule-page-actions">
         <div class="apply-actions">
-            <a class="dash-button apply-cancel" href="{{ url_for('citizen.apply_documents', application_id=application.application_id) }}">
+            <a class="dash-button apply-cancel" href="{{ url_for('citizen.apply_review', application_id=application.application_id) }}">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg>
                 Back
             </a>

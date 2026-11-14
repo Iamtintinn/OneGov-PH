@@ -167,64 +167,223 @@ def _service(
     }
 
 
+BIRTH_DISCLAIMER = (
+    "OneGov PH keeps this request for assistance and tracking. "
+    "It is not sent to PSA as an official filing. PSA still issues the certificate."
+)
+BIRTH_FEE_NOTE = (
+    "Demonstration total: ₱365.00 per copy "
+    "(PSA Document Fee ₱155.00 + Processing, Convenience & Service Fees ₱160.00 + Courier / Delivery Fee ₱50.00). "
+    "Two copies are charged ×2 (₱730.00). "
+    "Pay online through OneGov PH after review (Maya sandbox or other demonstration methods). "
+    "Confirm the current PSA fee and ordering rules on the official PSA channel."
+)
+
+
+def compose_birth_certificate(values=None):
+    """PSA Birth Certificate request form with type-based document uploads."""
+    from app.services.birth_requirements import document_requirements_for
+
+    answers = values or {}
+    selected_type = answers.get("application_type") or ""
+    request_type = "Request type"
+    certificate = "Certificate details"
+    parents = "Parents"
+    request_details = "Request details"
+    representative = "Representative details"
+    fields = [
+        _field(
+            "application_type",
+            "Application type",
+            "Selected on step 1. This determines the documents you must upload.",
+            field_type="hidden",
+            required=True,
+            section=request_type,
+        ),
+        _field(
+            "certificate_for",
+            "Who is named on the certificate",
+            "Choose Self if the certificate is yours. Choose another option if you are requesting it for a relative.",
+            field_type="select",
+            options=("Self", "Child", "Parent", "Spouse", "Other relative"),
+            section=certificate,
+        ),
+        _field(
+            "owner_first_name",
+            "Certificate owner's first name",
+            "Enter the first name printed on the birth record.",
+            section=certificate,
+        ),
+        _field(
+            "owner_middle_name",
+            "Certificate owner's middle name",
+            "Leave this blank if the birth record has no middle name.",
+            required=False,
+            section=certificate,
+        ),
+        _field(
+            "owner_last_name",
+            "Certificate owner's last name",
+            "Enter the last name printed on the birth record.",
+            section=certificate,
+        ),
+        _field(
+            "owner_birth_date",
+            "Certificate owner's date of birth",
+            "Use the date of birth on the birth record.",
+            field_type="date",
+            section=certificate,
+        ),
+        _field(
+            "place_of_birth",
+            "Place of birth",
+            "Enter the city or municipality and province of birth.",
+            section=certificate,
+        ),
+        _field(
+            "father_name",
+            "Father's complete name",
+            "Enter the father's name as it should appear on the record.",
+            section=parents,
+        ),
+        _field(
+            "mother_maiden_name",
+            "Mother's complete maiden name",
+            "Enter the mother's maiden name, not her married name.",
+            section=parents,
+        ),
+        _field(
+            "copies",
+            "Number of copies",
+            "Enter how many copies you are preparing to request, from 1 to 5.",
+            field_type="number",
+            max_length=1,
+            section=request_details,
+        ),
+        _field(
+            "representative",
+            "Applying through a representative",
+            "Choose Yes only if another person will submit or claim this request for you.",
+            field_type="select",
+            options=("No", "Yes"),
+            section=representative,
+        ),
+        _field(
+            "representative_name",
+            "Representative’s full name",
+            "Enter the complete name of the person who will submit or claim this request.",
+            section=representative,
+            show_when=("representative", "Yes"),
+            required_when_shown=True,
+        ),
+        _field(
+            "representative_relationship",
+            "Relationship to the certificate owner",
+            "Example: parent, child, spouse, sibling, or authorized relative.",
+            max_length=80,
+            section=representative,
+            show_when=("representative", "Yes"),
+            required_when_shown=True,
+        ),
+        _field(
+            "representative_contact",
+            "Representative’s contact number",
+            "Enter a mobile or telephone number for the representative.",
+            field_type="tel",
+            max_length=20,
+            section=representative,
+            show_when=("representative", "Yes"),
+            required_when_shown=True,
+        ),
+        _field(
+            "representative_details",
+            "Additional representative details",
+            "Optional. Add any extra notes about the representative or how the request will be claimed.",
+            field_type="textarea",
+            required=False,
+            max_length=500,
+            section=representative,
+            show_when=("representative", "Yes"),
+        ),
+    ]
+    type_docs = document_requirements_for(selected_type)
+    documents = tuple(
+        _document(
+            item["key"],
+            item["label"],
+            item["help"],
+            required=bool(item.get("required", True)),
+            id_choices=item.get("id_choices"),
+        )
+        for item in type_docs["documents"]
+    )
+    personal = []
+    for field in PERSONAL_FIELDS:
+        item = dict(field)
+        item["section"] = "Requester information"
+        personal.append(item)
+    return {
+        "kind": "birth",
+        "kicker": "Civil registry assistance",
+        "department_label": "PSA assistance",
+        "service_title": "Birth Certificate",
+        "process": (
+            "OneGov PH records your PSA birth certificate request so you can track the details and documents you prepared. "
+            "PSA still issues the certificate."
+        ),
+        "fields": tuple(personal) + tuple(fields),
+        "documents": documents,
+        "document_note": type_docs.get("note")
+        or "Upload the required documents for your selected birth certificate request type.",
+        "fee_note": BIRTH_FEE_NOTE,
+        "catalog_fee": BIRTH_FEE_NOTE,
+        "disclaimer": BIRTH_DISCLAIMER,
+        "step_labels": (
+            "1. Application type",
+            "2. Application details",
+            "3. Documents",
+            "4. Review",
+            "5. Payment",
+            "6. Confirmation",
+        ),
+        "type_first": True,
+        "payment_after_review": True,
+        "online_payment_only": True,
+        "submit_label": "Continue to payment",
+        "confirmation_step": 6,
+        "reminders": [
+            "OneGov PH does not submit this request to PSA.",
+            "Upload the documents required for your selected request type.",
+            "Pay the demonstration total of ₱365.00 per copy after review (×2 for two copies), then keep your reference for tracking.",
+        ],
+        "terms": (
+            "I confirm that the information and documents in this request are accurate. " + BIRTH_DISCLAIMER
+        ),
+        "next_steps": [
+            "Keep your reference number and use it when you ask about this birth certificate request.",
+            "The OneGov PH demonstration total (₱365.00 per copy) was recorded on payment. Confirm any separate PSA charges on the official channel.",
+            "PSA still issues the official certificate. OneGov PH does not mark this request approved or completed.",
+            "Open Application tracking to follow status changes and any instructions recorded on your account.",
+        ],
+        "submit_event": (
+            "Birth certificate request and payment were saved for assistance and tracking. "
+            "PSA has not reviewed it, and OneGov PH has not marked it approved or completed."
+        ),
+        "submit_notice": (
+            "Your Birth Certificate request {reference} was submitted in OneGov PH. "
+            "It is not an official filing. PSA remains responsible for issuing the certificate."
+        ),
+        "status_labels": {
+            "paid": "Paid",
+            "submitted": "Submitted",
+            "pending_documents": "Additional documents required",
+            "ready_for_release": "Ready for pickup",
+        },
+    }
+
+
 SERVICE_FORMS = {
-    "Birth Certificate": _service(
-        "OneGov PH records your PSA birth certificate request so you can track the details and documents you prepared. PSA still issues the certificate.",
-        (
-            _field(
-                "certificate_for",
-                "Who is named on the certificate",
-                "Choose Self if the certificate is yours. Choose another option if you are requesting it for a relative.",
-                field_type="select",
-                options=("Self", "Child", "Parent", "Spouse", "Other relative"),
-            ),
-            _field("owner_first_name", "Certificate owner's first name", "Enter the first name printed on the birth record."),
-            _field(
-                "owner_middle_name",
-                "Certificate owner's middle name",
-                "Leave this blank if the birth record has no middle name.",
-                required=False,
-            ),
-            _field("owner_last_name", "Certificate owner's last name", "Enter the last name printed on the birth record."),
-            _field(
-                "owner_birth_date",
-                "Certificate owner's date of birth",
-                "Use the date of birth on the birth record.",
-                field_type="date",
-            ),
-            _field("place_of_birth", "Place of birth", "Enter the city or municipality and province of birth."),
-            _field("father_name", "Father's complete name", "Enter the father's name as it should appear on the record."),
-            _field(
-                "mother_maiden_name",
-                "Mother's complete maiden name",
-                "Enter the mother's maiden name, not her married name.",
-            ),
-            _field(
-                "copies",
-                "Number of copies",
-                "Enter how many copies you are preparing to request, from 1 to 5.",
-                field_type="number",
-                max_length=1,
-            ),
-            _field(
-                "purpose",
-                "Purpose of the request",
-                "Example: school, passport, employment, or a personal record.",
-                field_type="textarea",
-                max_length=400,
-            ),
-        ),
-        (
-            _VALID_ID,
-            _document(
-                "authorization",
-                "Authorization letter",
-                "Required when the certificate is not your own. Upload a signed letter from the document owner, or your proof of relationship.",
-                required=False,
-                required_unless=("certificate_for", "Self"),
-            ),
-        ),
-    ),
+    "Birth Certificate": {"compose": "birth"},
     "CENOMAR": {"compose": "cenomar"},
     "Passport Application Assistance and Tracking": {
         **_service(
@@ -234,9 +393,9 @@ SERVICE_FORMS = {
                 _field(
                     "application_type",
                     "Application type",
-                    "Choose whether this is a new passport or a renewal.",
-                    field_type="select",
-                    options=("New", "Renewal"),
+                    "Selected on step 1. This determines the physical documents you need to bring.",
+                    field_type="hidden",
+                    required=True,
                 ),
                 _field("place_of_birth", "Place of birth", "Enter the place of birth shown on your birth record."),
             ),
@@ -253,6 +412,7 @@ SERVICE_FORMS = {
         "kind": "passport",
         "kicker": "Passport demonstration",
         "department_label": "Passport demonstration",
+        "service_title": "Passport Application",
         "upload_intro": (
             "Select one valid government ID, then upload a clear PDF or photo of that same ID "
             "(PDF, JPG, JPEG, or PNG, up to 16 MB). Readable name, birth date, and other details "
@@ -264,14 +424,26 @@ SERVICE_FORMS = {
             "records are simulated."
         ),
         "step_labels": (
-            "1. Documents",
-            "2. Application details",
-            "3. Scheduling",
-            "4. Payment",
-            "5. Confirmation",
+            "1. Application type",
+            "2. Documents",
+            "3. Application details",
+            "4. Review",
+            "5. Scheduling",
+            "6. Payment",
+            "7. Confirmation",
         ),
+        "type_first": True,
         "documents_first": True,
-        "confirmation_step": 5,
+        "review_before_schedule": True,
+        "review_back": "details",
+        "submit_label": "Continue to scheduling",
+        "terms": (
+            "I confirm that the application details and uploaded ID in this demonstration are accurate. "
+            "I understand that OneGov PH is not affiliated with or authorized by the Department of Foreign Affairs (DFA), "
+            "and that appointment schedules, payments, and confirmations here are simulated."
+        ),
+        "fee_note": "Demonstration passport fee: ₱1,150.00. You choose Maya sandbox or onsite payment after scheduling.",
+        "confirmation_step": 7,
         "status_labels": {
             "paid": "Paid",
             "scheduled": "Scheduled",
@@ -284,6 +456,7 @@ SERVICE_FORMS = {
         ),
         "next_steps": (
             "Keep your confirmation ID and reference number.",
+            "Bring the physical documents listed for your application type to your appointment.",
             "Open Application tracking to see status changes on your account.",
             "Download the PDF confirmation for your records.",
         ),
@@ -303,9 +476,9 @@ BARANGAY_DISCLAIMER = (
     "The barangay remains responsible for reviewing the request and issuing the official clearance."
 )
 BARANGAY_FEE_NOTE = (
-    "Processing Fee: Depends on your local barangay. "
-    "Please confirm the actual amount with your barangay before proceeding. "
-    "OneGov PH does not collect this payment."
+    "Processing fee: ₱50.00. "
+    "Pay online through OneGov PH after scheduling (Maya sandbox or other demonstration methods). "
+    "The barangay may still ask for separate local charges when you claim the clearance."
 )
 
 # Add a record here only after that barangay's fee, documents, and office details are confirmed.
@@ -359,6 +532,14 @@ def compose_barangay_clearance(values=None):
     residency = "Residency information"
     purpose_section = "Purpose of clearance"
     fields = [
+        _field(
+            "application_type",
+            "Application type",
+            "Selected on step 1. This determines the required documents you must upload.",
+            field_type="hidden",
+            required=True,
+            section=purpose_section,
+        ),
         _field(
             "first_name",
             "First name",
@@ -455,17 +636,18 @@ def compose_barangay_clearance(values=None):
             section=residency,
         ),
         _field(
-            "purpose",
-            "Purpose of the clearance",
-            "Example: employment, a business permit, or a school requirement.",
+            "purpose_notes",
+            "Additional purpose notes",
+            "Optional. Add any extra detail the barangay may need beyond the application type selected on step 1.",
             field_type="textarea",
+            required=False,
             max_length=400,
             section=purpose_section,
         ),
     ]
     if profile["require_nationality"]:
         fields.insert(
-            6,
+            7,
             _field(
                 "nationality",
                 "Nationality",
@@ -473,52 +655,38 @@ def compose_barangay_clearance(values=None):
                 section=applicant,
             ),
         )
-    documents = (
+    from app.services.barangay_requirements import document_requirements_for
+
+    type_docs = document_requirements_for(answers.get("application_type"))
+    documents = tuple(
         _document(
-            "valid_id",
-            "Valid government-issued ID",
-            "Upload a clear PDF or photo of one government ID. The name should match this application.",
-            required=bool(profile["documents"].get("valid_id", True)),
-        ),
-        _document(
-            "residency_proof",
-            "Proof of residency",
-            "Upload a bill, lease, or other document that shows you live in this barangay.",
-            required=bool(profile["documents"].get("residency_proof", True)),
-        ),
-        _document(
-            "cedula",
-            "Community Tax Certificate (Cedula)",
-            "This barangay requires a community tax certificate."
-            if profile["documents"].get("cedula")
-            else "Upload a cedula only if this barangay asks for one. Leave it out when the barangay does not require it.",
-            required=bool(profile["documents"].get("cedula", False)),
-        ),
+            item["key"],
+            item["label"],
+            item["help"],
+            required=bool(item.get("required", True)),
+            id_choices=item.get("id_choices"),
+        )
+        for item in type_docs["documents"]
     )
-    if profile["verified"] and barangay and city:
+    selected_type = type_docs.get("application_type") or "your selected application type"
+    if type_docs.get("note"):
+        document_note = type_docs["note"]
+    elif profile["verified"] and barangay and city:
         document_note = (
-            f"This checklist follows the verified requirements on file for {barangay}, {city}. "
-            "Another barangay can ask for a different set of documents."
+            f"Upload every required document for {selected_type}. "
+            f"This checklist follows the verified requirements on file for {barangay}, {city}."
         )
     elif barangay and city:
         document_note = (
-            f"OneGov PH does not have a verified requirement list for {barangay}, {city}. "
-            "The checklist below is a starting list. Confirm it with the barangay, because requirements are not the same everywhere."
+            f"Upload every required document for {selected_type}. "
+            f"Confirm the final list with {barangay}, {city}, because requirements can differ by barangay."
         )
     else:
         document_note = (
-            "Document requirements depend on the barangay that will issue the clearance. "
-            "This starting list can change when a verified requirement list is on file."
+            f"Upload every required document for {selected_type}. "
+            "Confirm the final list with the issuing barangay before you visit."
         )
-    fee_amount = profile.get("fee_amount")
-    if profile["verified"] and fee_amount is not None:
-        fee_note = (
-            f"Processing Fee: ₱{fee_amount} for this barangay. "
-            "Please confirm the actual amount with your barangay before proceeding. "
-            "OneGov PH does not collect this payment."
-        )
-    else:
-        fee_note = BARANGAY_FEE_NOTE
+    fee_note = BARANGAY_FEE_NOTE
     office = {
         "barangay": barangay,
         "city": city,
@@ -542,26 +710,35 @@ def compose_barangay_clearance(values=None):
         "fields": fields,
         "documents": documents,
         "document_note": document_note,
+        "online_payment_only": True,
         "fee_note": fee_note,
         "catalog_fee": BARANGAY_FEE_NOTE,
         "disclaimer": BARANGAY_DISCLAIMER,
         "local_office": office,
         "show_submitted_details": True,
         "step_labels": (
-            "1. Application details",
-            "2. Documents",
-            "3. Review",
-            "4. Confirmation",
+            "1. Application type",
+            "2. Application details",
+            "3. Documents",
+            "4. Review",
+            "5. Scheduling",
+            "6. Payment",
+            "7. Confirmation",
         ),
+        "type_first": True,
+        "review_before_schedule": True,
+        "payment_after_review": False,
+        "submit_label": "Continue to scheduling",
+        "confirmation_step": 7,
         "terms": "I confirm that the information and documents in this request are accurate. " + BARANGAY_DISCLAIMER,
         "next_steps": [
             "Keep your reference number and use it when you ask the barangay about this request.",
-            "Confirm the processing fee and the documents with the barangay. OneGov PH does not collect the fee.",
+            "The ₱50.00 OneGov PH demonstration fee was recorded on payment. Confirm any separate barangay charges before pickup.",
             "The barangay reviews the request and issues the official clearance. OneGov PH does not mark this request approved or completed.",
             "Open Application tracking to follow status changes and any instructions recorded on your account.",
         ],
         "submit_event": (
-            "Barangay clearance request saved for assistance and tracking. "
+            "Barangay clearance request and payment were saved for assistance and tracking. "
             "The barangay has not reviewed it, and OneGov PH has not marked it approved or completed."
         ),
         "submit_notice": (
@@ -569,6 +746,7 @@ def compose_barangay_clearance(values=None):
             "It is not an official filing. The barangay remains responsible for reviewing it and issuing the clearance."
         ),
         "status_labels": {
+            "paid": "Paid",
             "submitted": "Submitted",
             "pending_documents": "Additional documents required",
             "ready_for_release": "Ready for pickup",
@@ -582,9 +760,9 @@ RESIDENCY_DISCLAIMER = (
     "The barangay or city government remains responsible for verifying residency and issuing the official certificate."
 )
 RESIDENCY_FEE_NOTE = (
-    "Processing Fee: Depends on the issuing barangay or city. "
-    "Please confirm the actual fee with your local government office. "
-    "OneGov PH does not collect this payment."
+    "Processing fee: ₱50.00. "
+    "Pay online through OneGov PH after scheduling (Maya sandbox or other demonstration methods). "
+    "The barangay or city may still ask for separate local charges when you claim the certificate."
 )
 
 # Add a record only after that barangay or city confirms its fee, documents, and office details.
@@ -649,6 +827,14 @@ def compose_certificate_of_residency(values=None):
     duration = "Residency duration"
     purpose_section = "Purpose of certificate"
     fields = [
+        _field(
+            "application_type",
+            "Application type",
+            "Selected on step 1. This determines the required documents you must upload.",
+            field_type="hidden",
+            required=True,
+            section=purpose_section,
+        ),
         _field(
             "first_name",
             "First name",
@@ -765,17 +951,18 @@ def compose_certificate_of_residency(values=None):
             section=duration,
         ),
         _field(
-            "purpose",
-            "Purpose of the certificate",
-            "Example: school enrollment, employment, a bank account, or a government transaction.",
+            "purpose_notes",
+            "Additional purpose notes",
+            "Optional. Add any extra detail the issuing office may need beyond the application type selected on step 1.",
             field_type="textarea",
+            required=False,
             max_length=400,
             section=purpose_section,
         ),
     ]
     if profile["require_nationality"]:
         fields.insert(
-            6,
+            7,
             _field(
                 "nationality",
                 "Nationality",
@@ -783,61 +970,41 @@ def compose_certificate_of_residency(values=None):
                 section=personal,
             ),
         )
+    from app.services.residency_requirements import document_requirements_for
+
+    type_docs = document_requirements_for(answers.get("application_type"))
     documents = [
         _document(
-            "valid_id",
-            "Valid government-issued ID",
-            "Upload a clear PDF or photo of one government ID. The name should match this application.",
-            required=bool(profile["documents"].get("valid_id", True)),
-        ),
-        _document(
-            "proof_of_address",
-            "Proof of address",
-            "Upload a bill, lease, or other document that shows your current residential address.",
-            required=bool(profile["documents"].get("proof_of_address", True)),
-        ),
-        _document(
-            "barangay_clearance",
-            "Barangay clearance",
-            "This local government requires a barangay clearance."
-            if profile["documents"].get("barangay_clearance")
-            else "Upload a barangay clearance only if the issuing barangay or city asks for one.",
-            required=bool(profile["documents"].get("barangay_clearance", False)),
-        ),
-        _document(
-            "affidavit",
-            "Affidavit of residency",
-            "This local government requires an affidavit of residency."
-            if profile["documents"].get("affidavit")
-            else "Upload an affidavit of residency only if the issuing barangay or city asks for one.",
-            required=bool(profile["documents"].get("affidavit", False)),
-        ),
+            item["key"],
+            item["label"],
+            item["help"],
+            required=bool(item.get("required", True)),
+            id_choices=item.get("id_choices"),
+        )
+        for item in type_docs["documents"]
     ]
     documents.extend(_extra_documents(profile))
-    if profile["verified"] and barangay and city:
+    selected_type = type_docs.get("application_type") or "your selected application type"
+    if type_docs.get("note"):
         document_note = (
-            f"This checklist follows the verified requirements on file for {barangay}, {city}. "
-            "Another barangay or city can ask for different documents."
+            f"Upload every required document for {selected_type}. {type_docs['note']}"
+        )
+    elif profile["verified"] and barangay and city:
+        document_note = (
+            f"Upload every required document for {selected_type}. "
+            f"This checklist follows the verified requirements on file for {barangay}, {city}."
         )
     elif barangay and city:
         document_note = (
-            f"OneGov PH does not have a verified requirement list for {barangay}, {city}. "
-            "The checklist below is a starting list. Confirm it with the barangay or city, because requirements are not the same everywhere."
+            f"Upload every required document for {selected_type}. "
+            f"Confirm the final list with {barangay}, {city}, because requirements can differ by barangay or city."
         )
     else:
         document_note = (
-            "Document requirements depend on the barangay or city that will issue the certificate. "
-            "This starting list can change when a verified requirement list is on file."
+            f"Upload every required document for {selected_type}. "
+            "Confirm the final list with the issuing barangay or city before you visit."
         )
-    fee_amount = profile.get("fee_amount")
-    if profile["verified"] and fee_amount is not None:
-        fee_note = (
-            f"Processing Fee: ₱{fee_amount} for this local government office. "
-            "Please confirm the actual fee with your local government office. "
-            "OneGov PH does not collect this payment."
-        )
-    else:
-        fee_note = RESIDENCY_FEE_NOTE
+    fee_note = RESIDENCY_FEE_NOTE
     office = {
         "heading": "Issuing office",
         "address_label": "Office address",
@@ -858,24 +1025,42 @@ def compose_certificate_of_residency(values=None):
             office[office_key] = profile[source_key]
     return {
         "kind": "residency",
+        "kicker": "Local government request",
+        "department_label": "Barangay assistance",
+        "service_title": "Certificate of Residency",
         "process": "Prepare a certificate of residency for the barangay or city you name below. That office still verifies your residency and issues the certificate.",
         "fields": fields,
         "documents": tuple(documents),
         "document_note": document_note,
+        "online_payment_only": True,
         "fee_note": fee_note,
         "catalog_fee": RESIDENCY_FEE_NOTE,
         "disclaimer": RESIDENCY_DISCLAIMER,
         "local_office": office,
         "show_submitted_details": True,
+        "step_labels": (
+            "1. Application type",
+            "2. Application details",
+            "3. Documents",
+            "4. Review",
+            "5. Scheduling",
+            "6. Payment",
+            "7. Confirmation",
+        ),
+        "type_first": True,
+        "review_before_schedule": True,
+        "payment_after_review": False,
+        "submit_label": "Continue to scheduling",
+        "confirmation_step": 7,
         "terms": "I confirm that the information and documents in this request are accurate. " + RESIDENCY_DISCLAIMER,
         "next_steps": [
             "Keep your reference number and use it when you ask the barangay or city about this request.",
-            "Confirm the processing fee and the documents with the local government office. OneGov PH does not collect the fee.",
+            "The ₱50.00 OneGov PH demonstration fee was recorded on payment. Confirm any separate local charges before pickup.",
             "The barangay or city verifies residency and issues the official certificate. OneGov PH does not mark this request approved or completed.",
             "Open Application tracking to follow status changes. Only authorized personnel can update the status after you submit.",
         ],
         "submit_event": (
-            "Certificate of residency request saved for assistance and tracking. "
+            "Certificate of residency request and payment were saved for assistance and tracking. "
             "The local government has not reviewed it, and OneGov PH has not marked it approved or completed."
         ),
         "submit_notice": (
@@ -883,6 +1068,7 @@ def compose_certificate_of_residency(values=None):
             "It is not an official filing. The barangay or city government remains responsible for verifying residency and issuing the certificate."
         ),
         "status_labels": {
+            "paid": "Paid",
             "submitted": "Submitted",
             "pending_documents": "Additional documents required",
             "ready_for_release": "Ready for pickup",
@@ -896,8 +1082,9 @@ SENIOR_DISCLAIMER = (
     "The local government and OSCA remain responsible for verifying eligibility, processing applications, and issuing official Senior Citizen IDs."
 )
 SENIOR_FEE_NOTE = (
-    "No processing fee is listed for standard new Senior Citizen ID issuance. "
-    "Please confirm the applicable requirements and fees with your local OSCA office."
+    "New application fee: ₱0.00. Payment is not required for a first-time Senior Citizen ID. "
+    "Lost or damaged ID replacements use an admin-configurable fee. "
+    "An official receipt is issued only if a payment is collected."
 )
 _CITIZENSHIP = ("Filipino Citizen", "Dual Citizen")
 
@@ -926,16 +1113,28 @@ def senior_profile(values):
     }
 
 
-def _senior_document(profile, key, label, help_text, default_required=False, required_when=None):
+def _senior_document(
+    profile,
+    key,
+    label,
+    help_text,
+    default_required=False,
+    required_when=None,
+    id_choices=None,
+    status_label=None,
+):
     configured = (profile.get("documents") or {}).get(key)
     required = default_required if configured is None else bool(configured)
-    return _document(
+    item = _document(
         key,
         label,
         help_text,
         required=required,
         required_when=None if required else required_when,
+        id_choices=id_choices,
     )
+    item["status_label"] = status_label or ("Required" if required and required_when is None else "Conditional")
+    return item
 
 
 def compose_senior_citizen_id(values=None):
@@ -951,6 +1150,14 @@ def compose_senior_citizen_id(values=None):
     emergency = "Emergency contact"
     request_type = "Request type"
     fields = [
+        _field(
+            "application_type",
+            "Application type",
+            "Selected on step 1. This determines the physical documents you need to bring to OSCA.",
+            field_type="hidden",
+            required=True,
+            section=request_type,
+        ),
         _field("first_name", "First name", "Enter your first name as it appears on your identification.", section=personal),
         _field(
             "middle_name",
@@ -1086,70 +1293,67 @@ def compose_senior_citizen_id(values=None):
         _senior_document(
             profile,
             "valid_id",
-            "Valid government-issued ID",
-            "Upload a clear PDF or photo of one government ID. The name should match this application.",
+            "Valid Government-Issued ID",
+            "Choose one valid government ID, then upload a clear PDF or photo of that same ID. The name should match this application.",
             default_required=True,
+            id_choices="barangay",
+            status_label="Required",
         ),
         _senior_document(
             profile,
             "age_proof",
-            "Proof of age",
+            "Proof of Age",
             "Upload a PSA birth certificate or another proof of age your OSCA office accepts.",
             default_required=True,
+            status_label="Required",
         ),
         _senior_document(
             profile,
             "residency_proof",
-            "Proof of residency",
+            "Proof of Residency",
             "Upload a barangay certification or another proof of residency your OSCA office accepts.",
             default_required=True,
+            status_label="Required",
         ),
         _senior_document(
             profile,
             "photo",
-            "Recent ID photo",
+            "Recent ID Photo",
             "Upload a recent photo of your face. Ask your OSCA office whether it should be 1x1 or 2x2. OneGov PH does not measure the photo.",
             default_required=True,
-        ),
-        _senior_document(
-            profile,
-            "dual_citizenship",
-            "Dual citizenship certificate",
-            "Required when you choose Dual Citizen. Upload the certificate or recognition of dual citizenship.",
-            required_when=("citizenship_status", "Dual Citizen"),
-        ),
-        _senior_document(
-            profile,
-            "marriage_certificate",
-            "Marriage certificate",
-            "Upload this only if your OSCA office asks for it.",
-        ),
-        _senior_document(
-            profile,
-            "voters_certification",
-            "Voter's certification",
-            "Upload this only if your OSCA office asks for it.",
+            status_label="Required",
         ),
         _senior_document(
             profile,
             "authorization",
-            "Authorization letter",
-            "Required when a representative will submit or claim this request. Upload a signed authorization letter.",
+            "Authorization Letter",
+            "Needed when a representative will submit or claim this request. Upload a signed authorization letter.",
             required_when=("representative", "Yes"),
+            status_label="Conditional",
         ),
         _senior_document(
             profile,
             "representative_id",
-            "Representative's government-issued ID",
-            "Required with the authorization letter. Upload a clear PDF or photo of the representative's government ID.",
+            "Representative’s Government ID",
+            "Needed with the authorization letter. Upload a clear PDF or photo of the representative’s government ID.",
             required_when=("representative", "Yes"),
+            status_label="Conditional",
         ),
         _senior_document(
             profile,
             "previous_senior_id",
             "Previous Senior Citizen ID",
-            "Required when this is a transfer. Upload a copy of the Senior Citizen ID issued by the previous office.",
+            "Needed for a transfer. Upload a copy of the Senior Citizen ID issued by the previous office.",
             required_when=("id_transfer", "Yes"),
+            status_label="Conditional",
+        ),
+        _senior_document(
+            profile,
+            "cancellation_transfer",
+            "Certificate of Cancellation/Transfer",
+            "Needed for a transfer. Upload the certificate of cancellation or transfer from the previous OSCA office.",
+            required_when=("id_transfer", "Yes"),
+            status_label="Conditional",
         ),
     )
     if profile["verified"] and barangay and city:
@@ -1196,6 +1400,9 @@ def compose_senior_citizen_id(values=None):
             office[office_key] = profile[source_key]
     return {
         "kind": "senior",
+        "kicker": "Local government request",
+        "department_label": "OSCA assistance",
+        "service_title": "Senior Citizen ID",
         "process": "Prepare a Senior Citizen ID request for the OSCA office that covers your address. You must be 60 or older. That office still verifies eligibility and issues the ID.",
         "fields": fields,
         "documents": documents,
@@ -1205,6 +1412,20 @@ def compose_senior_citizen_id(values=None):
         "disclaimer": SENIOR_DISCLAIMER,
         "local_office": office,
         "show_submitted_details": True,
+        "step_labels": (
+            "1. Application type",
+            "2. Application details",
+            "3. Documents",
+            "4. Review",
+            "5. Scheduling",
+            "6. Payment",
+            "7. Confirmation",
+        ),
+        "type_first": True,
+        "review_before_schedule": True,
+        "payment_after_review": False,
+        "submit_label": "Continue to scheduling",
+        "confirmation_step": 7,
         "reminders": [
             "You must be 60 years old or older on the day you submit this request.",
             "Confirm the citizenship and residency requirements with your OSCA office. OneGov PH does not apply a local residency rule unless a verified OSCA requirement is on file.",
@@ -1212,19 +1433,23 @@ def compose_senior_citizen_id(values=None):
         "terms": "I confirm that the information and documents in this request are accurate. " + SENIOR_DISCLAIMER,
         "next_steps": [
             "Keep your reference number and use it when you ask the OSCA office about this request.",
-            "Confirm the requirements and any fee with your OSCA office. OneGov PH does not collect a payment.",
+            "Bring the physical documents listed on your confirmation page and receipt for OSCA verification.",
+            "New applications are free (₱0.00). Lost or damaged replacements may use an admin-configurable fee.",
             "The local government and OSCA verify eligibility and issue the Senior Citizen ID. OneGov PH does not mark this request approved or completed.",
             "Open Application tracking to follow status changes and any instructions recorded from OSCA. Only authorized personnel can update the status after you submit.",
         ],
         "submit_event": (
             "Senior Citizen ID request saved for assistance and tracking. "
+            "No payment was required for this new application. "
             "OSCA has not reviewed it, and OneGov PH has not marked it approved or completed."
         ),
         "submit_notice": (
             "Your Senior Citizen ID request {reference} was submitted in OneGov PH. "
-            "It is not an official filing. The local government and OSCA remain responsible for verifying eligibility and issuing the ID."
+            "It is not an official filing. No payment was collected for this new application. "
+            "The local government and OSCA remain responsible for verifying eligibility and issuing the ID."
         ),
         "status_labels": {
+            "not_applicable": "Not applicable",
             "submitted": "Submitted",
             "pending_documents": "Additional documents required",
             "ready_for_release": "Ready for pickup",
@@ -1239,12 +1464,11 @@ NBI_DISCLAIMER = (
     "Official registration, appointment scheduling, payment, biometric capture, verification, and clearance issuance remain under the National Bureau of Investigation."
 )
 NBI_FEE_NOTE = (
-    "Listed Clearance Fee: ₱130.00. Additional electronic payment service charges may apply. "
-    "Payment must be completed through official NBI payment channels. OneGov PH does not collect this payment."
+    "Regular NBI Clearance: ₱130.00. Online payment convenience fee: ₱30.00. "
+    "Regular online application total: ₱160.00."
 )
 _EDUCATION = ("Elementary", "High school", "Senior high school", "Vocational", "College", "Postgraduate")
 _EMPLOYMENT = ("Employed", "Self-employed", "Unemployed", "Student", "Retired", "Overseas worker")
-_RECORDED_PAYMENT = ("Not yet paid", "Paid through an official NBI channel", "Not sure")
 
 # Add a record only after an NBI requirement is confirmed. This does not connect to NBI.
 VERIFIED_NBI_REQUIREMENTS = {}
@@ -1262,10 +1486,13 @@ def nbi_profile():
         "require_mother": True,
         "require_educational_attainment": True,
         "require_occupation": True,
-        "require_employment_status": True,
+        "require_employment_status": False,
         "education_options": _EDUCATION,
         "employment_options": _EMPLOYMENT,
-        "documents": {},
+        "documents": {
+            "valid_id": True,
+            "valid_id_secondary": True,
+        },
         "instructions": None,
     }
     if not verified:
@@ -1275,20 +1502,41 @@ def nbi_profile():
     return merged
 
 
-def _nbi_document(profile, key, label, help_text):
-    required = bool((profile.get("documents") or {}).get(key))
-    return _document(key, label, help_text, required=required)
+def _nbi_document(profile, key, label, help_text, default_required=False, id_choices=None, status_label=None):
+    configured = (profile.get("documents") or {}).get(key)
+    required = default_required if configured is None else bool(configured)
+    item = _document(key, label, help_text, required=required, id_choices=id_choices)
+    item["status_label"] = status_label or ("Required" if required else "Optional")
+    return item
 
 
 def compose_nbi_clearance(values=None):
     """NBI clearance monitoring form. Other services keep their own questions."""
+    from app.services.nbi_requirements import (
+        document_requirements_for,
+        is_nbi_new_application,
+        requires_nbi_schedule,
+    )
+
+    answers = values or {}
     profile = nbi_profile()
     applicant = "Applicant information"
     father = "Father"
     mother = "Mother"
     background = "Education and employment"
-    appointment = "Existing NBI appointment"
+    application_section = "Application type"
+    selected_type = answers.get("application_type") or ""
+    needs_schedule = requires_nbi_schedule(selected_type)
+    is_new = is_nbi_new_application(selected_type)
     fields = [
+        _field(
+            "application_type",
+            "Application type",
+            "Selected on step 1. This determines whether you schedule an NBI visit or continue fully online.",
+            field_type="hidden",
+            required=True,
+            section=application_section,
+        ),
         _field("first_name", "First name", "Enter your first name as it appears on your identification.", section=applicant),
         _field(
             "middle_name",
@@ -1437,7 +1685,7 @@ def compose_nbi_clearance(values=None):
             _field(
                 "employment_status",
                 "Employment status",
-                "Select the status that applies to you today. Confirm this with NBI when you register.",
+                "Optional. Select the status that applies to you today if you want it on this request.",
                 field_type="select",
                 required=profile["require_employment_status"],
                 options=tuple(profile.get("employment_options") or _EMPLOYMENT),
@@ -1450,107 +1698,102 @@ def compose_nbi_clearance(values=None):
                 required=False,
                 section=background,
             ),
-            _field(
-                "preferred_branch",
-                "Preferred NBI branch",
-                "Optional. Enter a branch only if you already chose one or NBI already assigned one. OneGov PH does not assign a branch.",
-                required=False,
-                section=appointment,
-            ),
-            _field(
-                "appointment_date",
-                "Appointment date",
-                "Optional. Enter the appointment date NBI already gave you. OneGov PH does not schedule an appointment.",
-                field_type="date",
-                required=False,
-                allow_future=True,
-                section=appointment,
-            ),
-            _field(
-                "appointment_time",
-                "Appointment time",
-                "Optional. Enter the appointment time NBI already gave you.",
-                field_type="time",
-                required=False,
-                section=appointment,
-            ),
-            _field(
-                "nbi_reference",
-                "NBI reference number",
-                "Optional. Enter the reference number NBI already gave you. OneGov PH does not create an NBI reference number.",
-                required=False,
-                max_length=40,
-                section=appointment,
-            ),
-            _field(
-                "recorded_payment_status",
-                "Recorded payment status",
-                "Optional. Record a payment only if you already made it through an official NBI channel. OneGov PH does not collect or confirm it.",
-                field_type="select",
-                required=False,
-                options=_RECORDED_PAYMENT,
-                section=appointment,
-            ),
         ]
     )
-    documents = (
+    type_docs = document_requirements_for(selected_type)
+    documents = tuple(
         _nbi_document(
             profile,
-            "valid_id_primary",
-            "First valid government-issued ID",
-            "Optional unless a confirmed NBI requirement asks for the file. Upload a clear PDF or photo of one government ID.",
-        ),
-        _nbi_document(
-            profile,
-            "valid_id_secondary",
-            "Second valid government-issued ID",
-            "Optional unless a confirmed NBI requirement asks for the file. Upload a second government ID if you want it kept with this request.",
-        ),
-        _nbi_document(
-            profile,
-            "transaction_reference",
-            "NBI transaction reference",
-            "Optional. Upload this only if NBI already registered your transaction and gave you a reference.",
-        ),
-        _nbi_document(
-            profile,
-            "payment_confirmation",
-            "Payment confirmation",
-            "Optional. Upload this only if you already paid through an official NBI channel. OneGov PH does not confirm the payment.",
-        ),
+            item["key"],
+            item["label"],
+            item["help"],
+            default_required=bool(item.get("required", True)),
+            id_choices=item.get("id_choices"),
+        )
+        for item in type_docs["documents"]
     )
-    if profile["verified"] and (profile.get("documents") or {}).get("photo"):
+    if is_new and profile["verified"] and (profile.get("documents") or {}).get("photo"):
         documents = documents + (
             _nbi_document(
                 profile,
                 "photo",
                 "Recent photo",
                 "A confirmed requirement asks for this file. NBI still captures the photograph and biometrics at the branch.",
+                default_required=True,
             ),
         )
-    if profile["verified"]:
-        document_note = (
-            "This checklist follows the confirmed NBI requirements on file. "
-            "Uploads stay optional unless one of those requirements says a file is required. "
-            "NBI captures the photograph and biometrics at the branch for an ordinary local application."
-        )
-    else:
-        document_note = (
-            "These uploads are optional. OneGov PH does not have a confirmed NBI file requirement that makes them mandatory. "
-            "NBI captures the photograph and biometrics at the branch, so this form does not ask for a recent photo on an ordinary local application."
-        )
+    document_note = type_docs.get("note") or (
+        "Upload the required documents for your selected NBI application type."
+    )
     office = {
         "heading": "National Bureau of Investigation",
         "note": (
-            "OneGov PH does not assign an NBI branch, appointment, or reference number, and it has no live connection to NBI. "
-            "Confirm the branch and the current requirements through NBI."
+            "OneGov PH schedules a demonstration appointment only for New Application monitoring requests. "
+            "It has no live connection to NBI. Confirm current requirements through NBI."
+            if needs_schedule
+            else (
+                "This request continues online without a demonstration appointment. "
+                "OneGov PH has no live connection to NBI. Confirm current requirements through NBI."
+            )
         ),
     }
     if profile["verified"] and profile.get("instructions"):
         office["instructions"] = profile["instructions"]
         office["instructions_heading"] = "Instructions"
+    if needs_schedule:
+        step_labels = (
+            "1. Application type",
+            "2. Application details",
+            "3. Documents",
+            "4. Review",
+            "5. Scheduling",
+            "6. Payment",
+            "7. Confirmation",
+        )
+        confirmation_step = 7
+        submit_label = "Continue to scheduling"
+        next_steps = [
+            "Keep your OneGov PH reference number. It is separate from any reference number NBI gives you.",
+            "Bring the physical documents listed on your confirmation page and receipt to the NBI Clearance Center.",
+            "Attend the demonstration appointment you scheduled, then complete biometrics and clearance issuance through NBI.",
+            "The regular online application total shown here is ₱160.00 (₱130.00 clearance + ₱30.00 convenience fee).",
+            "Open Application tracking to follow monitoring updates such as Submitted, Under review, Appointment scheduled, Payment pending, Payment completed, For biometrics, With hit, Ready for release, Completed, Rejected, or Cancelled.",
+        ]
+        reminders = [
+            "OneGov PH does not register this request with NBI.",
+            "New applicants must personally appear at an NBI Clearance Center for biometric registration.",
+            "The appointment you schedule here is a demonstration booking for monitoring only.",
+            "NBI takes the photograph and biometrics at the branch for an ordinary local application.",
+            "After you submit, only authorized personnel can change the monitoring status. Those statuses are notes in OneGov PH, not a live update from NBI.",
+        ]
+    else:
+        step_labels = (
+            "1. Application type",
+            "2. Application details",
+            "3. Documents",
+            "4. Review",
+            "5. Payment",
+            "6. Confirmation",
+        )
+        confirmation_step = 6
+        submit_label = "Continue to payment"
+        next_steps = [
+            "Keep your OneGov PH reference number. It is separate from any reference number NBI gives you.",
+            "This request continues online. NBI may still instruct you to appear for additional verification.",
+            "The regular online application total shown here is ₱160.00 (₱130.00 clearance + ₱30.00 convenience fee).",
+            "Open Application tracking to follow monitoring updates such as Submitted, Under review, Payment pending, Payment completed, For biometrics, With hit, Ready for release, Completed, Rejected, or Cancelled.",
+        ]
+        reminders = [
+            "OneGov PH does not register this request with NBI.",
+            "Eligible renewal, lost, or damaged requests may continue online when NBI does not require an immediate visit.",
+            "Original identification documents must be presented when physical verification is required.",
+            "After you submit, only authorized personnel can change the monitoring status. Those statuses are notes in OneGov PH, not a live update from NBI.",
+        ]
     return {
         "kind": "nbi",
+        "kicker": "Clearance monitoring",
+        "department_label": "NBI assistance",
+        "service_title": "NBI Clearance",
         "process": (
             "Prepare and monitor an NBI clearance request in OneGov PH. "
             "NBI still handles registration, the appointment, payment, biometrics, verification, and issuance of the clearance."
@@ -1564,26 +1807,23 @@ def compose_nbi_clearance(values=None):
         "reference_label": "OneGov PH reference number",
         "local_office": office,
         "show_submitted_details": True,
-        "reminders": [
-            "OneGov PH does not register this request with NBI.",
-            "Record a branch, appointment, NBI reference number, or payment only when NBI has already given it to you.",
-            "NBI takes the photograph and biometrics at the branch for an ordinary local application.",
-            "After you submit, only authorized personnel can change the monitoring status. Those statuses are notes in OneGov PH, not a live update from NBI.",
-        ],
+        "step_labels": step_labels,
+        "type_first": True,
+        "review_before_schedule": needs_schedule,
+        "payment_after_review": not needs_schedule,
+        "online_payment_only": not needs_schedule,
+        "submit_label": submit_label,
+        "confirmation_step": confirmation_step,
+        "reminders": reminders,
         "terms": "I confirm that the information and documents in this request are accurate. " + NBI_DISCLAIMER,
-        "next_steps": [
-            "Keep your OneGov PH reference number. It is separate from any reference number NBI gives you.",
-            "Register, schedule, pay, and give biometrics through NBI. OneGov PH does not do those steps and does not collect the ₱130.00 clearance fee.",
-            "If NBI already gave you an appointment or reference number, you can save it on this request. OneGov PH does not check it with NBI.",
-            "Open Application tracking to follow monitoring updates such as Submitted, Under review, Appointment scheduled, Payment pending, Payment completed, For biometrics, With hit, Ready for release, Completed, Rejected, or Cancelled.",
-        ],
+        "next_steps": next_steps,
         "submit_event": (
-            "NBI clearance request saved for assistance and monitoring. "
+            "NBI clearance request and payment were saved for assistance and monitoring. "
             "NBI has not received this as an official filing, and OneGov PH has not marked it approved or completed."
         ),
         "submit_notice": (
             "Your NBI clearance request {reference} was submitted in OneGov PH for monitoring. "
-            "It is not an official NBI registration. Appointment, payment, biometrics, verification, and clearance issuance remain with NBI."
+            "It is not an official NBI registration. Biometrics, verification, and clearance issuance remain with NBI."
         ),
         "status_labels": {
             "submitted": "Submitted",
@@ -1603,14 +1843,15 @@ CENOMAR_DISCLAIMER = (
     "Official issuance, verification, and processing are handled by the Philippine Statistics Authority."
 )
 CENOMAR_FEE_NOTE = (
-    "The Philippine Statistics Authority charges the official CENOMAR fee. "
-    "Confirm the current amount and pay through an authorized PSA channel, such as PSA Serbilis. "
-    "OneGov PH does not collect this payment."
+    "Demonstration total: ₱365.00 per copy "
+    "(PSA Document Fee ₱155.00 + Processing, Convenience & Service Fees ₱160.00 + Courier / Delivery Fee ₱50.00). "
+    "Two copies are charged ×2 (₱730.00). "
+    "Pay through OneGov PH after review (Maya sandbox or onsite demonstration). "
+    "Confirm the current PSA fee and ordering rules on the official PSA channel."
 )
 CENOMAR_URL = "https://www.psaserbilis.com.ph/"
 _CENOMAR_PURPOSE = ("Marriage", "Employment", "Legal Purposes", "Immigration", "Personal Records", "Other")
 _CENOMAR_REQUESTER = ("Self", "Child", "Parent", "Spouse")
-_CENOMAR_DELIVERY = ("Door-to-door delivery", "Pick up at a collection location")
 CENOMAR_PAYMENT_OPTIONS = ("Not yet paid", "Paid through an official PSA channel", "Not sure")
 CENOMAR_RECORDED_STATUSES = (
     "Official application recorded",
@@ -1634,192 +1875,159 @@ CENOMAR_TRACKING_FIELDS = (
 
 
 def cenomar_incomplete_step(values):
-    """Return the first CENOMAR step that is still missing a required answer."""
+    """Return True when any required CENOMAR answer is still missing."""
     answers = values or {}
-    required = {
-        1: ("first_name", "last_name", "date_of_birth", "sex", "civil_status", "place_of_birth"),
-        2: ("father_name", "mother_maiden_name", "copies", "purpose"),
-        3: (
-            "requester_relationship",
-            "requester_name",
-            "contact_number",
-            "email",
-            "delivery_method",
-            "delivery_address",
-            "house_number",
-            "street",
-            "barangay",
-            "city",
-            "province",
-            "postal_code",
-        ),
-    }
-    for step, keys in required.items():
-        for key in keys:
-            if not str(answers.get(key) or "").strip():
-                return step
+    required = (
+        "first_name",
+        "last_name",
+        "date_of_birth",
+        "sex",
+        "civil_status",
+        "nationality",
+        "address",
+        "contact_number",
+        "email",
+        "certificate_for",
+        "owner_first_name",
+        "owner_last_name",
+        "owner_birth_date",
+        "owner_sex",
+        "owner_civil_status",
+        "place_of_birth",
+        "father_name",
+        "mother_maiden_name",
+        "copies",
+        "purpose",
+    )
+    for key in required:
+        if not str(answers.get(key) or "").strip():
+            return True
     if answers.get("purpose") == "Other" and not str(answers.get("purpose_other") or "").strip():
-        return 2
+        return True
     return None
 
 
 def compose_cenomar(values=None):
     """CENOMAR preparation and monitoring. PSA Serbilis still takes the official application."""
-    applicant = "Applicant information"
-    family = "Family information"
+    requester = "Requester information"
+    certificate = "Certificate details"
+    parents = "Parents"
     request = "Request details"
-    party = "Requesting party"
-    delivery = "Delivery information"
-    fields = [
-        _field("first_name", "First name", "Enter the first name of the person named on the CENOMAR.", section=applicant, step=1),
-        _field("middle_name", "Middle name", "Leave this blank if that person has no middle name.", required=False, section=applicant, step=1),
-        _field("last_name", "Last name", "Enter the last name of the person named on the CENOMAR.", section=applicant, step=1),
-        _field(
-            "date_of_birth",
-            "Date of birth",
-            "Use the date of birth on the birth record. A future date is not accepted.",
-            field_type="date",
-            section=applicant,
-            step=1,
-        ),
-        _field("sex", "Sex", "Select the sex recorded for the person named on the CENOMAR.", field_type="select", options=_SEX, section=applicant, step=1),
-        _field(
-            "civil_status",
-            "Civil status",
-            "Select the civil status of the person named on the CENOMAR.",
-            field_type="select",
-            options=_CIVIL_STATUS,
-            section=applicant,
-            step=1,
-        ),
-        _field(
-            "place_of_birth",
-            "Place of birth",
-            "Enter the city or municipality and province of birth.",
-            section=applicant,
-            step=1,
-        ),
-        _field(
-            "father_name",
-            "Father's complete name",
-            "Enter the father's first, middle, and last name.",
-            max_length=160,
-            section=family,
-            step=2,
-        ),
-        _field(
-            "mother_maiden_name",
-            "Mother's complete maiden name",
-            "Enter the mother's first, middle, and maiden last name.",
-            max_length=160,
-            section=family,
-            step=2,
-        ),
-        _field(
-            "copies",
-            "Number of copies",
-            "Enter how many copies you plan to order, from 1 to 5. Confirm the current limit on the official PSA channel.",
-            field_type="number",
-            max_length=1,
-            default="1",
-            section=request,
-            step=2,
-        ),
-        _field(
-            "purpose",
-            "Purpose of request",
-            "Select why the certificate is being requested.",
-            field_type="select",
-            options=_CENOMAR_PURPOSE,
-            section=request,
-            step=2,
-        ),
-        _field(
-            "purpose_other",
-            "Other purpose",
-            "Describe the purpose. This is shown only when you select Other.",
-            required=False,
-            max_length=200,
-            section=request,
-            step=2,
-            show_when=("purpose", "Other"),
-            required_when_shown=True,
-        ),
-        _field(
-            "requester_relationship",
-            "Who is requesting the certificate",
-            "PSA generally accepts a request from the person named on the CENOMAR, or from that person's child, parent, or spouse. PSA still decides whether the requester is eligible.",
-            field_type="select",
-            options=_CENOMAR_REQUESTER,
-            section=party,
-            step=3,
-        ),
-        _field(
-            "requester_name",
-            "Requesting party's complete name",
-            "Enter the full name of the person who will request the certificate on the official PSA channel.",
-            max_length=160,
-            section=party,
-            step=3,
-        ),
-        _field(
-            "contact_number",
-            "Contact number",
-            "Enter a mobile or telephone number for the requesting party.",
-            field_type="tel",
-            max_length=20,
-            section=party,
-            step=3,
-        ),
-        _field(
-            "email",
-            "Email address",
-            "Enter an email address the requesting party can open.",
-            field_type="email",
-            max_length=255,
-            section=party,
-            step=3,
-        ),
-        _field(
-            "delivery_method",
-            "Delivery option",
-            "Choose door-to-door delivery, or pickup only if the official PSA channel offers a collection location. OneGov PH does not assign a pickup site.",
-            field_type="select",
-            options=_CENOMAR_DELIVERY,
-            section=delivery,
-            step=3,
-        ),
-        _field(
-            "delivery_address",
-            "Complete delivery address",
-            "Enter the full address for door-to-door delivery. For pickup, enter the address you will use while the collection location is chosen on the official channel.",
-            field_type="textarea",
-            max_length=500,
-            section=delivery,
-            step=3,
-        ),
-        _field("house_number", "House number / building", "Enter the house number, unit, or building name.", max_length=80, section=delivery, step=3),
-        _field("street", "Street", "Enter the street name.", max_length=120, section=delivery, step=3),
-        _field("barangay", "Barangay", "Enter the barangay.", section=delivery, step=3),
-        _field("city", "City / municipality", "Enter the city or municipality.", section=delivery, step=3),
-        _field("province", "Province", "Enter the province. For Metro Manila, you may enter Metro Manila.", section=delivery, step=3),
-        _field(
-            "postal_code",
-            "Postal code",
-            "Enter the 4-digit postal code.",
-            max_length=4,
-            section=delivery,
-            step=3,
-        ),
-    ]
+    fields = []
+    for field in PERSONAL_FIELDS:
+        item = dict(field)
+        item["section"] = requester
+        fields.append(item)
+    fields.extend(
+        [
+            _field(
+                "certificate_for",
+                "Who is named on the CENOMAR",
+                "Choose Self if the CENOMAR is yours. Choose another option if you are requesting it for a relative.",
+                field_type="select",
+                options=_CENOMAR_REQUESTER,
+                section=certificate,
+            ),
+            _field(
+                "owner_first_name",
+                "Certificate owner's first name",
+                "Enter the first name of the person named on the CENOMAR.",
+                section=certificate,
+            ),
+            _field(
+                "owner_middle_name",
+                "Certificate owner's middle name",
+                "Leave this blank if that person has no middle name.",
+                required=False,
+                section=certificate,
+            ),
+            _field(
+                "owner_last_name",
+                "Certificate owner's last name",
+                "Enter the last name of the person named on the CENOMAR.",
+                section=certificate,
+            ),
+            _field(
+                "owner_birth_date",
+                "Certificate owner's date of birth",
+                "Use the date of birth on the birth record. A future date is not accepted.",
+                field_type="date",
+                section=certificate,
+            ),
+            _field(
+                "owner_sex",
+                "Certificate owner's sex",
+                "Select the sex recorded for the person named on the CENOMAR.",
+                field_type="select",
+                options=_SEX,
+                section=certificate,
+            ),
+            _field(
+                "owner_civil_status",
+                "Certificate owner's civil status",
+                "Select the civil status of the person named on the CENOMAR.",
+                field_type="select",
+                options=_CIVIL_STATUS,
+                section=certificate,
+            ),
+            _field(
+                "place_of_birth",
+                "Place of birth",
+                "Enter the city or municipality and province of birth.",
+                section=certificate,
+            ),
+            _field(
+                "father_name",
+                "Father's complete name",
+                "Enter the father's name as it should appear on the record.",
+                max_length=160,
+                section=parents,
+            ),
+            _field(
+                "mother_maiden_name",
+                "Mother's complete maiden name",
+                "Enter the mother's maiden name, not her married name.",
+                max_length=160,
+                section=parents,
+            ),
+            _field(
+                "copies",
+                "Number of copies",
+                "Enter how many copies you are preparing to request, from 1 to 5. Confirm the current limit on the official PSA channel.",
+                field_type="number",
+                max_length=1,
+                default="1",
+                section=request,
+            ),
+            _field(
+                "purpose",
+                "Purpose of Request",
+                "Select why the certificate is being requested.",
+                field_type="select",
+                options=_CENOMAR_PURPOSE,
+                section=request,
+            ),
+            _field(
+                "purpose_other",
+                "Other purpose",
+                "Enter your purpose. This is shown only when you select Other.",
+                required=False,
+                max_length=200,
+                section=request,
+                show_when=("purpose", "Other"),
+                required_when_shown=True,
+            ),
+        ]
+    )
     return {
         "kind": "cenomar",
+        "kicker": "Civil registry assistance",
         "service_title": "Certificate of No Marriage Record (CENOMAR)",
         "process": (
             "A CENOMAR is an official certification issued by the Philippine Statistics Authority confirming that "
             "no marriage record has been found under the specified person’s name in the PSA civil registry."
         ),
-        "department_label": "Philippine Statistics Authority (PSA)",
+        "department_label": "PSA assistance",
         "fields": fields,
         "documents": (),
         "fee_note": CENOMAR_FEE_NOTE,
@@ -1831,45 +2039,48 @@ def compose_cenomar(values=None):
         "reference_label": "OneGov PH reference number",
         "show_submitted_details": True,
         "step_labels": (
-            "1. Applicant information",
-            "2. Family and request",
-            "3. Requesting party and delivery",
-            "4. Review and confirmation",
+            "1. Application details",
+            "2. Review",
+            "3. Payment",
+            "4. Confirmation",
         ),
+        "payment_after_review": True,
+        "review_back": "details",
+        "submit_label": "Continue to payment",
+        "confirmation_step": 4,
         "reminders": [
-            "An official PSA application is completed on PSA Serbilis. This OneGov PH form does not submit the application to PSA.",
+            "OneGov PH prepares and tracks this CENOMAR request. PSA still issues the official certificate.",
             "The person named on the certificate, or that person's child, parent, or spouse, can prepare a request. PSA decides who is eligible.",
-            "If PSA asks for an authorization letter, a guardian, or a court order, complete that on the official channel. OneGov PH does not collect those papers.",
-            "OneGov PH does not collect the PSA fee and does not create a PSA reference number.",
+            "Pay the demonstration total of ₱365.00 per copy after review (×2 for two copies), then keep your reference for tracking.",
+            "You can still open PSA Serbilis for the official channel. OneGov PH does not create a PSA reference number.",
         ],
         "terms": "I confirm that the information in this request is accurate. " + CENOMAR_DISCLAIMER,
         "next_steps": [
-            "Open PSA Serbilis and complete the official CENOMAR application and payment there.",
-            "Keep your OneGov PH reference number. It is not a PSA reference number.",
-            "When PSA gives you a 16-digit reference number, record it on this request. OneGov PH does not receive that number from PSA.",
-            "Update the PSA status only with what the official channel shows. OneGov PH does not mark the certificate issued.",
+            "Keep your OneGov PH reference number and use it when you ask about this CENOMAR request.",
+            "The OneGov PH demonstration total (₱365.00 per copy) was recorded on payment. Confirm any separate PSA charges on the official channel.",
+            "PSA still issues the official CENOMAR. OneGov PH does not mark this request approved or completed.",
+            "When PSA gives you a 16-digit reference number, you can record it on this request later.",
         ],
         "submit_event": (
-            "CENOMAR request saved for assistance and monitoring. "
-            "This is not an official PSA application, and OneGov PH has not sent it to PSA."
+            "CENOMAR request and payment were saved for assistance and tracking. "
+            "PSA has not reviewed it, and OneGov PH has not marked it approved or completed."
         ),
         "submit_notice": (
-            "Your CENOMAR preparation {reference} was saved in OneGov PH. "
-            "It is not an official PSA application. Complete the request and payment on PSA Serbilis, then record the 16-digit PSA reference here."
+            "Your CENOMAR request {reference} was submitted in OneGov PH. "
+            "It is not an official filing. PSA remains responsible for issuing the certificate."
         ),
         "status_labels": {
             "draft": "Draft",
-            "submitted": "Awaiting official PSA application",
+            "paid": "Paid",
+            "submitted": "Submitted",
             "under_review": "Official application recorded",
             "rejected": "Rejected / needs attention",
+            "ready_for_release": "Ready for pickup",
         },
     }
 
 
 SSS_PATH_NEW = "First-time SS Number registration"
-SSS_PATH_EXISTING = "Existing SS Number concern"
-SSS_HAS_NO = "No, I am registering for the first time."
-SSS_HAS_YES = "Yes, I already have an SSS Number."
 SSS_URL = "https://www.sss.gov.ph/become-an-sss-member"
 SSS_SITE = "https://www.sss.gov.ph/"
 SSS_NOTICE = (
@@ -1877,13 +2088,15 @@ SSS_NOTICE = (
     "OneGov PH does not directly generate or issue SS Numbers."
 )
 SSS_DESCRIPTION = (
-    "OneGov PH helps a first-time applicant prepare an SS Number registration, and helps a citizen who already has an SS Number organize a concern. "
+    "OneGov PH helps a first-time applicant prepare an SS Number registration. "
     "SSS issues the number and handles the official record. OneGov PH does not generate or assign an SS Number."
 )
 SSS_FEE_NOTE = (
     "SS Number registration has no SSS processing fee. "
     "OneGov PH does not collect a payment and does not issue an SS Number."
 )
+SSS_HAS_PRIMARY_YES = "Yes, I have a primary government ID"
+SSS_HAS_PRIMARY_NO = "No, I will upload alternative identification"
 SSS_PURPOSES = (
     "Employment",
     "Self-Employment",
@@ -1897,52 +2110,6 @@ SSS_CATEGORIES = {
     "Non-Working Spouse": "Non-working spouse",
 }
 SSS_BENEFICIARY_RELATIONSHIPS = ("Father", "Mother", "Spouse", "Child", "Other eligible beneficiary")
-SSS_CONCERNS = (
-    "SS Number Verification Assistance",
-    "Lost or Forgotten SS Number",
-    "UMID / SSS ID Concern",
-    "Personal Information Correction",
-    "Membership Record Concern",
-    "Other SSS Concerns",
-)
-SSS_CONCERN_GUIDANCE = {
-    "SS Number Verification Assistance": {
-        "url": SSS_SITE,
-        "action": "Open the official SSS website",
-        "text": "SSS verifies a previously issued SS Number at an SSS office. Do not start a new registration, and do not apply for a second number.",
-        "next": "Ask SSS to verify the SS Number you already have. OneGov PH cannot look it up or issue another one.",
-    },
-    "Lost or Forgotten SS Number": {
-        "url": SSS_SITE,
-        "action": "Open the official SSS website",
-        "text": "An SS Number is a lifetime number. If you cannot remember it, request verification at the nearest SSS office. Do not apply for another SS Number.",
-        "next": "Request verification of your existing number at an SSS office. Do not open a first-time registration.",
-    },
-    "UMID / SSS ID Concern": {
-        "url": SSS_SITE,
-        "action": "Open the official SSS website",
-        "text": "UMID and SSS ID concerns are handled by SSS. OneGov PH does not issue an ID or a new SS Number.",
-        "next": "Continue the UMID or SSS ID concern through SSS. This record does not apply for a new SS Number.",
-    },
-    "Personal Information Correction": {
-        "url": "https://www.sss.gov.ph/wp-content/uploads/2024/10/E4-Member-Data-Change-Request.pdf",
-        "action": "Open SSS Form E-4",
-        "text": "SSS uses Member Data Change Request (SS Form E-4) for a membership data correction. Simple corrections can also be filed in My.SSS. OneGov PH does not change the membership record.",
-        "next": "Complete SS Form E-4, or the simple-correction request in My.SSS, and submit it to SSS with the documents SSS requires.",
-    },
-    "Membership Record Concern": {
-        "url": SSS_SITE,
-        "action": "Open the official SSS website",
-        "text": "Membership records are viewed and updated through My.SSS or an SSS office. OneGov PH does not change the SSS record.",
-        "next": "Sign in to My.SSS or visit an SSS office for the membership record. OneGov PH does not update it.",
-    },
-    "Other SSS Concerns": {
-        "url": SSS_SITE,
-        "action": "Open the official SSS website",
-        "text": "Continue this concern on the official SSS website or at an SSS office. OneGov PH does not submit it to SSS and does not issue an SS Number.",
-        "next": "Use the official SSS channel for this concern. OneGov PH only keeps your notes.",
-    },
-}
 SSS_RECORDED_STATUSES = (
     "Awaiting SS Number issuance",
     "SS Number issued",
@@ -1973,12 +2140,6 @@ SSS_FILE_RULES = {
     "type_error": "Upload a JPEG, JPG, or PDF file.",
     "size_error": "The file is larger than the 3 MB limit used by the SSS online application.",
 }
-SSS_DOCUMENT_EXAMPLES = (
-    "PSA birth certificate. SSS prefers this document.",
-    "If you do not have a birth certificate: a baptismal certificate, or one government ID such as a driver's license, passport, PhilSys ID or ePhilID, PRC card, SSS digitized ID, seaman's book, or UMID.",
-    "If you have none of those, SSS may ask for two other documents. Use the list on the official SSS website.",
-    "A non-working spouse should also be ready to show the marriage record and the member spouse's existing SS Number.",
-)
 
 
 def parse_beneficiaries(value):
@@ -2008,147 +2169,60 @@ def parse_beneficiaries(value):
     return people
 
 
-def _sss_choice(answers):
-    """Return the Step 1 answer, including a saved request from an earlier draft."""
-    choice = str(answers.get("has_ss_number") or "").strip()
-    if choice in (SSS_HAS_NO, SSS_HAS_YES):
-        return choice
-    legacy = str(answers.get("sss_path") or "").strip()
-    if legacy in (SSS_PATH_NEW, "new"):
-        return SSS_HAS_NO
-    if legacy in (SSS_PATH_EXISTING, "existing"):
-        return SSS_HAS_YES
-    return ""
-
-
-def _existing_document_examples(concern):
-    """Examples taken from the official SSS instructions for that concern."""
-    if concern == "Personal Information Correction":
-        return (
-            "Birth certificate or passport, when SS Form E-4 asks for it.",
-            "If you have neither, use the documents listed on the official E-4 form.",
-            "A file saved here is for your preparation. Submit it to SSS yourself.",
-        )
-    if concern in {"SS Number Verification Assistance", "Lost or Forgotten SS Number"}:
-        return (
-            "A government-issued ID you will present when SSS verifies the existing number.",
-            "A file saved here is not sent to SSS.",
-        )
-    if concern == "UMID / SSS ID Concern":
-        return (
-            "A government-issued ID you will present to SSS for this ID concern.",
-            "A file saved here is not sent to SSS.",
-        )
-    return (
-        "A document SSS asked you to bring for this concern, if you already have it.",
-        "A file saved here is not submitted to SSS.",
+def _sss_document(key, label, help_text, required=False, required_when=None, id_choices=None, status_label=None):
+    item = _document(
+        key,
+        label,
+        help_text,
+        required=required,
+        required_when=required_when,
+        id_choices=id_choices,
     )
-
-
-def _sss_common(choice, concern):
-    existing = choice == SSS_HAS_YES
-    guidance = SSS_CONCERN_GUIDANCE.get(concern) if existing else None
-    if existing and guidance is None:
-        guidance = {
-            "url": SSS_SITE,
-            "action": "Open the official SSS website",
-            "text": "Continue this existing SS Number concern through SSS. OneGov PH does not issue a new number.",
-            "next": "Use the official SSS channel. Do not apply for a second SS Number.",
-        }
-    return {
-        "kind": "sss",
-        "service_title": "SS Number Registration Assistance and Tracking",
-        "department_label": "Social Security System (SSS)",
-        "process": SSS_DESCRIPTION,
-        "disclaimer": SSS_NOTICE,
-        "fee_note": (
-            "This request has no processing fee. OneGov PH does not collect a payment and does not issue an SS Number."
-            if existing
-            else SSS_FEE_NOTE
-        ),
-        "reference_label": "OneGov PH reference number",
-        "private_keys": SSS_PRIVATE_KEYS,
-        "official_url": guidance["url"] if guidance else (SSS_URL if choice == SSS_HAS_NO else ""),
-        "official_heading": "Official SSS service" if existing else "Official SSS registration",
-        "official_action": guidance["action"] if guidance else "Continue to Official SSS Registration",
-        "official_text": (
-            guidance["text"]
-            if guidance
-            else "Finish the registration on the SSS website. SSS verifies the registrant, checks the email address, validates the information, generates the SS Number, and receives the supporting document."
-        ),
-        "official_next": guidance["next"] if guidance else "",
-        "status_labels": {
-            "draft": "Draft",
-            "submitted": "Existing SS Number concern recorded" if existing else "Awaiting official SSS registration",
-            "under_review": "Official registration recorded",
-        },
-        "recorded_statuses": SSS_RECORDED_STATUSES,
-        "document_statuses": SSS_DOCUMENT_STATUSES,
-        "file_rules": SSS_FILE_RULES,
-    }
+    if status_label:
+        item["status_label"] = status_label
+    return item
 
 
 def compose_sss(values=None):
-    """One four-step SSS form. Yes keeps an existing number; No prepares a first registration."""
+    """SS Number registration assistance: details, ID documents, review, free payment, confirmation."""
     answers = values or {}
-    choice = _sss_choice(answers)
-    concern = str(answers.get("concern_type") or "").strip()
-    asked = ("has_ss_number",)
-    new_member = ("has_ss_number", SSS_HAS_NO)
-    existing_member = ("has_ss_number", SSS_HAS_YES)
     personal = "Personal information"
     contact = "Contact information"
     address = "Address"
-    family = "Social status and place of birth"
+    family = "Family and place of birth"
     purpose = "Registration information"
     benefits = "Beneficiary information"
-    member = "Existing SSS member"
+    identification = "Identification"
+    primary_yes = ("has_primary_id", SSS_HAS_PRIMARY_YES)
+    primary_no = ("has_primary_id", SSS_HAS_PRIMARY_NO)
     fields = [
         _field(
-            "has_ss_number",
-            "Do you already have an SSS Number?",
-            "An SS Number is issued once. Choose Yes if SSS already issued one to you. That choice does not start a second registration.",
-            field_type="select",
-            options=(SSS_HAS_NO, SSS_HAS_YES),
-            section="SS Number",
-            placeholder="Select an answer",
-        ),
-        _field(
-            "existing_ss_number",
-            "Existing SS Number",
-            "Enter the 10-digit SS Number SSS already issued. Dashes are optional. OneGov PH does not create or replace this number.",
-            max_length=14,
-            section=member,
-            show_when=existing_member,
-        ),
-        _field(
-            "concern_type",
-            "Purpose of request",
-            "Choose the SSS service you need. This does not apply for a second SS Number.",
-            field_type="select",
-            options=SSS_CONCERNS,
-            section=member,
-            show_when=existing_member,
-        ),
-        _field(
-            "concern_details",
-            "Description",
-            "Describe the SSS concern. Do not enter a My.SSS password.",
-            field_type="textarea",
-            max_length=500,
-            section=member,
-            show_when=(existing_member, ("concern_type", "Other SSS Concerns")),
-            required_when_shown=True,
+            "sss_path",
+            "Request type",
+            "First-time SS Number registration assistance.",
+            field_type="hidden",
+            required=False,
+            default=SSS_PATH_NEW,
         ),
         _field(
             "first_name",
             "First name",
-            "Enter your first name. For a first-time registration, use the civil registry record.",
+            "Enter your first name as it appears on the civil registry record.",
             section=personal,
-            show_if_set=asked,
         ),
-        _field("middle_name", "Middle name", "Leave this blank if there is no middle name.", required=False, section=personal, show_if_set=asked),
-        _field("last_name", "Last name", "Enter your last name. For a first-time registration, use the civil registry record.", section=personal, show_if_set=asked),
+        _field(
+            "middle_name",
+            "Middle name",
+            "Leave this blank if there is no middle name.",
+            required=False,
+            section=personal,
+        ),
+        _field(
+            "last_name",
+            "Last name",
+            "Enter your last name as it appears on the civil registry record.",
+            section=personal,
+        ),
         _field(
             "suffix",
             "Suffix",
@@ -2157,7 +2231,6 @@ def compose_sss(values=None):
             required=False,
             options=("Jr.", "Sr.", "II", "III", "IV", "V"),
             section=personal,
-            show_when=new_member,
         ),
         _field(
             "date_of_birth",
@@ -2165,9 +2238,15 @@ def compose_sss(values=None):
             "Use your date of birth. A future date is not accepted.",
             field_type="date",
             section=personal,
-            show_if_set=asked,
         ),
-        _field("sex", "Sex", "Select the sex on the civil registry record.", field_type="select", options=_SEX, section=personal, show_when=new_member),
+        _field(
+            "sex",
+            "Sex",
+            "Select the sex on the civil registry record.",
+            field_type="select",
+            options=_SEX,
+            section=personal,
+        ),
         _field(
             "civil_status",
             "Civil status",
@@ -2175,7 +2254,6 @@ def compose_sss(values=None):
             field_type="select",
             options=_CIVIL_STATUS,
             section=personal,
-            show_when=new_member,
         ),
         _field(
             "citizenship",
@@ -2184,7 +2262,6 @@ def compose_sss(values=None):
             field_type="select",
             options=("Filipino", "Dual Citizen", "Foreign National"),
             section=personal,
-            show_when=new_member,
         ),
         _field(
             "nationality",
@@ -2192,7 +2269,7 @@ def compose_sss(values=None):
             "Enter your nationality. This is required for a foreign national.",
             required=False,
             section=personal,
-            show_when=(new_member, ("citizenship", "Foreign National")),
+            show_when=("citizenship", "Foreign National"),
             required_when_shown=True,
         ),
         _field(
@@ -2202,41 +2279,60 @@ def compose_sss(values=None):
             field_type="tel",
             max_length=20,
             section=contact,
-            show_if_set=asked,
         ),
         _field(
             "email",
             "Email address",
-            "Enter an email address you can open. For a first-time registration, SSS sends its verification link to this address. OneGov PH does not send or confirm that email.",
+            "Enter an email address you can open. SSS sends its verification link to this address. OneGov PH does not send or confirm that email.",
             field_type="email",
             max_length=255,
             section=contact,
-            show_if_set=asked,
         ),
         _field(
-            "complete_address",
-            "Complete address",
-            "Enter the complete address SSS should use for this existing-member concern.",
-            field_type="textarea",
-            max_length=300,
+            "house_number",
+            "House / lot number",
+            "Enter the house, lot, unit, or building number.",
+            max_length=80,
             section=address,
-            show_when=existing_member,
         ),
-        _field("house_number", "House / lot number", "Enter the house, lot, unit, or building number.", max_length=80, section=address, show_when=new_member),
-        _field("street", "Street", "Enter the street name.", max_length=120, section=address, show_when=new_member),
-        _field("subdivision", "Subdivision", "Leave this blank if there is no subdivision.", required=False, max_length=120, section=address, show_when=new_member),
-        _field("barangay", "Barangay", "Enter the barangay.", section=address, show_when=new_member),
-        _field("city", "City / municipality", "Enter the city or municipality.", section=address, show_when=new_member),
-        _field("province", "Province", "Enter the province. For Metro Manila, you may enter Metro Manila.", section=address, show_when=new_member),
-        _field("home_zip", "ZIP code", "For a Philippine address, enter the 4-digit ZIP code.", max_length=12, section=address, show_when=new_member),
-        _field("country", "Country", "Enter the country of this home address.", max_length=60, section=address, show_when=new_member),
+        _field("street", "Street", "Enter the street name.", max_length=120, section=address),
+        _field(
+            "subdivision",
+            "Subdivision",
+            "Leave this blank if there is no subdivision.",
+            required=False,
+            max_length=120,
+            section=address,
+        ),
+        _field("barangay", "Barangay", "Enter the barangay.", section=address),
+        _field("city", "City / municipality", "Enter the city or municipality.", section=address),
+        _field(
+            "province",
+            "Province",
+            "Enter the province. For Metro Manila, you may enter Metro Manila.",
+            section=address,
+        ),
+        _field(
+            "home_zip",
+            "ZIP code",
+            "For a Philippine address, enter the 4-digit ZIP code.",
+            max_length=12,
+            section=address,
+        ),
+        _field(
+            "country",
+            "Country",
+            "Enter the country of this home address.",
+            max_length=60,
+            section=address,
+            default="Philippines",
+        ),
         _field(
             "father_name",
             "Father's complete name",
             "Enter the father's first, middle, and last name.",
             max_length=160,
             section=family,
-            show_when=new_member,
         ),
         _field(
             "mother_maiden_name",
@@ -2244,10 +2340,21 @@ def compose_sss(values=None):
             "Enter the mother's first, middle, and maiden last name.",
             max_length=160,
             section=family,
-            show_when=new_member,
         ),
-        _field("place_of_birth", "Place of birth", "Enter the place of birth shown on the civil registry record.", section=family, show_when=new_member),
-        _field("birth_country", "Country of birth", "Enter the country of birth.", max_length=60, section=family, show_when=new_member),
+        _field(
+            "place_of_birth",
+            "Place of birth",
+            "Enter the place of birth shown on the civil registry record.",
+            section=family,
+        ),
+        _field(
+            "birth_country",
+            "Country of birth",
+            "Enter the country of birth.",
+            max_length=60,
+            section=family,
+            default="Philippines",
+        ),
         _field(
             "registration_purpose",
             "Purpose of registration",
@@ -2255,7 +2362,6 @@ def compose_sss(values=None):
             field_type="select",
             options=SSS_PURPOSES,
             section=purpose,
-            show_when=new_member,
         ),
         _field(
             "membership_category",
@@ -2266,7 +2372,6 @@ def compose_sss(values=None):
             source="registration_purpose",
             lookup=SSS_CATEGORIES,
             empty="Select a purpose to show the membership category.",
-            show_when=new_member,
         ),
         _field(
             "spouse_member_name",
@@ -2275,7 +2380,7 @@ def compose_sss(values=None):
             required=False,
             max_length=160,
             section=purpose,
-            show_when=(new_member, ("registration_purpose", "Non-Working Spouse")),
+            show_when=("registration_purpose", "Non-Working Spouse"),
             required_when_shown=True,
         ),
         _field(
@@ -2285,7 +2390,7 @@ def compose_sss(values=None):
             required=False,
             max_length=14,
             section=purpose,
-            show_when=(new_member, ("registration_purpose", "Non-Working Spouse")),
+            show_when=("registration_purpose", "Non-Working Spouse"),
             required_when_shown=True,
         ),
         _field(
@@ -2294,10 +2399,9 @@ def compose_sss(values=None):
             "Enter 6 to 20 letters or numbers. SSS checks whether it is available. OneGov PH does not reserve it or ask for the My.SSS password.",
             max_length=20,
             section=purpose,
-            show_when=new_member,
         ),
-        _field("height_cm", "Height (cm)", "Enter your height in centimeters.", max_length=6, section=purpose, show_when=new_member),
-        _field("weight_kg", "Weight (kg)", "Enter your weight in kilograms.", max_length=6, section=purpose, show_when=new_member),
+        _field("height_cm", "Height (cm)", "Enter your height in centimeters.", max_length=6, section=purpose),
+        _field("weight_kg", "Weight (kg)", "Enter your weight in kilograms.", max_length=6, section=purpose),
         _field(
             "beneficiaries",
             "Beneficiaries",
@@ -2306,83 +2410,118 @@ def compose_sss(values=None):
             required=False,
             options=SSS_BENEFICIARY_RELATIONSHIPS,
             section=benefits,
-            show_when=new_member,
+        ),
+        _field(
+            "has_primary_id",
+            "Can you provide a primary government ID?",
+            "Choose Yes if you can upload one primary ID from the SSS list. Choose No only when you cannot provide a primary ID and will upload two alternative documents instead.",
+            field_type="select",
+            options=(SSS_HAS_PRIMARY_YES, SSS_HAS_PRIMARY_NO),
+            section=identification,
+            placeholder="Select an answer",
         ),
     ]
-    spec = _sss_common(choice, concern)
-    if choice == SSS_HAS_YES:
-        guidance_next = spec.get("official_next") or "Use the official SSS channel for this concern."
-        documents = (
-            _document(
-                "supporting_document",
-                "Supporting document for this concern",
-                "Optional. Upload a JPEG, JPG, or PDF no larger than 3 MB when you have a document for this SSS concern. A file saved here is not submitted to SSS.",
-                required=False,
-            ),
-        )
-        examples = _existing_document_examples(concern)
-        examples_heading = "Documents you may need for this concern"
-        note = "Upload a supporting document only when it applies to the concern you selected. SSS receives the document through its own office or online service, not from OneGov PH."
-        intro = "Prepare a JPEG, JPG, or PDF no larger than 3 MB if you have a document for this concern. OneGov PH stores the copy you choose. It is not submitted to SSS."
-        submit_event = "Existing SS Number concern saved for monitoring. OneGov PH did not issue an SS Number or change the SSS record."
-        submit_notice = "Your existing SS Number concern {reference} was saved in OneGov PH. No new SS Number was created."
-        next_steps = [
-            guidance_next,
-            "Keep the OneGov PH reference number. It is not an SS Number or an SSS transaction number.",
-            "Opening the official SSS link does not submit this concern and does not change the OneGov PH status.",
-        ]
-    elif choice == SSS_HAS_NO:
-        documents = (
-            _document(
-                "supporting_document",
-                "Supporting document you are preparing",
-                "Optional in OneGov PH. On the SSS website, upload one readable color JPEG, JPG, or PDF no larger than 3 MB. A file saved here has not been submitted to SSS.",
-                required=False,
-            ),
-        )
-        examples = SSS_DOCUMENT_EXAMPLES
-        examples_heading = "Examples of documents SSS accepts"
-        note = "SSS lets an applicant continue without a document, but the SS Number can remain temporary until SSS approves a supporting document. Upload that document on the SSS website."
-        intro = "Prepare a JPEG, JPG, or PDF no larger than 3 MB. OneGov PH stores the copy you choose. It is not submitted to SSS."
-        submit_event = "SS Number preparation saved. This is not an SSS registration, and OneGov PH has not generated an SS Number."
-        submit_notice = "Your SS Number preparation {reference} was saved in OneGov PH. Continue on the official SSS website. OneGov PH has not generated an SS Number."
-        next_steps = [
+    documents = (
+        _sss_document(
+            "valid_id",
+            "Section A: Primary identification",
+            "Choose one primary ID (Driver’s License, Philippine Passport, PhilSys National ID / ePhilID, PRC ID, UMID Card, or Seaman’s Book), then upload a clear PDF or photo of that same ID.",
+            required_when=primary_yes,
+            id_choices="sss",
+            status_label="Required",
+        ),
+        _sss_document(
+            "alt_id_1",
+            "Section B: Alternative identification — first document",
+            "Shown only when you cannot provide a primary ID. Upload the first of two alternative documents (for example Barangay ID, NBI Clearance, School ID, Birth Certificate, TIN ID, or Police Clearance).",
+            required_when=primary_no,
+            id_choices="sss_alt",
+            status_label="Required",
+        ),
+        _sss_document(
+            "alt_id_2",
+            "Section B: Alternative identification — second document",
+            "Upload a second alternative document that differs from the first. Common pairs: Barangay ID + NBI Clearance, School ID + Birth Certificate, or TIN ID + Police Clearance.",
+            required_when=primary_no,
+            id_choices="sss_alt",
+            status_label="Required",
+        ),
+    )
+    return {
+        "kind": "sss",
+        "kicker": "Social Security assistance",
+        "department_label": "Social Security System (SSS)",
+        "service_title": "SS Number Registration Assistance and Tracking",
+        "process": SSS_DESCRIPTION,
+        "disclaimer": SSS_NOTICE,
+        "fee_note": SSS_FEE_NOTE,
+        "fields": fields,
+        "documents": documents,
+        "document_note": (
+            "Section A accepts one primary government ID. "
+            "Section B appears only when you cannot provide a primary ID, and then two alternative documents are required. "
+            "Files saved here are not submitted to SSS."
+        ),
+        "upload_intro": (
+            "Upload a clear PDF or photo of each required identification document. "
+            "OneGov PH stores the copy you choose. It is not submitted to SSS."
+        ),
+        "upload_accept": ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png",
+        "reference_label": "OneGov PH reference number",
+        "private_keys": SSS_PRIVATE_KEYS,
+        "official_url": SSS_URL,
+        "official_heading": "Official SSS registration",
+        "official_action": "Continue to Official SSS Registration",
+        "official_text": (
+            "Finish the registration on the SSS website. SSS verifies the registrant, checks the email address, "
+            "validates the information, generates the SS Number, and receives the supporting document."
+        ),
+        "show_submitted_details": True,
+        "step_labels": (
+            "1. Application details",
+            "2. Documents",
+            "3. Review",
+            "4. Payment",
+            "5. Confirmation",
+        ),
+        "payment_after_review": True,
+        "submit_label": "Continue to payment",
+        "confirmation_step": 5,
+        "reminders": [
+            "An SS Number is issued once. Do not start a second registration if SSS already issued one to you.",
+            "OneGov PH does not generate an SS Number, assign a number, or send this form to SSS.",
+            "Upload one primary ID when you have one. Otherwise upload two alternative documents.",
+        ],
+        "terms": (
+            "I certify that the information and documents I provided are accurate and complete to the best of my knowledge. "
+            + SSS_NOTICE
+        ),
+        "submit_event": (
+            "SSS request saved for assistance and tracking. "
+            "No payment was required. "
+            "SSS has not received this as an official filing, and OneGov PH has not issued an SS Number."
+        ),
+        "submit_notice": (
+            "Your SSS request {reference} was submitted in OneGov PH. "
+            "No payment was collected. Continue on the official SSS website. "
+            "OneGov PH has not generated an SS Number."
+        ),
+        "next_steps": [
             "Open the official SSS registration page and complete every SSS step there, including email verification.",
             "Keep the OneGov PH reference number. It is not an SS Number or an SSS transaction number.",
             "When SSS gives you an SS Number, a transaction number, or the E-1/E-6 form, record those details here.",
             "Opening the SSS website does not change the OneGov PH status.",
-        ]
-    else:
-        documents = ()
-        examples = ()
-        examples_heading = ""
-        note = ""
-        intro = "Choose whether you already have an SSS Number before uploading a document."
-        submit_event = "SSS request saved. OneGov PH has not generated an SS Number."
-        submit_notice = "Your SSS request {reference} was saved in OneGov PH. OneGov PH has not generated an SS Number."
-        next_steps = [
-            "Keep the OneGov PH reference number. It is not an SS Number.",
-        ]
-    spec.update(
-        {
-            "fields": fields,
-            "documents": documents,
-            "document_examples": examples,
-            "document_examples_heading": examples_heading,
-            "document_note": note,
-            "upload_intro": intro,
-            "upload_accept": ".pdf,.jpg,.jpeg,application/pdf,image/jpeg",
-            "reminders": [
-                "An SS Number is issued once. If you already have one, answer Yes. Do not start a second registration.",
-                "OneGov PH does not generate an SS Number, assign a number, or send this form to SSS.",
-            ],
-            "terms": "I certify that the information I provided is accurate and complete to the best of my knowledge.",
-            "submit_event": submit_event,
-            "submit_notice": submit_notice,
-            "next_steps": next_steps,
-        }
-    )
-    return spec
+        ],
+        "status_labels": {
+            "not_applicable": "Not applicable",
+            "submitted": "Awaiting official SSS registration",
+            "under_review": "Official registration recorded",
+        },
+        "recorded_statuses": SSS_RECORDED_STATUSES,
+        "document_statuses": SSS_DOCUMENT_STATUSES,
+        "file_rules": SSS_FILE_RULES,
+    }
+
 
 
 def specification_for(service, values=None):
@@ -2394,6 +2533,8 @@ def specification_for(service, values=None):
     spec = SERVICE_FORMS.get(service.service_name)
     if spec is None:
         return None
+    if spec.get("compose") == "birth":
+        return compose_birth_certificate(values or {})
     if spec.get("compose") == "barangay":
         return compose_barangay_clearance(values or {})
     if spec.get("compose") == "residency":
@@ -2418,13 +2559,23 @@ def specification_for(service, values=None):
         "disclaimer",
         "kicker",
         "department_label",
+        "service_title",
         "step_labels",
         "confirmation_step",
         "status_labels",
         "submit_event",
         "submit_notice",
         "next_steps",
+        "reminders",
         "documents_first",
+        "type_first",
+        "review_before_schedule",
+        "review_back",
+        "submit_label",
+        "terms",
+        "fee_note",
+        "payment_after_review",
+        "online_payment_only",
     ):
         if spec.get(extra):
             result[extra] = spec[extra]

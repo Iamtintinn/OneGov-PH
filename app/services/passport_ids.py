@@ -113,11 +113,13 @@ def is_minor(date_of_birth, today=None):
 
 def passport_id_groups(application_type=None, date_of_birth=None):
     """IDs this applicant may select. School ID options stay listed for every applicant."""
+    from app.services.passport_requirements import is_passport_renewal_type, normalize_passport_type
+
     groups = [{"title": "Valid government IDs", "items": list(_CORE)}]
-    app_type = str(application_type or "").strip()
-    # Documents can come before application type is known, so include renewal IDs then.
-    if not app_type or app_type == "Renewal":
-        groups.append({"title": "For renewal applicants only", "items": list(_RENEWAL)})
+    app_type = normalize_passport_type(application_type)
+    # Include latest-passport options for renewals and related non-first-time types.
+    if not app_type or is_passport_renewal_type(app_type) or app_type == "Renewal":
+        groups.append({"title": "For renewal and replacement applicants", "items": list(_RENEWAL)})
     groups.append({"title": "For minor applicants", "items": list(_MINOR)})
     return groups
 

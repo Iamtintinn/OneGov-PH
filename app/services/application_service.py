@@ -53,11 +53,21 @@ def read_details(application):
         "fields": list(raw.get("fields") or []),
         "checklist": list(raw.get("checklist") or []),
         "id_autofill_keys": list(raw.get("id_autofill_keys") or []),
+        "passport_reviewed": bool(raw.get("passport_reviewed")),
+        "barangay_reviewed": bool(raw.get("barangay_reviewed")),
+        "residency_reviewed": bool(raw.get("residency_reviewed")),
+        "senior_reviewed": bool(raw.get("senior_reviewed")),
+        "nbi_reviewed": bool(raw.get("nbi_reviewed")),
+        "birth_reviewed": bool(raw.get("birth_reviewed")),
+        "cenomar_reviewed": bool(raw.get("cenomar_reviewed")),
+        "philsys_reviewed": bool(raw.get("philsys_reviewed")),
     }
     if raw.get("appointment"):
         details["appointment"] = raw["appointment"]
     if raw.get("confirmation"):
         details["confirmation"] = raw["confirmation"]
+    if raw.get("payment"):
+        details["payment"] = raw["payment"]
     return details
 
 
@@ -70,10 +80,28 @@ def write_details(application, details, commit=True):
     autofill_keys = list(details.get("id_autofill_keys") or [])
     if autofill_keys:
         payload["id_autofill_keys"] = autofill_keys
+    if details.get("passport_reviewed"):
+        payload["passport_reviewed"] = True
+    if details.get("barangay_reviewed"):
+        payload["barangay_reviewed"] = True
+    if details.get("residency_reviewed"):
+        payload["residency_reviewed"] = True
+    if details.get("senior_reviewed"):
+        payload["senior_reviewed"] = True
+    if details.get("nbi_reviewed"):
+        payload["nbi_reviewed"] = True
+    if details.get("birth_reviewed"):
+        payload["birth_reviewed"] = True
+    if details.get("cenomar_reviewed"):
+        payload["cenomar_reviewed"] = True
+    if details.get("philsys_reviewed"):
+        payload["philsys_reviewed"] = True
     if details.get("appointment"):
         payload["appointment"] = details["appointment"]
     if details.get("confirmation"):
         payload["confirmation"] = details["confirmation"]
+    if details.get("payment"):
+        payload["payment"] = details["payment"]
     application.application_details = payload
     application.last_updated = _now()
     if commit:
@@ -210,13 +238,7 @@ def _beneficiaries_from_form(form, civil_status):
 
 def validate_answers(service, spec, form, extra=None):
     """Validate one service form. Returns stored field rows and a map of errors."""
-    from app.services.application_forms import (
-        SSS_HAS_NO,
-        SSS_HAS_YES,
-        SSS_PATH_EXISTING,
-        SSS_PATH_NEW,
-        field_is_visible,
-    )
+    from app.services.application_forms import SSS_PATH_NEW, field_is_visible
 
     errors = {}
     stored = []
@@ -233,7 +255,13 @@ def validate_answers(service, spec, form, extra=None):
             stored.append(row)
             continue
         raw = form.get(key, "")
-        if field["type"] == "email":
+        if field["type"] == "hidden":
+            value = clean_text(raw) or clean_text(field.get("default") or "")
+            if key == "sss_path" and not value:
+                value = SSS_PATH_NEW
+            if key == "application_type" and not value:
+                value = clean_text((extra or {}).get("application_type") or "")
+        elif field["type"] == "email":
             value = normalize_email(raw)
             if field["required"] and not value:
                 errors[key] = f"{label} is required."
@@ -354,11 +382,7 @@ def validate_answers(service, spec, form, extra=None):
         elif field["type"] == "select":
             value = clean_text(raw)
             if field["required"] and not value:
-                errors[key] = (
-                    "Select whether you already have an SSS Number."
-                    if key == "has_ss_number"
-                    else f"Select a {label.lower()}."
-                )
+                errors[key] = f"Select a {label.lower()}."
             elif value and value not in field["options"]:
                 errors[key] = f"Select a valid {label.lower()}."
         elif field["type"] == "number":
@@ -431,9 +455,8 @@ def validate_answers(service, spec, form, extra=None):
         if not present:
             errors[field["key"]] = f"{field['label']} is required."
     field_keys = {field["key"] for field in spec["fields"]}
-    new_registration = clean_text(form.get("has_ss_number", "")) == SSS_HAS_NO
     purpose = clean_text(form.get("registration_purpose", ""))
-    if new_registration and "registration_purpose" in field_keys and purpose == "Non-Working Spouse":
+    if "registration_purpose" in field_keys and purpose == "Non-Working Spouse":
         civil = clean_text(form.get("civil_status", ""))
         if civil and civil != "Married":
             errors["registration_purpose"] = (
@@ -441,8 +464,7 @@ def validate_answers(service, spec, form, extra=None):
                 "SSS confirms eligibility on the official website."
             )
     if (
-        new_registration
-        and "registration_purpose" in field_keys
+        "registration_purpose" in field_keys
         and purpose == "Overseas Filipino Worker (OFW)"
         and clean_text(form.get("citizenship", "")) == "Foreign National"
     ):
@@ -460,19 +482,12 @@ def validate_answers(service, spec, form, extra=None):
             row["key"] == "nationality"
             and "citizenship" in field_keys
             and citizenship != "Foreign National"
+            and spec.get("kind") == "sss"
         ):
             row["value"] = ""
             errors.pop(row["key"], None)
-    choice = clean_text(form.get("has_ss_number", ""))
-    if any(field["key"] == "has_ss_number" for field in spec["fields"]) and choice in (SSS_HAS_NO, SSS_HAS_YES):
-        stored.append(
-            {
-                "key": "sss_path",
-                "label": "Request",
-                "value": SSS_PATH_NEW if choice == SSS_HAS_NO else SSS_PATH_EXISTING,
-                "section": "SS Number",
-            }
-        )
+        if row["key"] == "sss_path" and not row.get("value"):
+            row["value"] = SSS_PATH_NEW
     return stored, errors
 
 
@@ -594,6 +609,7 @@ def save_draft(user, service, stored_fields, application=None):
         if row is not None:
             _delete_stored_file(row.uploaded_file)
             db.session.delete(row)
+        previous["id_autofill_keys"] = []
     if application is None:
         application = Application(
             tracking_number=_tracking_number(),
@@ -628,6 +644,9 @@ def requirement_for(application, document_key):
 def missing_documents(application, spec):
     if spec.get("checklist"):
         return missing_checklist(application, spec)
+    # Temporary: allow Senior Citizen ID continue without uploaded documents.
+    if spec.get("kind") == "senior":
+        return []
     values = field_map(application)
     missing = []
     for rule in document_rules(spec, values):
@@ -635,6 +654,18 @@ def missing_documents(application, spec):
             continue
         if rule.get("id_choices") == "dfa":
             if not _passport_id_ready(application, values):
+                missing.append(rule["label"])
+            continue
+        if rule.get("id_choices") == "barangay":
+            if not _barangay_id_ready(application, rule["key"]):
+                missing.append(rule["label"])
+            continue
+        if rule.get("id_choices") in {"sss", "sss_alt"}:
+            if not _sss_id_ready(
+                application,
+                rule["key"],
+                pool="alternative" if rule.get("id_choices") == "sss_alt" else "primary",
+            ):
                 missing.append(rule["label"])
             continue
         row = requirement_for(application, rule["key"])
@@ -661,6 +692,40 @@ def _passport_id_ready(application, values):
         values.get("date_of_birth"),
         matched.get("document_key") if matched else "",
     )
+    return matched is not None and selected is not None and row is not None and bool(row.uploaded_file)
+
+
+def _barangay_id_ready(application, document_key="valid_id"):
+    """A listed ID counts when an ID type is matched and the file is uploaded."""
+    from app.services.barangay_ids import barangay_id_by_key
+
+    matched = next(
+        (
+            item
+            for item in read_checklist(application)
+            if item.get("key") == document_key and item.get("value") in {"selected", "matched"}
+        ),
+        None,
+    )
+    row = requirement_for(application, document_key)
+    selected = barangay_id_by_key(matched.get("document_key") if matched else "")
+    return matched is not None and selected is not None and row is not None and bool(row.uploaded_file)
+
+
+def _sss_id_ready(application, document_key="valid_id", pool="primary"):
+    """An SSS listed ID counts when an ID type is matched and the file is uploaded."""
+    from app.services.sss_ids import sss_id_by_key
+
+    matched = next(
+        (
+            item
+            for item in read_checklist(application)
+            if item.get("key") == document_key and item.get("value") in {"selected", "matched"}
+        ),
+        None,
+    )
+    row = requirement_for(application, document_key)
+    selected = sss_id_by_key(matched.get("document_key") if matched else "", pool=pool)
     return matched is not None and selected is not None and row is not None and bool(row.uploaded_file)
 
 
@@ -774,6 +839,100 @@ def save_passport_id(application, selected, upload):
     return _store_payload(application, "valid_id", payload, extension, upload.filename)
 
 
+def save_barangay_id(application, selected, upload, document_key="valid_id"):
+    """Store a searchable-list government ID only when the file matches the selected ID."""
+    from app.services.barangay_ids import check_barangay_id_text
+    from app.services.document_text import read_document_text
+
+    payload, extension, error = _payload_from_upload(upload)
+    if error:
+        return error
+    text, read_error = read_document_text(payload, extension)
+    if read_error:
+        return read_error
+    mismatch = check_barangay_id_text(selected["key"], text)
+    if mismatch:
+        return mismatch
+    details = read_details(application)
+    checklist = [item for item in details["checklist"] if item.get("key") != document_key]
+    checklist.append({
+        "key": document_key,
+        "document_key": selected["key"],
+        "label": selected["label"],
+        "value": "matched",
+        "filename": clean_text(upload.filename)[:200],
+    })
+    details["checklist"] = checklist
+    write_details(application, details, commit=False)
+    return _store_payload(application, document_key, payload, extension, upload.filename)
+
+
+def save_sss_id(application, selected, upload, document_key="valid_id", pool="primary"):
+    """Store an SSS primary or alternative ID when the visible title matches the selection."""
+    from app.services.document_text import read_document_text
+    from app.services.sss_ids import check_sss_id_text
+
+    payload, extension, error = _payload_from_upload(upload)
+    if error:
+        return error
+    text, read_error = read_document_text(payload, extension)
+    if read_error:
+        return read_error
+    mismatch = check_sss_id_text(selected["key"], text, pool=pool)
+    if mismatch:
+        return mismatch
+    if document_key.startswith("alt_id_"):
+        other_key = "alt_id_2" if document_key == "alt_id_1" else "alt_id_1"
+        other = next(
+            (
+                item
+                for item in read_checklist(application)
+                if item.get("key") == other_key and item.get("value") in {"selected", "matched"}
+            ),
+            None,
+        )
+        if other and other.get("document_key") == selected["key"]:
+            return (
+                "Choose two different alternative documents. "
+                f"{selected['label']} is already used for the other upload."
+            )
+    details = read_details(application)
+    checklist = [item for item in details["checklist"] if item.get("key") != document_key]
+    checklist.append({
+        "key": document_key,
+        "document_key": selected["key"],
+        "label": selected["label"],
+        "value": "matched",
+        "filename": clean_text(upload.filename)[:200],
+    })
+    details["checklist"] = checklist
+    write_details(application, details, commit=False)
+    return _store_payload(application, document_key, payload, extension, upload.filename)
+
+
+def _philsys_autofill_from_text(text):
+    """Map OCR fields from a supporting ID onto PhilSys application field keys."""
+    from app.services.passport_ids import extract_id_fields
+
+    extracted = extract_id_fields(text) or {}
+    mapped = {}
+    for key, value in extracted.items():
+        cleaned = str(value or "").strip()
+        if not cleaned:
+            continue
+        if key == "civil_status":
+            mapped["marital_status"] = cleaned
+        elif key == "address":
+            mapped["permanent_address"] = cleaned
+        elif key == "nationality":
+            lowered = cleaned.casefold()
+            if "filipino" in lowered or lowered in {"ph", "philippines", "philippine"}:
+                mapped["citizenship"] = "Filipino Citizen"
+        else:
+            mapped[key] = cleaned
+    return mapped
+
+
 def save_philsys_document(application, document, upload):
     """Store the supporting ID only when its visible title matches the selected document."""
     from app.services.document_text import read_document_text
@@ -801,7 +960,10 @@ def save_philsys_document(application, document, upload):
         "value": "matched",
         "filename": clean_text(upload.filename)[:200],
     })
-    application.application_details = {"fields": details["fields"], "checklist": checklist}
+    details["checklist"] = checklist
+    write_details(application, details, commit=False)
+    spec = specification_for(application.service, field_map(application))
+    merge_id_autofill(application, _philsys_autofill_from_text(text), spec or {})
     return _store_payload(
         application,
         "supporting_id",
@@ -915,13 +1077,9 @@ def save_sss_tracking(application, user, form, files):
     from app.services.application_forms import (
         SSS_DOCUMENT_STATUSES,
         SSS_FILE_RULES,
-        SSS_PATH_NEW,
         SSS_RECORDED_STATUSES,
     )
 
-    answers = field_map(application)
-    if answers.get("sss_path") != SSS_PATH_NEW:
-        return "Record an SS Number from the separate existing-number concern, not from a new registration."
     ss_number = _ss_number_digits(form.get("ss_number", ""))
     if ss_number and not (ss_number.isdigit() and len(ss_number) == 10):
         return "Enter the 10-digit SS Number SSS issued. OneGov PH does not create this number."
@@ -1010,6 +1168,7 @@ def _delete_stored_file(relative_path):
 
 
 def cancel_draft(application):
+    from app.models.nbi_appointment import NbiAppointment
     from app.models.passport_appointment import PassportAppointment
 
     for row in list(application.requirements):
@@ -1022,6 +1181,13 @@ def cancel_draft(application):
     )
     if appointment is not None:
         db.session.delete(appointment)
+    nbi_appointment = db.session.scalar(
+        db.select(NbiAppointment).where(
+            NbiAppointment.application_id == application.application_id
+        )
+    )
+    if nbi_appointment is not None:
+        db.session.delete(nbi_appointment)
     confirmation = read_details(application).get("confirmation") or {}
     if confirmation.get("pdf_path"):
         _delete_stored_file(confirmation["pdf_path"])
@@ -1039,7 +1205,7 @@ def submit_application(application, user):
 
         incomplete = cenomar_incomplete_step(field_map(application))
         if incomplete:
-            return "Complete every CENOMAR step before saving this request."
+            return "Complete every CENOMAR detail before saving this request."
     if application.application_status != "draft":
         return None
     if missing_documents(application, spec):
@@ -1105,20 +1271,309 @@ def submit_application(application, user):
     return None
 
 
+def passport_type_ready(application):
+    """True when a passport application type was selected on step 1."""
+    from app.services.passport_requirements import PASSPORT_APPLICATION_TYPES, normalize_passport_type
+
+    selected = normalize_passport_type(field_map(application).get("application_type"))
+    return selected in PASSPORT_APPLICATION_TYPES
+
+
+def save_passport_application_type(application, application_type):
+    """Store the passport application type without wiping other draft answers."""
+    from app.services.passport_requirements import PASSPORT_APPLICATION_TYPES, normalize_passport_type
+
+    selected = normalize_passport_type(application_type)
+    if selected not in PASSPORT_APPLICATION_TYPES:
+        return "Select a passport application type."
+    details = read_details(application)
+    details["fields"] = _upsert_field(
+        details["fields"],
+        "application_type",
+        "Application type",
+        selected,
+        "Application",
+    )
+    write_details(application, details)
+    return None
+
+
+def barangay_type_ready(application):
+    """True when a barangay clearance application type was selected on step 1."""
+    from app.services.barangay_requirements import BARANGAY_APPLICATION_TYPES, normalize_barangay_type
+
+    selected = normalize_barangay_type(field_map(application).get("application_type"))
+    return selected in BARANGAY_APPLICATION_TYPES
+
+
+def save_barangay_application_type(application, application_type):
+    """Store the barangay application type without wiping other draft answers."""
+    from app.services.barangay_requirements import BARANGAY_APPLICATION_TYPES, normalize_barangay_type
+
+    selected = normalize_barangay_type(application_type)
+    if selected not in BARANGAY_APPLICATION_TYPES:
+        return "Select a barangay clearance application type."
+    details = read_details(application)
+    details["fields"] = _upsert_field(
+        details["fields"],
+        "application_type",
+        "Application type",
+        selected,
+        "Purpose of clearance",
+    )
+    # Keep legacy purpose display in summaries aligned with the selected type.
+    details["fields"] = _upsert_field(
+        details["fields"],
+        "purpose",
+        "Purpose of the clearance",
+        selected,
+        "Purpose of clearance",
+    )
+    write_details(application, details)
+    return None
+
+
+def residency_type_ready(application):
+    """True when a certificate of residency application type was selected on step 1."""
+    from app.services.residency_requirements import RESIDENCY_APPLICATION_TYPES, normalize_residency_type
+
+    selected = normalize_residency_type(field_map(application).get("application_type"))
+    return selected in RESIDENCY_APPLICATION_TYPES
+
+
+def senior_type_ready(application):
+    """True when a Senior Citizen ID application type was selected on step 1."""
+    from app.services.senior_requirements import SENIOR_APPLICATION_TYPES, normalize_senior_type
+
+    selected = normalize_senior_type(field_map(application).get("application_type"))
+    return selected in SENIOR_APPLICATION_TYPES
+
+
+def save_senior_application_type(application, application_type):
+    """Store the Senior Citizen ID application type without wiping other draft answers."""
+    from app.services.senior_requirements import SENIOR_APPLICATION_TYPES, normalize_senior_type
+
+    selected = normalize_senior_type(application_type)
+    if selected not in SENIOR_APPLICATION_TYPES:
+        return "Select a Senior Citizen ID application type."
+    details = read_details(application)
+    details["fields"] = _upsert_field(
+        details["fields"],
+        "application_type",
+        "Application type",
+        selected,
+        "Request type",
+    )
+    write_details(application, details)
+    return None
+
+
+def nbi_type_ready(application):
+    """True when an NBI clearance application type was selected on step 1."""
+    from app.services.nbi_requirements import NBI_APPLICATION_TYPES, normalize_nbi_type
+
+    selected = normalize_nbi_type(field_map(application).get("application_type"))
+    return selected in NBI_APPLICATION_TYPES
+
+
+def save_nbi_application_type(application, application_type):
+    """Store the NBI application type without wiping other draft answers."""
+    from app.services.nbi_requirements import NBI_APPLICATION_TYPES, normalize_nbi_type
+
+    selected = normalize_nbi_type(application_type)
+    if selected not in NBI_APPLICATION_TYPES:
+        return "Select an NBI clearance application type."
+    details = read_details(application)
+    details["fields"] = _upsert_field(
+        details["fields"],
+        "application_type",
+        "Application type",
+        selected,
+        "Application type",
+    )
+    write_details(application, details)
+    return None
+
+
+def birth_type_ready(application):
+    """True when a birth certificate request type was selected on step 1."""
+    from app.services.birth_requirements import BIRTH_APPLICATION_TYPES, normalize_birth_type
+
+    selected = normalize_birth_type(field_map(application).get("application_type"))
+    return selected in BIRTH_APPLICATION_TYPES
+
+
+def save_birth_application_type(application, application_type):
+    """Store the birth certificate request type without wiping other draft answers."""
+    from app.services.birth_requirements import BIRTH_APPLICATION_TYPES, normalize_birth_type
+
+    selected = normalize_birth_type(application_type)
+    if selected not in BIRTH_APPLICATION_TYPES:
+        return "Select a birth certificate request type."
+    details = read_details(application)
+    details["fields"] = _upsert_field(
+        details["fields"],
+        "application_type",
+        "Application type",
+        selected,
+        "Request type",
+    )
+    write_details(application, details)
+    return None
+
+
+def save_residency_application_type(application, application_type):
+    """Store the residency application type without wiping other draft answers."""
+    from app.services.residency_requirements import RESIDENCY_APPLICATION_TYPES, normalize_residency_type
+
+    selected = normalize_residency_type(application_type)
+    if selected not in RESIDENCY_APPLICATION_TYPES:
+        return "Select a certificate of residency application type."
+    details = read_details(application)
+    details["fields"] = _upsert_field(
+        details["fields"],
+        "application_type",
+        "Application type",
+        selected,
+        "Purpose of certificate",
+    )
+    details["fields"] = _upsert_field(
+        details["fields"],
+        "purpose",
+        "Purpose of the certificate",
+        selected,
+        "Purpose of certificate",
+    )
+    write_details(application, details)
+    return None
+
+
 def passport_details_ready(application, spec=None):
-    """True when required passport application fields are saved."""
+    """True when required passport or documents-first application fields are saved."""
     values = field_map(application)
     spec = spec or specification_for(application.service, values)
-    if not spec or spec.get("kind") != "passport":
+    if not spec or not (spec.get("kind") in {"passport", "philsys"} or spec.get("documents_first")):
         return False
     for field in spec.get("fields") or []:
         if not field.get("required"):
+            continue
+        if field.get("type") == "hidden" and field.get("key") == "application_type":
+            if not passport_type_ready(application):
+                return False
             continue
         if field.get("show_rules") and not field_is_visible_from_map(field, values):
             continue
         if not str(values.get(field["key"]) or "").strip():
             return False
     return True
+
+
+def passport_review_ready(application):
+    """True when the passport review step was accepted."""
+    return bool(read_details(application).get("passport_reviewed"))
+
+
+def mark_passport_reviewed(application):
+    """Record that the applicant accepted the passport review step."""
+    details = read_details(application)
+    details["passport_reviewed"] = True
+    write_details(application, details)
+
+
+def barangay_review_ready(application):
+    """True when the barangay review step was accepted."""
+    return bool(read_details(application).get("barangay_reviewed"))
+
+
+def mark_barangay_reviewed(application):
+    """Record that the applicant accepted the barangay review step."""
+    details = read_details(application)
+    details["barangay_reviewed"] = True
+    write_details(application, details)
+
+
+def residency_review_ready(application):
+    """True when the residency review step was accepted."""
+    return bool(read_details(application).get("residency_reviewed"))
+
+
+def mark_residency_reviewed(application):
+    """Record that the applicant accepted the residency review step."""
+    details = read_details(application)
+    details["residency_reviewed"] = True
+    write_details(application, details)
+
+
+def senior_review_ready(application):
+    """True when the senior citizen review step was accepted."""
+    return bool(read_details(application).get("senior_reviewed"))
+
+
+def mark_senior_reviewed(application):
+    """Record that the applicant accepted the senior citizen review step."""
+    details = read_details(application)
+    details["senior_reviewed"] = True
+    write_details(application, details)
+
+
+def nbi_review_ready(application):
+    """True when the NBI review step was accepted."""
+    return bool(read_details(application).get("nbi_reviewed"))
+
+
+def mark_nbi_reviewed(application):
+    """Record that the applicant accepted the NBI review step."""
+    details = read_details(application)
+    details["nbi_reviewed"] = True
+    write_details(application, details)
+
+
+def birth_review_ready(application):
+    """True when the birth certificate review step was accepted."""
+    return bool(read_details(application).get("birth_reviewed"))
+
+
+def mark_birth_reviewed(application):
+    """Record that the applicant accepted the birth certificate review step."""
+    details = read_details(application)
+    details["birth_reviewed"] = True
+    write_details(application, details)
+
+
+def cenomar_review_ready(application):
+    """True when the CENOMAR review step was accepted."""
+    return bool(read_details(application).get("cenomar_reviewed"))
+
+
+def mark_cenomar_reviewed(application):
+    """Record that the applicant accepted the CENOMAR review step."""
+    details = read_details(application)
+    details["cenomar_reviewed"] = True
+    write_details(application, details)
+
+
+def philsys_review_ready(application):
+    """True when the PhilSys review step was accepted."""
+    return bool(read_details(application).get("philsys_reviewed"))
+
+
+def mark_philsys_reviewed(application):
+    """Record that the applicant accepted the PhilSys review step."""
+    details = read_details(application)
+    details["philsys_reviewed"] = True
+    write_details(application, details)
+
+
+def sss_review_ready(application):
+    """True when the SSS review step was accepted."""
+    return bool(read_details(application).get("sss_reviewed"))
+
+
+def mark_sss_reviewed(application):
+    """Record that the applicant accepted the SSS review step."""
+    details = read_details(application)
+    details["sss_reviewed"] = True
+    write_details(application, details)
 
 
 def field_is_visible_from_map(field, values):
@@ -1131,7 +1586,112 @@ def continue_target(application):
     spec = specification_for(application.service, field_map(application))
     if spec is None or application.application_status != "draft":
         return "detail"
-    if spec.get("kind") == "passport" or spec.get("documents_first"):
+    if spec.get("kind") == "passport":
+        if not passport_type_ready(application):
+            return "type"
+        if missing_documents(application, spec):
+            return "documents"
+        if not passport_details_ready(application, spec):
+            return "details"
+        if not passport_review_ready(application):
+            return "review"
+        from app.services.passport_scheduling import appointment_for
+
+        if appointment_for(application) is None:
+            return "schedule"
+        return "payment"
+    if spec.get("kind") == "philsys":
+        if missing_documents(application, spec):
+            return "documents"
+        if not passport_details_ready(application, spec):
+            return "details"
+        if not philsys_review_ready(application):
+            return "review"
+        from app.services.philsys_scheduling import appointment_for
+
+        if appointment_for(application) is None:
+            return "schedule"
+        return "payment"
+    if spec.get("kind") == "nbi":
+        if spec.get("type_first") and not nbi_type_ready(application):
+            return "type"
+        if not read_fields(application):
+            return "details"
+        if missing_documents(application, spec):
+            return "documents"
+        if not nbi_review_ready(application):
+            return "review"
+        if spec.get("review_before_schedule"):
+            from app.services.nbi_scheduling import appointment_for
+
+            if appointment_for(application) is None:
+                return "schedule"
+        return "payment"
+    if spec.get("kind") in {"barangay", "residency"}:
+        if spec.get("type_first"):
+            type_ready = barangay_type_ready(application) if spec.get("kind") == "barangay" else residency_type_ready(application)
+            if not type_ready:
+                return "type"
+        if not read_fields(application):
+            return "details"
+        if missing_documents(application, spec):
+            return "documents"
+        reviewed = (
+            barangay_review_ready(application)
+            if spec.get("kind") == "barangay"
+            else residency_review_ready(application)
+        )
+        if not reviewed:
+            return "review"
+        if spec.get("review_before_schedule"):
+            from app.services.barangay_scheduling import appointment_for
+
+            if appointment_for(application) is None:
+                return "schedule"
+        return "payment"
+    if spec.get("kind") == "senior":
+        if spec.get("type_first") and not senior_type_ready(application):
+            return "type"
+        if not read_fields(application):
+            return "details"
+        if missing_documents(application, spec):
+            return "documents"
+        if not senior_review_ready(application):
+            return "review"
+        if spec.get("review_before_schedule"):
+            from app.services.senior_scheduling import appointment_for
+
+            if appointment_for(application) is None:
+                return "schedule"
+        return "payment"
+    if spec.get("kind") == "birth":
+        if spec.get("type_first") and not birth_type_ready(application):
+            return "type"
+        if not read_fields(application):
+            return "details"
+        if missing_documents(application, spec):
+            return "documents"
+        if not birth_review_ready(application):
+            return "review"
+        return "payment"
+    if spec.get("kind") in {"cenomar", "sss"}:
+        if not read_fields(application):
+            return "details"
+        if missing_documents(application, spec):
+            return "documents"
+        if spec.get("kind") == "cenomar":
+            from app.services.application_forms import cenomar_incomplete_step
+
+            incomplete = cenomar_incomplete_step(field_map(application))
+            if incomplete:
+                return "details"
+            reviewed = cenomar_review_ready(application)
+        else:
+            reviewed = sss_review_ready(application)
+        if not reviewed:
+            return "review"
+        return "payment"
+    if spec.get("documents_first"):
         if missing_documents(application, spec):
             return "documents"
         if not passport_details_ready(application, spec):

@@ -3,7 +3,6 @@
 import secrets
 from datetime import datetime
 
-from flask import url_for
 from sqlalchemy import update
 
 from app import db
@@ -29,8 +28,24 @@ METHOD_LABELS = {
     "gcash": "GCash",
     "maya": "Maya",
     "online_banking": "Online banking",
-    "over_the_counter": "Pay onsite (demo)",
+    "over_the_counter": "Pay onsite",
 }
+ONSITE_LOCATIONS = (
+    {
+        "key": "quezon_city_partner",
+        "name": "OneGov PH Partner Payment Center – Quezon City",
+        "address": "2F Civic Center Annex, East Avenue, Diliman, Quezon City",
+        "hours": "Mon–Fri, 8:00 AM – 5:00 PM",
+        "note": "Demonstration site only. Bring your application reference and a valid ID.",
+    },
+    {
+        "key": "makati_partner",
+        "name": "OneGov PH Partner Payment Center – Makati",
+        "address": "Ground Floor, Ayala Triangle Extension Desk, Makati City",
+        "hours": "Mon–Sat, 9:00 AM – 6:00 PM",
+        "note": "Demonstration site only. Cash and over-the-counter settlement are accepted here.",
+    },
+)
 
 
 def _now():
@@ -278,26 +293,16 @@ def start_maya_checkout(application, user):
 
     db.session.flush()
 
-    redirect_urls = {
-        "success": url_for(
-            "citizen.apply_maya_result",
+    from app.services.maya_checkout import build_redirect_urls
+
+    try:
+        redirect_urls = build_redirect_urls(
             application_id=application.application_id,
-            outcome="success",
-            _external=True,
-        ),
-        "failure": url_for(
-            "citizen.apply_maya_result",
-            application_id=application.application_id,
-            outcome="failure",
-            _external=True,
-        ),
-        "cancel": url_for(
-            "citizen.apply_maya_result",
-            application_id=application.application_id,
-            outcome="cancel",
-            _external=True,
-        ),
-    }
+            payment_reference=payment.payment_reference,
+        )
+    except MayaCheckoutError as exc:
+        db.session.rollback()
+        return None, str(exc)
     buyer = {
         "firstName": (user.first_name or "Citizen")[:100],
         "lastName": (user.last_name or "Applicant")[:100],
@@ -378,7 +383,25 @@ def _apply_verified_status(payment, application, local_status, maya_status, sour
         db.session.commit()
         user = db.session.get(User, user_id)
         if user is not None and application.application_status == "draft":
-            finalize_passport_application(application, user, "paid")
+            kind = (specification_for(application.service, field_map(application)) or {}).get("kind")
+            if kind in {"barangay", "residency"}:
+                from app.services.barangay_payment import finalize_barangay_application
+
+                finalize_barangay_application(application, user, "paid")
+            elif kind == "nbi":
+                from app.services.nbi_payment import finalize_nbi_application
+
+                finalize_nbi_application(application, user, "paid")
+            elif kind == "birth":
+                from app.services.birth_payment import finalize_birth_application
+
+                finalize_birth_application(application, user, "paid")
+            elif kind == "cenomar":
+                from app.services.cenomar_payment import finalize_cenomar_application
+
+                finalize_cenomar_application(application, user, "paid")
+            else:
+                finalize_passport_application(application, user, "paid")
         return "paid", None
 
     if local_status in {"failed", "cancelled"}:

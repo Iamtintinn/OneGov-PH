@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from urllib.parse import urlencode
 
 import requests
-from flask import current_app
+from flask import current_app, has_request_context, request
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 logger = logging.getLogger(__name__)
+
+MAYA_RETURN_SALT = "maya-checkout-return"
+MAYA_RETURN_MAX_AGE = 60 * 60 * 24  # 24 hours
 
 SANDBOX_HOST = "https://pg-sandbox.paymaya.com"
 PRODUCTION_HOST = "https://pg.paymaya.com"
@@ -111,6 +116,74 @@ def _request(
         return response.json()
     except ValueError as exc:
         raise MayaCheckoutError("Maya Checkout returned a non-JSON response.") from exc
+
+
+def public_base_url() -> str:
+    """
+    Prefer a configured public HTTPS origin (ngrok / deployed host) for Maya redirects.
+    Localhost-only return URLs often break QRPh returns and drop the browser session.
+    """
+    for key in ("MAYA_PUBLIC_BASE_URL", "MAYA_WEBHOOK_BASE_URL"):
+        configured = (current_app.config.get(key) or "").strip().rstrip("/")
+        if configured:
+            return configured
+    if has_request_context():
+        return request.url_root.rstrip("/")
+    return ""
+
+
+def _return_serializer() -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt=MAYA_RETURN_SALT)
+
+
+def build_return_token(*, application_id: int, payment_reference: str) -> str:
+    """Signed token so Maya return URLs still work after a cross-site session drop."""
+    return _return_serializer().dumps(
+        {
+            "aid": int(application_id),
+            "rrn": str(payment_reference or ""),
+        }
+    )
+
+
+def verify_return_token(token: str) -> dict[str, Any] | None:
+    if not token:
+        return None
+    try:
+        payload = _return_serializer().loads(token, max_age=MAYA_RETURN_MAX_AGE)
+    except (BadSignature, SignatureExpired, TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    try:
+        application_id = int(payload.get("aid"))
+    except (TypeError, ValueError):
+        return None
+    reference = str(payload.get("rrn") or "").strip()
+    if application_id < 1 or not reference:
+        return None
+    return {"application_id": application_id, "payment_reference": reference}
+
+
+def build_redirect_urls(*, application_id: int, payment_reference: str) -> dict[str, str]:
+    """
+    Build Maya success/failure/cancel URLs with a signed token.
+    QRPh and other wallet returns can POST/redirect cross-site and lose the login cookie;
+    the token lets apply_maya_result finish verification without forcing login first.
+    """
+    base = public_base_url()
+    if not base:
+        raise MayaCheckoutError(
+            "Could not build Maya return URLs. Set MAYA_PUBLIC_BASE_URL or MAYA_WEBHOOK_BASE_URL "
+            "to your public HTTPS origin (for example an ngrok URL), or open the app from a browser request."
+        )
+    token = build_return_token(application_id=application_id, payment_reference=payment_reference)
+    path = f"/citizen/applications/{int(application_id)}/payment/maya/result"
+    urls = {}
+    for outcome in ("success", "failure", "cancel"):
+        query = urlencode({"outcome": outcome, "token": token})
+        urls[outcome] = f"{base}{path}?{query}"
+    return urls
 
 
 def create_checkout(

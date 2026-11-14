@@ -92,6 +92,35 @@
         <p><a class="dash-button" href="{{ url_for('citizen.passport_confirmation_pdf', application_id=application.application_id) }}">Download PDF confirmation</a></p>
         {% endif %}
         {% endif %}
+        {% if spec and spec.kind in ['barangay', 'residency', 'senior', 'nbi', 'birth', 'cenomar', 'philsys', 'sss'] and barangay_confirmation_id %}
+        <h2>Confirmation proof</h2>
+        <p class="notice notice-warning">{% if spec.kind == 'residency' %}Demonstration confirmation – not an official certificate of residency{% elif spec.kind == 'senior' %}Demonstration confirmation – not an official Senior Citizen ID{% elif spec.kind == 'nbi' %}Demonstration confirmation – not an official NBI clearance{% elif spec.kind == 'birth' %}Demonstration confirmation – not an official PSA birth certificate{% elif spec.kind == 'cenomar' %}Demonstration confirmation – not an official PSA CENOMAR{% elif spec.kind == 'philsys' %}Demonstration confirmation – not an official PhilSys National ID{% elif spec.kind == 'sss' %}Demonstration confirmation – not an official SS Number{% else %}Demonstration confirmation – not an official barangay clearance{% endif %}</p>
+        <dl class="detail-list">
+            <div>
+                <dt>Confirmation ID</dt>
+                <dd>{{ barangay_confirmation_id }}</dd>
+            </div>
+            {% if barangay_summary and barangay_summary.payment %}
+            <div>
+                <dt>Payment reference</dt>
+                <dd class="pay-mono">{{ barangay_summary.payment.payment_reference }}</dd>
+            </div>
+            <div>
+                <dt>Payment status</dt>
+                <dd>
+                    <span class="pay-status-pill pay-status-pill--{{ barangay_summary.status_key or barangay_summary.payment.payment_status }}">
+                        {{ barangay_summary.status_label }}
+                    </span>
+                </dd>
+            </div>
+            <div>
+                <dt>Amount</dt>
+                <dd>{{ barangay_summary.amount_display }}</dd>
+            </div>
+            {% endif %}
+        </dl>
+        <p><a class="dash-button" href="{% if spec.kind == 'senior' %}{{ url_for('citizen.senior_confirmation_pdf', application_id=application.application_id) }}{% elif spec.kind == 'nbi' %}{{ url_for('citizen.nbi_confirmation_pdf', application_id=application.application_id) }}{% elif spec.kind == 'birth' %}{{ url_for('citizen.birth_confirmation_pdf', application_id=application.application_id) }}{% elif spec.kind == 'cenomar' %}{{ url_for('citizen.cenomar_confirmation_pdf', application_id=application.application_id) }}{% elif spec.kind == 'philsys' %}{{ url_for('citizen.philsys_confirmation_pdf', application_id=application.application_id) }}{% elif spec.kind == 'sss' %}{{ url_for('citizen.sss_confirmation_pdf', application_id=application.application_id) }}{% else %}{{ url_for('citizen.barangay_confirmation_pdf', application_id=application.application_id) }}{% endif %}">Download receipt</a></p>
+        {% endif %}
         {% if detail_fields %}
         <h2>Application details</h2>
         <dl class="detail-list">
@@ -168,7 +197,6 @@
         <p>{{ spec.official_text }}</p>
         <p><a class="dash-button" href="{{ spec.official_url }}" target="_blank" rel="noopener noreferrer">{{ spec.official_action }}</a></p>
         <p class="field-help">Opening this link does not change the OneGov PH status. The status above is the OneGov PH record, not a status sent by SSS.</p>
-        {% if saved.path == 'First-time SS Number registration' %}
         <h2>SSS details you recorded</h2>
         <p class="field-help">Enter the SS Number, transaction number, or document status only after SSS gives them to you. Saving these details does not mean SSS changed the OneGov PH status.</p>
         <form class="apply-form" method="post" enctype="multipart/form-data" action="{{ url_for('citizen.record_sss_tracking', application_id=application.application_id) }}">
@@ -231,7 +259,6 @@
             <li>{{ label }}: {% if row and row.uploaded_file %}<a href="{{ url_for('citizen.application_document', application_id=application.application_id, requirement_id=row.requirement_id) }}">{{ row.remarks or 'View file' }}</a>{% else %}Not uploaded{% endif %}</li>
             {% endfor %}
         </ul>
-        {% endif %}
         {% endif %}
         {% if spec and spec.kind == 'cenomar' and application.application_status != 'draft' %}
         {% set saved = namespace(reference='', application_date='', payment='', payment_date='', delivery='', recorded='') %}

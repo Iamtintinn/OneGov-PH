@@ -32,14 +32,16 @@ BIOMETRICS = (
     "Do not upload a photograph, fingerprint, or iris scan through OneGov PH."
 )
 STEP_LABELS = (
-    "1. Application details",
-    "2. Documents",
+    "1. Documents",
+    "2. Application details",
     "3. Review",
-    "4. Confirmation",
+    "4. Scheduling",
+    "5. Payment",
+    "6. Confirmation",
 )
 NEXT_STEPS = (
     "Keep your OneGov PH reference number. It is not a PhilSys transaction number.",
-    "Bring the original documents to an authorized PSA registration center. The center captures the photograph, fingerprints, and iris scan.",
+    "Attend the demonstration registration appointment you scheduled, then complete identity verification and biometrics at an authorized PSA center.",
     "Do not send biometric data through OneGov PH.",
     "Registration at the center is free. OneGov PH has not registered you with PhilSys.",
     "When PSA gives you a transaction reference, save it on this request. Saving it does not change your status to Registered.",
@@ -366,26 +368,11 @@ def supporting_id_groups(citizenship):
 
 
 def registration_documents(citizenship):
-    resident = is_resident_alien(citizenship)
     return (
-        _document(
-            "psa_birth_certificate",
-            "PSA birth certificate",
-            "Upload a PDF or photo of the PSA birth certificate. Bring the original to the registration center. OneGov PH does not validate it with PSA."
-            if not resident
-            else "Optional for a resident alien. Upload a PSA birth certificate only if it applies. OneGov PH does not validate it with PSA.",
-            required=not resident,
-        ),
         _document(
             "supporting_id",
             "Valid supporting identification document",
             "Select the supporting ID in the list, then upload a clear PDF or photo of that same document. OneGov PH checks the visible title. This is not PSA acceptance.",
-        ),
-        _document(
-            "other_supporting",
-            "Other accepted supporting document",
-            "Optional. Upload another accepted supporting document only if it applies to your registration.",
-            required=False,
         ),
     )
 
@@ -396,22 +383,27 @@ def specification(values=None):
     if resident:
         document_note = (
             "A resident alien selects the Alien Certificate of Registration or ACR ID, and can also upload the sworn certification of length of stay. "
-            "A PSA birth certificate is optional. OneGov PH does not capture biometrics and does not accept them as uploads."
+            "OneGov PH does not capture biometrics and does not accept them as uploads."
         )
     else:
         document_note = (
-            "Upload the PSA birth certificate and one valid supporting identification document. "
-            "Another accepted supporting document is optional. "
+            "Upload one valid supporting identification document. "
             "OneGov PH does not capture biometrics and does not accept a photograph, fingerprint, or iris scan as an upload."
         )
     return {
         "kind": "philsys",
+        "kicker": "National ID assistance",
+        "service_title": "PhilSys National ID Registration Assistance",
         "process": PROCESS,
         "department_label": DEPARTMENT_LABEL,
         "include_personal": False,
         "fields": fields(),
         "documents": registration_documents(answers.get("citizenship")),
         "document_note": document_note,
+        "upload_intro": (
+            "Upload one supporting identification document first. "
+            "Citizenship chosen later may change which documents apply."
+        ),
         "checklist": False,
         "reminders": REMINDERS,
         "biometrics": BIOMETRICS,
@@ -420,10 +412,15 @@ def specification(values=None):
         "disclaimer": DISCLAIMER,
         "reference_label": "OneGov PH reference number",
         "show_submitted_details": True,
+        "documents_first": True,
+        "review_before_schedule": True,
+        "review_back": "details",
+        "submit_label": "Continue to scheduling",
+        "confirmation_step": 6,
         "terms": TERMS,
         "next_steps": NEXT_STEPS,
         "submit_event": (
-            "National ID preparation saved for assistance and tracking. "
+            "National ID preparation, demonstration appointment, and free payment step were saved for assistance and tracking. "
             "The person is not registered with PhilSys, and no National ID has been issued."
         ),
         "submit_notice": (

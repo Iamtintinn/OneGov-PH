@@ -153,6 +153,56 @@
     border-color: #efc4c4;
 }
 
+.pay-status-pill--not_applicable,
+.pay-status-banner--not_applicable .pay-status-pill--not_applicable {
+    color: #3d5a73;
+    background: #eef4f8;
+    border-color: #c9d7e3;
+}
+
+.pay-status-banner--not_applicable {
+    border-color: #c9d7e3;
+    background: linear-gradient(180deg, #f7fafc 0%, #eef4f8 100%);
+}
+
+.pay-config-list {
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem 1rem;
+}
+
+.pay-config-list div {
+    margin: 0;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid var(--pay-border);
+    border-radius: 12px;
+    background: #fff;
+}
+
+.pay-config-list dt {
+    margin: 0 0 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--dash-muted);
+}
+
+.pay-config-list dd {
+    margin: 0;
+    color: var(--pay-navy);
+    font-size: 0.92rem;
+    font-weight: 650;
+    line-height: 1.35;
+}
+
+@media (max-width: 700px) {
+    .pay-config-list {
+        grid-template-columns: 1fr;
+    }
+}
+
 .pay-status-pill--cancelled,
 .pay-status-pill--refunded {
     color: #7a4d12;
@@ -193,7 +243,8 @@
 }
 
 .pay-channel-grid,
-.pay-method-grid {
+.pay-method-grid,
+.pay-onsite-grid {
     display: grid;
     gap: 0.75rem;
 }
@@ -202,26 +253,30 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.pay-method-grid {
+.pay-method-grid,
+.pay-onsite-grid {
     grid-template-columns: 1fr;
 }
 
 .pay-channel-card,
-.pay-method-card {
+.pay-method-card,
+.pay-onsite-card {
     position: relative;
     margin: 0;
     cursor: pointer;
 }
 
 .pay-channel-card input,
-.pay-method-card input {
+.pay-method-card input,
+.pay-onsite-card input {
     position: absolute;
     opacity: 0;
     pointer-events: none;
 }
 
 .pay-channel-body,
-.pay-method-body {
+.pay-method-body,
+.pay-onsite-body {
     display: flex;
     align-items: center;
     gap: 0.85rem;
@@ -234,23 +289,75 @@
 }
 
 .pay-channel-card:hover .pay-channel-body,
-.pay-method-card:hover .pay-method-body {
+.pay-method-card:hover .pay-method-body,
+.pay-onsite-card:hover .pay-onsite-body {
     border-color: #bfd3e4;
     box-shadow: var(--pay-shadow-sm);
 }
 
 .pay-channel-card:has(input:checked) .pay-channel-body,
 .pay-method-card:has(input:checked) .pay-method-body,
+.pay-onsite-card:has(input:checked) .pay-onsite-body,
 .pay-channel-card input:focus-visible + .pay-channel-body,
-.pay-method-card input:focus-visible + .pay-method-body {
+.pay-method-card input:focus-visible + .pay-method-body,
+.pay-onsite-card input:focus-visible + .pay-onsite-body {
     border-color: var(--pay-blue);
     background: #fff;
     box-shadow: 0 0 0 3px rgba(59, 130, 176, 0.16), var(--pay-shadow-sm);
 }
 
-.pay-channel-card:has(input:checked) .pay-channel-body {
+.pay-channel-card:has(input:checked) .pay-channel-body,
+.pay-onsite-card:has(input:checked) .pay-onsite-body {
     border-color: var(--pay-maroon);
     box-shadow: 0 0 0 3px rgba(120, 31, 58, 0.12), var(--pay-shadow-sm);
+}
+
+.pay-onsite-body {
+    align-items: flex-start;
+}
+
+.pay-onsite-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.85rem;
+    height: 1.85rem;
+    border-radius: 999px;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: var(--pay-navy);
+    background: #ffe9a8;
+}
+
+.pay-onsite-copy {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.pay-onsite-copy strong {
+    color: var(--pay-navy);
+    font-size: 0.96rem;
+    line-height: 1.35;
+}
+
+.pay-onsite-copy small,
+.pay-onsite-meta,
+.pay-onsite-note {
+    color: var(--dash-muted);
+    font-size: 0.84rem;
+    line-height: 1.4;
+}
+
+.pay-onsite-meta {
+    color: var(--pay-navy);
+    font-weight: 650;
+}
+
+.pay-onsite-note {
+    margin-top: 0.15rem;
 }
 
 .pay-channel-icon {
@@ -573,21 +680,65 @@
     width: 100%;
 }
 
+.passport-details-main.pay-panel,
 .passport-details-main {
     min-width: 0;
     margin: 0;
     height: 100%;
+    padding: 0.85rem 0.9rem 0.95rem;
+}
+
+.passport-details-main > .confirm-panel-head,
+.passport-details-main > .pay-panel-head {
+    gap: 0.55rem;
+    margin-bottom: 0.6rem;
+}
+
+.passport-details-main > .confirm-panel-head h2,
+.passport-details-main > .pay-panel-head h2 {
+    margin: 0 0 0.1rem;
+    font-size: 0.98rem;
+}
+
+.passport-details-main > .confirm-panel-head p,
+.passport-details-main > .pay-panel-head p {
+    margin: 0;
+    font-size: 0.76rem;
+    line-height: 1.3;
+}
+
+.passport-details-main .confirm-panel-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9px;
+}
+
+.passport-details-main .confirm-panel-icon svg {
+    width: 16px;
+    height: 16px;
 }
 
 .passport-autofill-note {
-    margin: 0 0 1rem;
-    padding: 0.7rem 0.85rem;
-    border-radius: 12px;
+    margin: 0 0 0.7rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 10px;
     border: 1px solid #d5ebde;
     background: #f5fbf7;
     color: #1f6b43;
-    font-size: 0.88rem;
-    line-height: 1.45;
+    font-size: 0.8rem;
+    line-height: 1.35;
+}
+
+.passport-details-fields .computed-value {
+    margin: 0;
+    padding: 0.5rem 0.65rem;
+    border-radius: 10px;
+    border: 1px solid var(--pay-border);
+    background: #f8fafc;
+    color: var(--pay-navy);
+    font-size: 0.84rem;
+    font-weight: 650;
+    line-height: 1.35;
 }
 
 .passport-validation-banner {
@@ -676,7 +827,7 @@
 .passport-details-fields {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1.1rem 1.25rem;
+    gap: 0.5rem 0.75rem;
     width: 100%;
 }
 
@@ -689,13 +840,67 @@
     grid-column: 1 / -1;
 }
 
+.passport-details-fields .apply-field label {
+    font-size: 0.8rem;
+    font-weight: 650;
+    line-height: 1.2;
+}
+
+.passport-details-fields .apply-field .field-help {
+    margin: 0.05rem 0 0.2rem;
+    font-size: 0.7rem;
+    line-height: 1.25;
+}
+
+.passport-details-fields .apply-field input,
+.passport-details-fields .apply-field select,
+.passport-details-fields .apply-field textarea,
+.passport-details-fields .apply-field .date-input-control,
+.passport-details-fields .apply-field .select-input select {
+    padding: 0.4rem 0.55rem;
+    border-radius: 9px;
+    font-size: 0.82rem;
+    line-height: 1.25;
+    min-height: 0;
+}
+
+.passport-details-fields .apply-field .date-input-control {
+    min-height: 2.2rem;
+    padding-left: 2.15rem !important;
+}
+
+.passport-details-fields .date-input-icon {
+    left: 0.65rem;
+}
+
+.passport-details-fields .date-input-icon svg {
+    width: 15px;
+    height: 15px;
+}
+
+.passport-details-fields .apply-field textarea {
+    min-height: 3.6rem;
+}
+
+.passport-details-fields .date-input-display {
+    margin: 0.12rem 0 0;
+    font-size: 0.7rem;
+}
+
+.passport-details-fields .field-error {
+    margin: 0.18rem 0 0;
+    font-size: 0.7rem;
+}
+
 .passport-details-section {
     grid-column: 1 / -1;
-    margin: 0.35rem 0 0;
+    margin: 0.1rem 0 0;
     padding-top: 0.35rem;
     border-top: 1px solid var(--pay-border);
     color: var(--pay-navy);
-    font-size: 0.95rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1.2;
 }
 
 .passport-details-fields > .passport-details-section:first-child {
@@ -706,6 +911,7 @@
 
 .passport-details-fields .select-input,
 .passport-details-fields .text-input,
+.passport-details-fields .date-input,
 .passport-details-fields select,
 .passport-details-fields input {
     width: 100%;
@@ -811,6 +1017,31 @@
     line-height: 1.45;
 }
 
+.passport-details-disclaimer--flush {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+}
+
+.passport-reminder-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.55rem;
+}
+
+.passport-reminder-list li {
+    margin: 0;
+    padding: 0.65rem 0.75rem;
+    border-radius: 10px;
+    border: 1px solid #ead5dc;
+    background: #fff;
+    color: var(--pay-navy);
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
 .passport-details-form .pay-actions {
     margin-top: 1.25rem;
 }
@@ -877,7 +1108,7 @@
     border-radius: 14px;
     border: 1px solid var(--pay-border);
     background: #fff;
-    box-shadow: var(--pay-shadow-sm);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .confirm-metric strong {
@@ -901,34 +1132,26 @@
     flex-shrink: 0;
 }
 
-.confirm-metric--green {
-    border-color: #d5ebde;
-    background: #f5fbf7;
+.confirm-metric--green,
+.confirm-metric--gold,
+.confirm-metric--maroon {
+    border-color: var(--pay-border);
+    background: #fff;
 }
 
 .confirm-metric--green .confirm-metric-icon {
-    color: #2a7a4d;
-    background: #e4f4ea;
-}
-
-.confirm-metric--gold {
-    border-color: #efe4bc;
-    background: #fffcef;
+    color: #2f7a52;
+    background: #eef6f1;
 }
 
 .confirm-metric--gold .confirm-metric-icon {
-    color: #9a7420;
-    background: #f8efd0;
-}
-
-.confirm-metric--maroon {
-    border-color: #ead5dc;
-    background: #fdf6f8;
+    color: #8a6a1f;
+    background: #f7f3e8;
 }
 
 .confirm-metric--maroon .confirm-metric-icon {
-    color: #8a3a55;
-    background: #f5e4ea;
+    color: #8a3f57;
+    background: #f6eef1;
 }
 
 .confirm-layout {
@@ -1122,6 +1345,14 @@
     background: #fff;
 }
 
+.confirm-receipt-btn {
+    display: flex;
+    width: 100%;
+    margin-top: 1rem;
+    justify-content: center;
+    text-align: center;
+}
+
 @media (max-width: 960px) {
     .confirm-layout,
     .confirm-metric-row {
@@ -1137,6 +1368,317 @@
 @media (max-width: 720px) {
     .confirm-info-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+/* Review step */
+.review-shell {
+    padding: 1.4rem 1.5rem 1.75rem 2.15rem;
+    background: #fff;
+}
+
+.review-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(16.5rem, 0.95fr);
+    gap: 1.1rem 1.2rem;
+    align-items: start;
+    width: 100%;
+}
+
+.review-main {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.review-panel {
+    margin: 0;
+}
+
+.review-panel-title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.review-panel-title-row > div {
+    min-width: 0;
+}
+
+.review-edit-link {
+    flex-shrink: 0;
+    margin-top: 0.15rem;
+    color: var(--pay-maroon);
+    font-size: 0.84rem;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.review-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem 0.75rem;
+}
+
+.review-section-head {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 0.25rem;
+    padding-top: 0.55rem;
+    border-top: 1px solid var(--pay-border);
+}
+
+.review-section-head:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+}
+
+.review-section-head h3 {
+    margin: 0;
+    color: var(--pay-navy);
+    font-size: 0.92rem;
+}
+
+.review-detail-item {
+    display: grid;
+    gap: 0.2rem;
+    padding: 0.7rem 0.8rem;
+    border-radius: 12px;
+    border: 1px solid var(--pay-border);
+    background: #f8fafc;
+}
+
+.review-detail-wide {
+    grid-column: 1 / -1;
+}
+
+.review-detail-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--dash-muted);
+}
+
+.review-detail-value {
+    color: var(--pay-navy);
+    font-size: 0.92rem;
+    font-weight: 650;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.review-doc-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+}
+
+.review-docs-card .pay-panel-head {
+    margin-bottom: 0.75rem;
+}
+
+.review-docs-card .confirm-panel-head {
+    align-items: flex-start;
+}
+
+.review-doc-item {
+    display: grid;
+    gap: 0.45rem;
+    padding: 0.75rem 0.85rem;
+    border-radius: 12px;
+    border: 1px solid var(--pay-border);
+    background: #fff;
+}
+
+.review-doc-item.is-ready {
+    border-color: #cfe5d8;
+    background: #f6fbf8;
+}
+
+.review-doc-item.is-missing {
+    border-color: #f0d8d8;
+    background: #fff8f8;
+}
+
+.review-doc-item strong {
+    display: block;
+    color: var(--pay-navy);
+    font-size: 0.9rem;
+    line-height: 1.35;
+}
+
+.review-doc-item strong em {
+    font-style: normal;
+    font-weight: 600;
+    color: var(--dash-muted);
+}
+
+.review-doc-item span {
+    display: block;
+    margin-top: 0.15rem;
+    color: var(--dash-muted);
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
+.review-doc-item a {
+    color: var(--pay-maroon);
+    font-size: 0.84rem;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    word-break: break-word;
+}
+
+.review-note-block {
+    margin-top: 0.85rem;
+    padding: 0.8rem 0.9rem;
+    border-radius: 12px;
+    border: 1px solid var(--pay-border);
+    background: #f8fafc;
+}
+
+.review-note-block strong {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: var(--pay-navy);
+    font-size: 0.88rem;
+}
+
+.review-note-block p {
+    margin: 0;
+    color: var(--dash-text);
+    font-size: 0.86rem;
+    line-height: 1.45;
+}
+
+.review-side {
+    display: grid;
+    gap: 0.85rem;
+    min-width: 0;
+    align-content: start;
+}
+
+.review-fee-card {
+    border-color: #e7d7a8;
+    background: linear-gradient(180deg, #fffdf6 0%, #fff8e8 100%);
+}
+
+.review-fee-value {
+    margin: 0;
+    color: var(--pay-navy);
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+.review-footer {
+    margin-top: 1.15rem;
+    padding: 1rem 1.1rem 1.05rem;
+    border-radius: 16px;
+    border: 1px solid var(--pay-border);
+    border-top: 3px solid #2f9e66;
+    background: #fff;
+    box-shadow: var(--pay-shadow-sm);
+}
+
+.review-footer-copy {
+    margin-bottom: 0.85rem;
+}
+
+.review-footer-copy h2 {
+    margin: 0 0 0.25rem;
+    color: var(--pay-navy);
+    font-size: 1rem;
+}
+
+.review-footer-copy p {
+    margin: 0;
+    color: var(--dash-muted);
+    font-size: 0.88rem;
+    line-height: 1.4;
+}
+
+.review-form {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.review-check {
+    padding: 0.75rem 0.85rem;
+    border-radius: 12px;
+    border: 1px solid var(--pay-border);
+    background: #f8fafc;
+    font-size: 0.86rem;
+    line-height: 1.45;
+}
+
+.review-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+    margin: 0;
+}
+
+.review-actions .dash-button {
+    min-width: 0;
+}
+
+.review-actions .pay-btn-primary {
+    margin-left: auto;
+}
+
+.review-cancel-form {
+    display: none;
+}
+
+.review-cancel-btn {
+    order: 0;
+}
+
+@media (max-width: 960px) {
+    .review-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .review-side {
+        order: 1;
+    }
+
+    .review-actions .pay-btn-primary {
+        margin-left: 0;
+    }
+}
+
+@media (max-width: 720px) {
+    .review-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .review-panel-title-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .review-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .review-actions .dash-button {
+        width: 100%;
     }
 }
 

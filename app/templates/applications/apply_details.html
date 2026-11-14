@@ -4,19 +4,33 @@
 {% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
 {% block content %}
 <div class="dash-page site-width">
-    {% if spec.kind in ['passport', 'barangay'] %}
-    {% set modern_step_count = (step_labels|length) if step_labels else (5 if spec.kind == 'passport' else 4) %}
-    {% set next_action = 'scheduling' if spec.kind == 'passport' else 'documents' %}
+    {% if spec.kind in ['passport', 'barangay', 'residency', 'senior', 'nbi', 'birth', 'cenomar', 'philsys', 'sss'] %}
+    {% set modern_step_count = (step_labels|length) if step_labels else (7 if (spec.kind == 'passport' and spec.type_first) else (6 if spec.kind in ['passport', 'philsys'] else (5 if spec.kind in ['barangay', 'residency', 'sss'] else 4))) %}
+    {% set next_action = 'review' if spec.kind in ['passport', 'cenomar', 'philsys'] else 'documents' %}
     <section class="apply-card pay-shell confirm-shell passport-details-shell" aria-labelledby="apply-heading">
         {% include "applications/_progress.html" %}
 
         <header class="pay-hero confirm-hero">
             <div class="pay-hero-copy">
-                <p class="pay-kicker">{% if spec.kind == 'passport' %}{{ spec.kicker or "Passport demonstration" }}{% else %}{{ spec.department_label or service.department.department_name }}{% endif %}</p>
+                <p class="pay-kicker">{% if spec.kind == 'passport' %}{{ spec.kicker or "Passport demonstration" }}{% else %}{{ spec.kicker or spec.department_label or service.department.department_name }}{% endif %}</p>
                 <h1 id="apply-heading" class="passport-details-title">{{ spec.service_title or service.service_name }}</h1>
                 <p class="welcome-text">
                     {% if spec.kind == 'passport' %}
                     Review and complete your application details. Fields readable from your uploaded ID are filled in; leave anything missing blank until you enter it.
+                    {% elif spec.kind == 'birth' %}
+                    Enter the requester and certificate details for this PSA birth certificate request. OneGov PH only prepares and tracks the request; PSA still issues the certificate.
+                    {% elif spec.kind == 'cenomar' %}
+                    Enter the requester and certificate details for this CENOMAR request. OneGov PH prepares and tracks the request; PSA still issues the certificate.
+                    {% elif spec.kind == 'philsys' %}
+                    Enter your personal, address, and contact details for this National ID preparation request. PSA still registers you and captures biometrics in person.
+                    {% elif spec.kind == 'residency' %}
+                    Enter your personal and residential details for this certificate of residency request. The barangay or city still verifies residency and issues the certificate.
+                    {% elif spec.kind == 'senior' %}
+                    Enter your personal, residential, and contact details for this Senior Citizen ID request. You must be 60 or older. OSCA still verifies eligibility and issues the ID.
+                    {% elif spec.kind == 'nbi' %}
+                    Enter the applicant details for this NBI clearance monitoring request. OneGov PH does not register the request with NBI; the bureau still handles appointment, payment, biometrics, and issuance.
+                    {% elif spec.kind == 'sss' %}
+                    Enter your personal, address, registration, and identification details for this SS Number registration assistance request. SSS still issues the number; OneGov PH does not generate an SS Number.
                     {% else %}
                     Enter your applicant and residency details for this barangay clearance request. The barangay still reviews the request and issues the clearance.
                     {% endif %}
@@ -58,6 +72,20 @@
                             <p>
                                 {% if spec.kind == 'passport' %}
                                 Confirm the details pulled from your ID, then complete any blank fields before scheduling.
+                                {% elif spec.kind == 'birth' %}
+                                Fill in the requester details, certificate owner information, parents, and purpose. If a representative will claim this request, choose Yes and complete their details.
+                                {% elif spec.kind == 'cenomar' %}
+                                Fill in the requester details, certificate owner information, parents, and purpose.
+                                {% elif spec.kind == 'philsys' %}
+                                Fill in personal, address, and contact details. Leave optional fields blank when they do not apply.
+                                {% elif spec.kind == 'residency' %}
+                                Fill in personal, residential, duration, and purpose details. Required fields must be complete before you continue.
+                                {% elif spec.kind == 'senior' %}
+                                Fill in personal, residential, contact, and request-type details. Age is calculated from your date of birth and must be 60 or older.
+                                {% elif spec.kind == 'nbi' %}
+                                Fill in applicant, parents, education or employment, and any NBI appointment details you already have. Leave optional fields blank when they do not apply.
+                                {% elif spec.kind == 'sss' %}
+                                Fill in personal, address, family, registration, and whether you can provide a primary government ID. Required fields must be complete before you continue to documents.
                                 {% else %}
                                 Fill in the applicant, residency, and purpose details. Required fields must be complete before you continue.
                                 {% endif %}
@@ -67,17 +95,98 @@
                     {% if autofilled_labels %}
                     <p class="passport-autofill-note" role="status">Filled from your uploaded ID: {{ autofilled_labels|join(', ') }}.</p>
                     {% endif %}
+                    {% if spec.type_first and values.get('application_type') %}
+                    <div class="passport-autofill-note" role="status">
+                        Application type: <strong>{{ values.get('application_type') }}</strong>
+                        · <a href="{{ url_for('citizen.apply_type', service_id=service.service_id) }}">Change</a>
+                        {% if spec.kind == 'nbi' and values.get('application_type') == 'New Application' %}
+                        · Physical appearance required after payment
+                        {% elif spec.kind == 'nbi' %}
+                        · Continues fully online
+                        {% endif %}
+                    </div>
+                    {% endif %}
                     <div class="passport-details-fields">
                         {% for field in fields %}
                         {% set current = values[field.key] if field.key in values else (field.default if field.default is defined and field.default is not none else '') %}
                         {% if field.type != 'hidden' %}
+                        {% set gate = namespace(show=true) %}
+                        {% if field.show_rules %}
+                            {% for rule in field.show_rules %}
+                                {% if rule.set %}
+                                    {% if not values.get(rule.key) %}{% set gate.show = false %}{% endif %}
+                                {% elif values.get(rule.key) != rule.equals %}
+                                    {% set gate.show = false %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
                         {% if field.section and (loop.first or fields[loop.index0 - 1].type == 'hidden' or field.section != fields[loop.index0 - 1].section) %}
                         <h3 class="passport-details-section">{{ field.section }}</h3>
                         {% endif %}
-                        <div class="apply-field{% if field.type == 'textarea' or field.key in ['address', 'permanent_address', 'present_address', 'purpose'] %} apply-field-wide{% endif %}{% if errors.get(field.key) %} has-error{% endif %}">
-                            <label for="{{ field.key }}">{{ field.label }}{% if not field.required %} <span class="optional">(optional)</span>{% endif %}</label>
+                        <div class="apply-field{% if field.type in ['textarea', 'computed', 'beneficiaries', 'output'] or field.key in ['address', 'permanent_address', 'present_address', 'previous_address', 'purpose', 'purpose_other', 'previous_name', 'place_of_birth', 'representative_details', 'delivery_address'] %} apply-field-wide{% endif %}{% if errors.get(field.key) %} has-error{% endif %}" {% if field.show_rules %}data-show-rules='{{ field.show_rules|tojson }}'{% if not gate.show %} hidden{% endif %}{% endif %}>
+                            <label for="{{ field.key }}">{{ field.label }}{% if not field.required and not field.required_when_shown and field.type not in ['computed', 'output'] %} <span class="optional">(optional)</span>{% endif %}</label>
                             <p class="field-help" id="{{ field.key }}-help">{{ field.help }}</p>
-                            {% if field.type == 'select' %}
+                            {% if field.type == 'computed' %}
+                            <p class="computed-value" id="{{ field.key }}" data-source="{{ field.source }}" data-calc="{{ field.calc or 'residency' }}" role="status">{{ values.get(field.key) or field.empty }}</p>
+                            {% elif field.type == 'output' %}
+                            <p class="output-value" id="{{ field.key }}" role="status" {% if field.lookup %}data-source="{{ field.source }}" data-empty="{{ field.empty }}" data-lookup='{{ field.lookup|tojson }}'{% endif %}>{{ current or field.empty }}</p>
+                            {% elif field.type == 'beneficiaries' %}
+                            <div id="beneficiary-list" data-married="{{ 'yes' if values.get('civil_status') == 'Married' else 'no' }}">
+                                {% for person in beneficiary_rows(values.get(field.key)) %}
+                                <fieldset class="beneficiary-card">
+                                    <h3>Beneficiary {{ loop.index }}</h3>
+                                    <label for="beneficiary-name-{{ loop.index }}">Complete name</label>
+                                    <input id="beneficiary-name-{{ loop.index }}" name="beneficiary_name" type="text" maxlength="160" autocomplete="off" value="{{ person.name }}">
+                                    <label for="beneficiary-relationship-{{ loop.index }}">Relationship</label>
+                                    <select id="beneficiary-relationship-{{ loop.index }}" name="beneficiary_relationship" autocomplete="off">
+                                        <option value="">Select relationship</option>
+                                        {% for option in field.options %}
+                                        {% if option != 'Spouse' or values.get('civil_status') == 'Married' %}
+                                        <option value="{{ option }}" {% if person.relationship == option %}selected{% endif %}>{{ option }}</option>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                    <label for="beneficiary-birth-{{ loop.index }}">Date of birth</label>
+                                    <div class="date-input">
+                                        <span class="date-input-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M3 10h18"></path><path d="M8 3v4"></path><path d="M16 3v4"></path></svg>
+                                        </span>
+                                        <input id="beneficiary-birth-{{ loop.index }}" class="date-input-control" name="beneficiary_birth_date" type="date" value="{{ person.birth_date }}">
+                                    </div>
+                                    <label for="beneficiary-note-{{ loop.index }}">Other information <span class="optional">(optional)</span></label>
+                                    <input id="beneficiary-note-{{ loop.index }}" name="beneficiary_note" type="text" maxlength="200" value="{{ person.note }}">
+                                    <button class="dash-button apply-cancel remove-beneficiary" type="button">Remove</button>
+                                </fieldset>
+                                {% endfor %}
+                            </div>
+                            <button class="dash-button" id="add-beneficiary" type="button">Add beneficiary</button>
+                            <template id="beneficiary-template">
+                                <fieldset class="beneficiary-card">
+                                    <h3>Beneficiary</h3>
+                                    <label>Complete name</label>
+                                    <input name="beneficiary_name" type="text" maxlength="160" autocomplete="off">
+                                    <label>Relationship</label>
+                                    <select name="beneficiary_relationship" autocomplete="off">
+                                        <option value="">Select relationship</option>
+                                        {% for option in field.options %}
+                                        {% if option != 'Spouse' or values.get('civil_status') == 'Married' %}
+                                        <option value="{{ option }}">{{ option }}</option>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                    <label>Date of birth</label>
+                                    <div class="date-input">
+                                        <span class="date-input-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M3 10h18"></path><path d="M8 3v4"></path><path d="M16 3v4"></path></svg>
+                                        </span>
+                                        <input class="date-input-control" name="beneficiary_birth_date" type="date">
+                                    </div>
+                                    <label>Other information <span class="optional">(optional)</span></label>
+                                    <input name="beneficiary_note" type="text" maxlength="200">
+                                    <button class="dash-button apply-cancel remove-beneficiary" type="button">Remove</button>
+                                </fieldset>
+                            </template>
+                            {% elif field.type == 'select' %}
                             <div class="select-input">
                                 <select id="{{ field.key }}" name="{{ field.key }}" autocomplete="off" {% if field.required %}required{% endif %} aria-describedby="{{ field.key }}-help{% if errors.get(field.key) %} {{ field.key }}-error{% endif %}" aria-invalid="{{ 'true' if errors.get(field.key) else 'false' }}">
                                     <option value="">{{ field.placeholder or ("Select " ~ field.label|lower) }}</option>
@@ -103,11 +212,13 @@
                             <textarea id="{{ field.key }}" name="{{ field.key }}" maxlength="{{ field.max_length }}" autocomplete="off" {% if field.required %}required{% endif %} aria-describedby="{{ field.key }}-help{% if errors.get(field.key) %} {{ field.key }}-error{% endif %}" aria-invalid="{{ 'true' if errors.get(field.key) else 'false' }}">{{ current }}</textarea>
                             {% else %}
                             <div class="text-input">
-                                <input id="{{ field.key }}" name="{{ field.key }}" type="{{ 'email' if field.type == 'email' else ('tel' if field.type == 'tel' else 'text') }}" inputmode="{{ 'numeric' if field.type == 'number' else 'text' }}" value="{{ current }}" maxlength="{{ field.max_length }}" autocomplete="off" {% if field.required %}required{% endif %} aria-describedby="{{ field.key }}-help{% if errors.get(field.key) %} {{ field.key }}-error{% endif %}" aria-invalid="{{ 'true' if errors.get(field.key) else 'false' }}">
+                                <input id="{{ field.key }}" name="{{ field.key }}" type="{{ 'email' if field.type == 'email' else ('tel' if field.type == 'tel' else ('time' if field.type == 'time' else 'text')) }}" inputmode="{{ 'decimal' if field.key in ['height_cm', 'weight_kg'] else ('numeric' if field.type == 'number' or field.key in ['home_zip', 'spouse_member_ss_number'] else 'text') }}" value="{{ current }}" maxlength="{{ field.max_length }}" autocomplete="off" {% if field.required %}required{% endif %} aria-describedby="{{ field.key }}-help{% if errors.get(field.key) %} {{ field.key }}-error{% endif %}" aria-invalid="{{ 'true' if errors.get(field.key) else 'false' }}">
                             </div>
                             {% endif %}
                             {% if errors.get(field.key) %}<p class="field-error" id="{{ field.key }}-error">{{ errors[field.key] }}</p>{% endif %}
                         </div>
+                        {% else %}
+                        <input type="hidden" name="{{ field.key }}" value="{{ current }}">
                         {% endif %}
                         {% endfor %}
                     </div>
@@ -152,21 +263,113 @@
                                 </dd>
                             </div>
                         </dl>
-                        {% if spec.disclaimer %}
+                        {% if spec.disclaimer and spec.kind not in ['barangay', 'residency', 'senior', 'nbi', 'birth', 'cenomar', 'philsys'] %}
                         <p class="passport-details-disclaimer">{{ spec.disclaimer }}</p>
                         {% endif %}
                     </div>
+
+                    {% if spec.kind in ['senior', 'nbi', 'birth', 'cenomar', 'philsys', 'sss'] and spec.reminders %}
+                    <section class="passport-notice-card" aria-labelledby="modern-reminders-heading">
+                        <div class="passport-notice-top">
+                            <strong id="modern-reminders-heading">Before you begin</strong>
+                        </div>
+                        <ul class="passport-reminder-list">
+                            {% for reminder in spec.reminders %}
+                            <li>{{ reminder }}</li>
+                            {% endfor %}
+                        </ul>
+                    </section>
+                    {% endif %}
+
+                    {% if spec.kind == 'nbi' and spec.local_office %}
+                    <section class="passport-notice-card" aria-labelledby="nbi-office-heading">
+                        <div class="passport-notice-top">
+                            <strong id="nbi-office-heading">{{ spec.local_office.heading or "National Bureau of Investigation" }}</strong>
+                        </div>
+                        {% if spec.local_office.note %}
+                        <p class="passport-details-disclaimer passport-details-disclaimer--flush">{{ spec.local_office.note }}</p>
+                        {% endif %}
+                        {% if spec.local_office.instructions %}
+                        <p class="passport-details-disclaimer"><strong>{{ spec.local_office.instructions_heading or "Instructions" }}:</strong> {{ spec.local_office.instructions }}</p>
+                        {% endif %}
+                    </section>
+                    {% endif %}
+
+                    {% if spec.kind == 'senior' and spec.local_office and (spec.local_office.barangay or spec.local_office.city or spec.local_office.address or spec.local_office.contact_number or spec.local_office.office_hours) %}
+                    <section class="passport-notice-card" aria-labelledby="senior-office-heading">
+                        <div class="passport-notice-top">
+                            <strong id="senior-office-heading">{{ spec.local_office.heading or "OSCA office" }}</strong>
+                        </div>
+                        <dl class="passport-notice-meta">
+                            {% if spec.local_office.barangay or spec.local_office.city %}
+                            <div>
+                                <dt>Coverage</dt>
+                                <dd>{% if spec.local_office.barangay %}{{ spec.local_office.barangay }}{% endif %}{% if spec.local_office.barangay and spec.local_office.city %}, {% endif %}{% if spec.local_office.city %}{{ spec.local_office.city }}{% endif %}</dd>
+                            </div>
+                            {% endif %}
+                            {% if spec.local_office.address %}
+                            <div>
+                                <dt>{{ spec.local_office.address_label or "Office address" }}</dt>
+                                <dd>{{ spec.local_office.address }}</dd>
+                            </div>
+                            {% endif %}
+                            {% if spec.local_office.contact_number %}
+                            <div>
+                                <dt>Contact</dt>
+                                <dd>{{ spec.local_office.contact_number }}</dd>
+                            </div>
+                            {% endif %}
+                            {% if spec.local_office.office_hours %}
+                            <div>
+                                <dt>Office hours</dt>
+                                <dd>{{ spec.local_office.office_hours }}</dd>
+                            </div>
+                            {% endif %}
+                        </dl>
+                        {% if spec.local_office.note %}
+                        <p class="passport-details-disclaimer">{{ spec.local_office.note }}</p>
+                        {% endif %}
+                    </section>
+                    {% endif %}
 
                     <section class="passport-next-card" aria-labelledby="passport-next-heading">
                         <h2 id="passport-next-heading">What happens next</h2>
                         <ol class="confirm-steps passport-details-steps">
                             {% if spec.kind == 'passport' %}
+                            <li>Review your details and uploaded ID.</li>
                             <li>Choose a demonstration appointment.</li>
                             <li>Pay with Maya sandbox or onsite.</li>
-                            <li>Download your confirmation PDF.</li>
+                            {% elif spec.kind == 'residency' %}
+                            <li>Upload proof of residency and a valid ID.</li>
+                            <li>Review your request, then pay ₱50.00.</li>
+                            <li>Track updates in your OneGov PH account.</li>
+                            {% elif spec.kind == 'senior' %}
+                            <li>Upload proof of age, residency, and photo. A valid ID is recommended.</li>
+                            <li>Review your request, then confirm the free ₱0.00 payment step.</li>
+                            <li>Track updates in your OneGov PH account.</li>
+                            {% elif spec.kind == 'nbi' %}
+                            <li>Upload two valid government-issued IDs.</li>
+                            <li>Review your request, then schedule a demonstration appointment.</li>
+                            <li>Pay the ₱160.00 regular online total, then complete biometrics through NBI.</li>
+                            {% elif spec.kind == 'birth' %}
+                            <li>Upload a valid government ID and any authorization letter that applies.</li>
+                            <li>Review your request, then pay the ₱365.00-per-copy demonstration total.</li>
+                            <li>Track updates in your OneGov PH account.</li>
+                            {% elif spec.kind == 'cenomar' %}
+                            <li>Complete requester, certificate owner, parents, and purpose details.</li>
+                            <li>Review your request, then pay the ₱365.00-per-copy demonstration total.</li>
+                            <li>Track updates in your OneGov PH account.</li>
+                            {% elif spec.kind == 'philsys' %}
+                            <li>Review your details and uploaded documents.</li>
+                            <li>Choose a demonstration registration appointment.</li>
+                            <li>Confirm the free ₱0.00 payment step, then track updates in your account.</li>
+                            {% elif spec.kind == 'sss' %}
+                            <li>Upload a primary government ID, or two alternative documents if you cannot.</li>
+                            <li>Review your request, then confirm the free ₱0.00 payment step.</li>
+                            <li>Continue registration on the official SSS website and track updates here.</li>
                             {% else %}
                             <li>Upload the required barangay documents.</li>
-                            <li>Review your request before submitting.</li>
+                            <li>Review your request, then pay ₱50.00.</li>
                             <li>Track updates in your OneGov PH account.</li>
                             {% endif %}
                         </ol>
@@ -175,7 +378,7 @@
             </div>
 
             <div class="pay-actions apply-actions">
-                {% if spec.kind == 'passport' and application %}
+                {% if spec.kind in ['passport', 'philsys'] and application %}
                 <a class="dash-button apply-cancel pay-btn-ghost" href="{{ url_for('citizen.apply_documents', application_id=application.application_id) }}">Back</a>
                 {% endif %}
                 <a class="dash-button apply-cancel pay-btn-ghost" href="{{ url_for('citizen.services') }}">Cancel</a>
@@ -269,7 +472,6 @@
         {% if spec.step_notes and spec.step_notes.get(step) %}<p class="field-help">{{ spec.step_notes[step] }}</p>{% endif %}
         <form class="apply-form" method="post" action="{{ url_for('citizen.apply_details', service_id=service.service_id) }}" autocomplete="off" novalidate>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            {% if spec.kind == 'cenomar' %}<input type="hidden" name="cenomar_step" value="{{ step }}">{% endif %}
             {% set visible_fields = fields | rejectattr('type', 'equalto', 'hidden') | list %}
             {% if not visible_fields or not visible_fields[0].section %}
             <h2>Your information</h2>
@@ -402,18 +604,8 @@
             </div>
             {% endif %}
             {% endfor %}
-            {% if spec.kind == 'cenomar' and step == 3 %}
-            <p class="field-help">Check the requesting party and delivery details above, then continue to review the full request.</p>
-            {% endif %}
             <div class="apply-actions">
-                {% if spec.kind == 'cenomar' and step > 1 %}
-                <a class="dash-button apply-cancel" href="{{ url_for('citizen.apply_details', service_id=service.service_id, step=step - 1) }}">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg>
-                    Back
-                </a>
-                {% else %}
                 <a class="dash-button apply-cancel" href="{{ url_for('citizen.services') }}">Cancel</a>
-                {% endif %}
                 <button class="dash-button dash-button-apply" type="submit">
                     Continue
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
@@ -594,12 +786,33 @@ function matchesShowRules(form, rules) {
 function toggleConditionalFields(form) {
     form.querySelectorAll("[data-show-rules]").forEach(function (field) {
         var rules = JSON.parse(field.getAttribute("data-show-rules"));
-        field.hidden = !matchesShowRules(form, rules);
+        var show = matchesShowRules(form, rules);
+        field.hidden = !show;
+        field.querySelectorAll("input, select, textarea").forEach(function (input) {
+            if (!input.hasAttribute("data-keep-required")) {
+                if (show) {
+                    if (input.getAttribute("data-was-required") === "true") {
+                        input.required = true;
+                    }
+                } else {
+                    if (input.required) {
+                        input.setAttribute("data-was-required", "true");
+                    }
+                    input.required = false;
+                    if (input.type === "checkbox") {
+                        input.checked = false;
+                    } else {
+                        input.value = "";
+                    }
+                }
+            }
+        });
     });
-    form.querySelectorAll("h2").forEach(function (heading) {
+    form.querySelectorAll("h2, h3.passport-details-section").forEach(function (heading) {
         var sibling = heading.nextElementSibling;
         var anyVisible = false;
-        while (sibling && sibling.tagName !== "H2") {
+        var stopTag = heading.tagName;
+        while (sibling && sibling.tagName !== stopTag) {
             if (sibling.classList.contains("apply-field") && !sibling.hidden) {
                 anyVisible = true;
             }

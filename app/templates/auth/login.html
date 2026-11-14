@@ -10,6 +10,7 @@
             <p class="lede">Use the email and password for your OneGov PH account.</p>
             <form class="login-form" method="post" action="{{ url_for('auth.login') }}" novalidate>
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
                 {% if error %}
                 <p class="form-error" role="alert">{{ error }}</p>
                 {% endif %}

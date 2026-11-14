@@ -11,15 +11,45 @@
             <div class="pay-hero-copy">
                 <p class="pay-kicker">Secure payment</p>
                 <h1 id="payment-heading">Complete your payment</h1>
-                <p class="welcome-text">Review the fee summary, choose a payment method, and continue. Maya uses Checkout sandbox; other options are demonstration records only.</p>
+                <p class="welcome-text">
+                    {% if free_payment or spec.kind == 'senior' %}
+                    {% if spec.kind == 'philsys' %}
+                    PhilSys National ID registration is free. Review the fee summary, then continue to confirmation. No payment is collected.
+                    {% elif spec.kind == 'sss' %}
+                    SS Number registration has no processing fee. Review the fee summary, then continue to confirmation. No payment is collected, and OneGov PH does not issue an SS Number.
+                    {% else %}
+                    New Senior Citizen ID applications are free. Review the fee configuration, then continue to confirmation. No payment is collected for a first-time request.
+                    {% endif %}
+                    {% elif spec.kind == 'barangay' %}
+                    Pay the ₱50.00 barangay clearance processing fee, then continue to confirmation. Maya uses Checkout sandbox; other options are demonstration records only.
+                    {% elif spec.kind == 'residency' %}
+                    Pay the ₱50.00 certificate of residency processing fee, then continue to confirmation. Maya uses Checkout sandbox; other options are demonstration records only.
+                    {% elif spec.kind == 'nbi' %}
+                    Pay the regular online application total of ₱160.00 (₱130.00 clearance + ₱30.00 convenience fee), then continue to confirmation. Maya uses Checkout sandbox; other options are demonstration records only.
+                    {% elif spec.kind == 'birth' %}
+                    Pay the demonstration birth certificate total of ₱365.00 per copy (PSA document, processing, and courier fees). Two copies are charged ×2. Maya uses Checkout sandbox; other options are demonstration records only.
+                    {% elif spec.kind == 'cenomar' %}
+                    Pay the demonstration CENOMAR total of ₱365.00 per copy (PSA document, processing, and courier fees). Two copies are charged ×2. Maya uses Checkout sandbox; other options are demonstration records only.
+                    {% else %}
+                    Review the fee summary, choose a payment method, and continue. Maya uses Checkout sandbox; other options are demonstration records only.
+                    {% endif %}
+                </p>
             </div>
-            <div class="pay-secure-chip" title="Encrypted session">
+            <div class="pay-secure-chip" title="{% if free_payment or spec.kind == 'senior' %}No payment required{% else %}Encrypted session{% endif %}">
                 <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18"><path fill="currentColor" d="M12 2a5 5 0 0 0-5 5v2H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 7V7a3 3 0 1 1 6 0v2H9zm3 4a1.5 1.5 0 0 1 .75 2.8V18h-1.5v-2.2A1.5 1.5 0 0 1 12 13z"/></svg>
-                <span>Protected checkout</span>
+                <span>{% if free_payment or spec.kind == 'senior' %}No payment due{% else %}Protected checkout{% endif %}</span>
             </div>
         </header>
 
-        {% if summary.payment %}
+        {% if free_payment or spec.kind == 'senior' %}
+        <div class="pay-status-banner pay-status-banner--not_applicable" role="status">
+            <span class="pay-status-pill pay-status-pill--not_applicable">{{ summary.status_label or "Not Applicable" }}</span>
+            <div class="pay-status-banner-copy">
+                <strong>{% if spec.kind == 'philsys' %}Registration fee{% elif spec.kind == 'sss' %}SSS processing fee{% else %}New application fee{% endif %} {{ summary.amount_display }}</strong>
+                <span>Payment required: {{ summary.payment_required_label or "No" }}. {% if spec.kind == 'philsys' %}PhilSys registration stays free in OneGov PH and at PSA.{% elif spec.kind == 'sss' %}SS Number registration stays free in OneGov PH. SSS still issues the number.{% else %}First-time Senior Citizen ID requests stay free in OneGov PH.{% endif %}</span>
+            </div>
+        </div>
+        {% elif summary.payment %}
         <div class="pay-status-banner pay-status-banner--{{ summary.status_key or summary.payment.payment_status }}" role="status">
             <span class="pay-status-pill pay-status-pill--{{ summary.status_key or summary.payment.payment_status }}">{{ summary.status_label or summary.payment.payment_status }}</span>
             <div class="pay-status-banner-copy">
@@ -37,6 +67,44 @@
                 <form class="payment-form pay-form" method="post" action="{{ url_for('citizen.apply_payment', application_id=application.application_id) }}" id="payment-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
+                    {% if free_payment or spec.kind == 'senior' %}
+                    <section class="pay-panel" aria-labelledby="pay-config-heading">
+                        <div class="pay-panel-head">
+                            <h2 id="pay-config-heading">Fee configuration</h2>
+                            <p>{% if spec.kind == 'sss' %}Payment feature settings for SSS registration assistance.{% elif spec.kind == 'philsys' %}Payment feature settings for PhilSys National ID registration.{% else %}Payment feature settings for Senior Citizen ID requests.{% endif %}</p>
+                        </div>
+                        <dl class="pay-config-list">
+                            <div>
+                                <dt>{% if spec.kind == 'sss' %}SSS processing fee{% else %}New Application Fee{% endif %}</dt>
+                                <dd>{{ summary.fee_configuration.new_application_fee_display if summary.fee_configuration else summary.amount_display }}</dd>
+                            </div>
+                            <div>
+                                <dt>Payment Required</dt>
+                                <dd>{{ summary.fee_configuration.payment_required_label if summary.fee_configuration else "No" }}</dd>
+                            </div>
+                            <div>
+                                <dt>Payment Status</dt>
+                                <dd>{{ summary.fee_configuration.payment_status_label if summary.fee_configuration else "Not Applicable" }}</dd>
+                            </div>
+                            {% if spec.kind != 'sss' %}
+                            <div>
+                                <dt>Lost ID Replacement</dt>
+                                <dd>{{ summary.fee_configuration.lost_id_replacement if summary.fee_configuration else "Admin-configurable fee" }}</dd>
+                            </div>
+                            <div>
+                                <dt>Damaged ID Replacement</dt>
+                                <dd>{{ summary.fee_configuration.damaged_id_replacement if summary.fee_configuration else "Admin-configurable fee" }}</dd>
+                            </div>
+                            {% endif %}
+                            <div>
+                                <dt>Official Receipt</dt>
+                                <dd>{{ summary.fee_configuration.official_receipt if summary.fee_configuration else "Only if a payment is collected" }}</dd>
+                            </div>
+                        </dl>
+                        <p class="pay-inline-help">{{ summary.fee_configuration.note if summary.fee_configuration else "New / first-time Senior Citizen ID applications are free." }}</p>
+                    </section>
+                    {% else %}
+                    {% if not online_payment_only %}
                     <section class="pay-panel" aria-labelledby="pay-channel-heading">
                         <div class="pay-panel-head">
                             <h2 id="pay-channel-heading">Payment channel</h2>
@@ -69,11 +137,14 @@
                             </label>
                         </div>
                     </section>
+                    {% else %}
+                    <input type="hidden" name="payment_choice" value="online">
+                    {% endif %}
 
                     <section class="pay-panel" id="online-methods" aria-labelledby="pay-method-heading">
                         <div class="pay-panel-head">
-                            <h2 id="pay-method-heading">Online method</h2>
-                            <p>Select a provider. Only Maya redirects to a live sandbox checkout.</p>
+                            <h2 id="pay-method-heading">{% if online_payment_only %}Payment method{% else %}Online method{% endif %}</h2>
+                            <p>{% if online_payment_only %}Select a provider. Only Maya redirects to a live sandbox checkout. Onsite payment is not available for this service.{% else %}Select a provider. Only Maya redirects to a live sandbox checkout.{% endif %}</p>
                         </div>
                         <div class="pay-method-grid" role="radiogroup" aria-label="Online payment method">
                             <label class="pay-method-card">
@@ -116,10 +187,33 @@
                                 </span>
                             </label>
                         </div>
-                        <p class="pay-inline-help" id="maya-help">Pay Now opens Maya hosted checkout. Payment is marked paid only after OneGov PH verifies the result.</p>
+                        <p class="pay-inline-help" id="maya-help">Pay Now opens Maya hosted checkout. For QRPh, use the Sandbox Maya App to scan the QR on Maya’s page. After you return, OneGov PH verifies the payment even if the login cookie was dropped.</p>
                     </section>
 
-                    <p class="pay-inline-help" id="onsite-help" hidden>Onsite payment stays pending until a staff demonstration marks it paid. No real fee is collected here.</p>
+                    <section class="pay-panel" id="onsite-locations" aria-labelledby="onsite-locations-heading" hidden>
+                        <div class="pay-panel-head">
+                            <h2 id="onsite-locations-heading">Where you can pay</h2>
+                            <p>Choose one demonstration payment site. These are dump locations for portfolio testing only.</p>
+                        </div>
+                        <div class="pay-onsite-grid" role="radiogroup" aria-label="Onsite payment location">
+                            {% for place in onsite_locations %}
+                            <label class="pay-onsite-card">
+                                <input type="radio" name="onsite_location" value="{{ place.key }}" {% if loop.first %}checked{% endif %} disabled>
+                                <span class="pay-onsite-body">
+                                    <span class="pay-onsite-badge" aria-hidden="true">{{ loop.index }}</span>
+                                    <span class="pay-onsite-copy">
+                                        <strong>{{ place.name }}</strong>
+                                        <small>{{ place.address }}</small>
+                                        <span class="pay-onsite-meta">{{ place.hours }}</span>
+                                        <span class="pay-onsite-note">{{ place.note }}</span>
+                                    </span>
+                                </span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                        <p class="pay-inline-help" id="onsite-help">Onsite payment stays pending until a staff demonstration marks it paid. No real fee is collected here.</p>
+                    </section>
+                    {% endif %}
                 </form>
             </div>
 
@@ -127,10 +221,150 @@
                 <div class="pay-summary">
                     <div class="pay-summary-top">
                         <h2>Payment summary</h2>
-                        <span class="pay-summary-badge">Due now</span>
+                        <span class="pay-summary-badge">{% if free_payment or spec.kind == 'senior' %}Free{% else %}Due now{% endif %}</span>
                     </div>
 
                     <dl class="pay-summary-meta">
+                        {% if summary.service_kind == 'senior' %}
+                        <div>
+                            <dt>Application type</dt>
+                            <dd>{{ summary.application_type or "New application" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Barangay</dt>
+                            <dd>{{ summary.barangay or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>City / municipality</dt>
+                            <dd>{{ summary.city or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Payment required</dt>
+                            <dd>{{ summary.payment_required_label or "No" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Payment status</dt>
+                            <dd>{{ summary.status_label or "Not Applicable" }}</dd>
+                        </div>
+                        {% elif summary.service_kind == 'sss' %}
+                        <div>
+                            <dt>Applicant</dt>
+                            <dd>{{ summary.full_name or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Barangay</dt>
+                            <dd>{{ summary.barangay or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>City / municipality</dt>
+                            <dd>{{ summary.city or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Primary ID available</dt>
+                            <dd>{{ summary.has_primary_id or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Payment required</dt>
+                            <dd>{{ summary.payment_required_label or "No" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Payment status</dt>
+                            <dd>{{ summary.status_label or "Not Applicable" }}</dd>
+                        </div>
+                        {% elif summary.service_kind in ['barangay', 'residency'] %}
+                        <div>
+                            <dt>Barangay</dt>
+                            <dd>{{ summary.barangay or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>City / municipality</dt>
+                            <dd>{{ summary.city or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Purpose</dt>
+                            <dd>{{ summary.purpose or "—" }}</dd>
+                        </div>
+                        {% elif summary.service_kind == 'nbi' %}
+                        <div>
+                            <dt>Applicant</dt>
+                            <dd>{{ summary.full_name or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Location</dt>
+                            <dd>{{ summary.appointment.location_label if summary.appointment else "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Schedule</dt>
+                            <dd>
+                                {% if summary.appointment %}
+                                {{ summary.appointment.appointment_date }} · {{ summary.appointment.appointment_time }}
+                                {% else %}
+                                —
+                                {% endif %}
+                            </dd>
+                        </div>
+                        {% elif summary.service_kind == 'birth' %}
+                        <div>
+                            <dt>Certificate owner</dt>
+                            <dd>{{ summary.owner_name or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Who is named</dt>
+                            <dd>{{ summary.certificate_for or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Copies</dt>
+                            <dd>{{ summary.copies_display or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Request type</dt>
+                            <dd>{{ summary.application_type or "—" }}</dd>
+                        </div>
+                        {% elif summary.service_kind == 'cenomar' %}
+                        <div>
+                            <dt>Certificate owner</dt>
+                            <dd>{{ summary.owner_name or summary.applicant_name or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Who is named</dt>
+                            <dd>{{ summary.certificate_for or summary.requester_relationship or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Copies</dt>
+                            <dd>{{ summary.copies_display or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Purpose</dt>
+                            <dd>{{ summary.purpose or "—" }}</dd>
+                        </div>
+                        {% elif summary.service_kind == 'philsys' %}
+                        <div>
+                            <dt>Applicant</dt>
+                            <dd>{{ summary.applicant_name or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Citizenship</dt>
+                            <dd>{{ summary.citizenship or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Location</dt>
+                            <dd>{{ summary.appointment.location_label if summary.appointment else "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Schedule</dt>
+                            <dd>
+                                {% if summary.appointment %}
+                                {{ summary.appointment.appointment_date }} · {{ summary.appointment.appointment_time }}
+                                {% else %}
+                                —
+                                {% endif %}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>Payment required</dt>
+                            <dd>{{ summary.payment_required_label or "No" }}</dd>
+                        </div>
+                        {% else %}
                         <div>
                             <dt>Application type</dt>
                             <dd>{{ summary.application_type or "—" }}</dd>
@@ -149,19 +383,29 @@
                                 {% endif %}
                             </dd>
                         </div>
+                        {% endif %}
                     </dl>
 
                     <div class="pay-summary-breakdown">
+                        {% if summary.fee_lines %}
+                        {% for line in summary.fee_lines %}
                         <div class="pay-line">
-                            <span>Application fee</span>
+                            <span>{{ line.label }}</span>
+                            <strong>{{ line.amount_display }}</strong>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <div class="pay-line">
+                            <span>{{ summary.application_fee_label or "Application fee" }}</span>
                             <strong>{{ summary.application_fee_display }}</strong>
                         </div>
                         <div class="pay-line">
-                            <span>Processing fee</span>
+                            <span>{{ summary.processing_fee_label or "Processing fee" }}</span>
                             <strong>{{ summary.processing_fee_display }}</strong>
                         </div>
+                        {% endif %}
                         <div class="pay-line pay-line--total">
-                            <span>Total amount</span>
+                            <span>{{ summary.total_label or "Total amount" }}</span>
                             <strong>{{ summary.amount_display }}</strong>
                         </div>
                     </div>
@@ -190,17 +434,23 @@
                     {% endif %}
 
                     <ul class="pay-trust-list">
+                        {% if free_payment or spec.kind == 'senior' %}
+                        <li>New applications are free</li>
+                        <li>No wallet or card details are collected</li>
+                        <li>Official receipt only if a fee is collected later</li>
+                        {% else %}
                         <li>Amount is calculated on the server</li>
                         <li>Card and wallet details are never stored here</li>
                         <li>Sandbox / demo payments only</li>
+                        {% endif %}
                     </ul>
                 </div>
             </aside>
         </div>
 
         <div class="pay-actions apply-actions">
-            <a class="dash-button apply-cancel pay-btn-secondary" href="{{ url_for('citizen.apply_schedule', application_id=application.application_id) }}">Back</a>
-            <button class="dash-button pay-btn-primary" type="submit" form="payment-form" id="payment-submit">Pay Now</button>
+            <a class="dash-button apply-cancel pay-btn-secondary" href="{{ url_for(payment_back_endpoint or 'citizen.apply_schedule', application_id=application.application_id) }}">Back</a>
+            <button class="dash-button pay-btn-primary" type="submit" form="payment-form" id="payment-submit">{% if free_payment or spec.kind == 'senior' %}Continue{% else %}Pay Now{% endif %}</button>
             <form method="post" action="{{ url_for('citizen.apply_cancel', application_id=application.application_id) }}" onsubmit="return confirm('Cancel this application? The information and files you entered will be removed.');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="dash-button apply-cancel pay-btn-ghost" type="submit">Cancel application</button>
@@ -208,13 +458,18 @@
         </div>
     </section>
 </div>
+{% if not free_payment and spec.kind != 'senior' %}
 <script>
 (function () {
     var onlineBox = document.getElementById("online-methods");
-    var onsiteHelp = document.getElementById("onsite-help");
+    var onsiteBox = document.getElementById("onsite-locations");
     var mayaHelp = document.getElementById("maya-help");
     var submitBtn = document.getElementById("payment-submit");
     var methodInputs = document.querySelectorAll('input[name="online_method"]');
+    var locationInputs = document.querySelectorAll('input[name="onsite_location"]');
+    if (!onlineBox || !submitBtn) {
+        return;
+    }
 
     function selectedMethod() {
         var checked = document.querySelector('input[name="online_method"]:checked');
@@ -223,15 +478,26 @@
 
     function sync() {
         var choice = document.querySelector('input[name="payment_choice"]:checked');
-        var online = choice && choice.value === "online";
+        var hiddenChoice = document.querySelector('input[name="payment_choice"][type="hidden"]');
+        var choiceValue = (choice && choice.value) || (hiddenChoice && hiddenChoice.value) || "online";
+        var online = choiceValue === "online";
+        var onsite = choiceValue === "onsite";
         var method = selectedMethod();
         var maya = online && method === "maya";
         onlineBox.hidden = !online;
-        onsiteHelp.hidden = online;
-        mayaHelp.hidden = !maya;
+        if (onsiteBox) {
+            onsiteBox.hidden = !onsite;
+        }
+        if (mayaHelp) {
+            mayaHelp.hidden = !maya;
+        }
         methodInputs.forEach(function (input) {
             input.disabled = !online;
             input.required = online;
+        });
+        locationInputs.forEach(function (input) {
+            input.disabled = !onsite;
+            input.required = onsite;
         });
         if (maya) {
             submitBtn.textContent = "Pay Now";
@@ -251,4 +517,5 @@
     sync();
 })();
 </script>
+{% endif %}
 {% endblock %}
