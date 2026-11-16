@@ -683,25 +683,15 @@ def apply_schedule(application_id):
             location_by_code,
             save_appointment,
         )
-    elif kind in {"barangay", "residency"}:
-        type_ready = barangay_type_ready(application) if kind == "barangay" else residency_type_ready(application)
-        reviewed = barangay_review_ready(application) if kind == "barangay" else residency_review_ready(application)
-        if not type_ready:
-            flash("Select an application type before scheduling.", "warning")
-            return redirect(url_for("citizen.apply_type", service_id=application.service_id))
-        if not read_fields(application):
-            flash("Complete the application details before scheduling.", "warning")
-            return redirect(url_for("citizen.apply_details", service_id=application.service_id))
+    elif kind == "residency":
+        reviewed = residency_review_ready(application)
         if not reviewed:
             flash("Review your application before scheduling.", "warning")
             return redirect(url_for("citizen.apply_review", application_id=application.application_id))
-        from app.services.barangay_scheduling import (
-            LOCATIONS,
-            appointment_for,
-            available_month_calendars,
-            location_by_code,
-            save_appointment,
-        )
+        if not read_fields(application):
+            flash("Complete the application details before scheduling.", "warning")
+            return redirect(url_for("citizen.apply_details", service_id=application.service_id))
+        return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
     elif kind == "senior":
         if not senior_type_ready(application):
             flash("Select an application type before scheduling.", "warning")
@@ -777,31 +767,52 @@ def apply_delivery(application_id):
     if application.application_status != "draft":
         return redirect(url_for("citizen.apply_confirmation", application_id=application.application_id))
     spec = specification_for(application.service, field_map(application))
-    if spec.get("kind") != "barangay":
+    kind = spec.get("kind")
+    if kind == "barangay":
+        if not barangay_review_ready(application):
+            flash("Review your application before setting the delivery details.", "warning")
+            return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+        from app.services.barangay_delivery import (
+            CITY,
+            DEFAULT_LAT,
+            DEFAULT_LNG,
+            DELIVERY_FEE,
+            DEMO_BARANGAYS,
+            PROVINCE,
+            REGION,
+            barangay_center,
+            delivery_ready,
+            delivery_values,
+            save_delivery,
+            validate_delivery_form,
+        )
+    elif kind == "residency":
+        if not residency_review_ready(application):
+            flash("Review your application before setting the delivery details.", "warning")
+            return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+        from app.services.residency_delivery import (
+            CITY,
+            DEFAULT_LAT,
+            DEFAULT_LNG,
+            DELIVERY_FEE,
+            DEMO_BARANGAYS,
+            LAT_MIN,
+            LAT_MAX,
+            LNG_MIN,
+            LNG_MAX,
+            delivery_ready,
+            delivery_values,
+            residency_center,
+            save_delivery,
+            validate_delivery_form,
+        )
+    else:
         return redirect(url_for("citizen.application_continue", application_id=application.application_id))
-    if not read_fields(application):
-        flash("Complete the application details before delivery.", "warning")
-        return redirect(url_for("citizen.apply_details", service_id=application.service_id))
-    if not barangay_review_ready(application):
-        flash("Review your application before setting the delivery details.", "warning")
-        return redirect(url_for("citizen.apply_review", application_id=application.application_id))
 
-    from app.services.barangay_delivery import (
-        CITY,
-        DEFAULT_LAT,
-        DEFAULT_LNG,
-        DELIVERY_FEE,
-        DEMO_BARANGAYS,
-        PROVINCE,
-        REGION,
-        barangay_center,
-        delivery_ready,
-        delivery_values,
-        save_delivery,
-        validate_delivery_form,
-    )
-
-    values = delivery_values(application)
+    if kind == "barangay":
+        values = delivery_values(application)
+    else:
+        values = delivery_values(application)
     errors = {}
     if request.method == "POST":
         values, errors = validate_delivery_form(request.form)
@@ -816,19 +827,30 @@ def apply_delivery(application_id):
     initial_lat = values.get("latitude")
     initial_lng = values.get("longitude")
     if not (initial_lat and initial_lng):
-        center = barangay_center(values.get("barangay") or field_map(application).get("barangay"))
-        if center:
-            initial_lat, initial_lng = center
+        if kind == "residency":
+            center = residency_center(values.get("barangay") or field_map(application).get("barangay"))
+            if center:
+                initial_lat, initial_lng = center
+            else:
+                initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
         else:
-            initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
+            center = barangay_center(values.get("barangay") or field_map(application).get("barangay"))
+            if center:
+                initial_lat, initial_lng = center
+            else:
+                initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
 
+    if kind == "barangay":
+        delivery_region_val = REGION
+    else:
+        delivery_region_val = DEMO_BARANGAYS[0]["name"] if DEMO_BARANGAYS else ""
     context = _common(application, 5)
     context.update(
         {
             "values": values,
             "errors": errors,
             "barangay_options": DEMO_BARANGAYS,
-            "delivery_region": REGION,
+            "delivery_region": delivery_region_val,
             "delivery_province": PROVINCE,
             "delivery_city": CITY,
             "delivery_fee": DELIVERY_FEE,

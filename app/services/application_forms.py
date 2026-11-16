@@ -727,7 +727,7 @@ def compose_barangay_clearance(values=None):
         ),
         "type_first": True,
         "review_before_schedule": False,
-        "payment_after_review": False,
+        "payment_after_review": True,
         "submit_label": "Continue to delivery",
         "confirmation_step": 7,
         "terms": "I confirm that the information and documents in this request are accurate. " + BARANGAY_DISCLAIMER,

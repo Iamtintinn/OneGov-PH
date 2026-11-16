@@ -41,10 +41,12 @@ def write_receipt_pdf(path, data):
 
     Expected keys:
       subtitle, watermark, footer, confirmation_id, tracking_number
+      show_tracking_number: optional bool (default True) for the header line
       details: list of (label, value)
+      delivery_rows: optional list of (label, value)
       fee_lines: optional list of {label, amount_display}
       total_label, amount
-      payment_rows: optional list of (label, value) under fees
+      payment_rows: optional list of (label, value) after the payment total
     """
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
@@ -83,8 +85,9 @@ def write_receipt_pdf(path, data):
     pdf.drawRightString(right, height - 18 * mm, "Confirmation")
     pdf.setFont("Helvetica", 9)
     pdf.drawRightString(right, height - 26 * mm, data.get("confirmation_id") or "—")
-    pdf.setFont("Helvetica", 8)
-    pdf.drawRightString(right, height - 32 * mm, data.get("tracking_number") or "—")
+    if data.get("show_tracking_number", True):
+        pdf.setFont("Helvetica", 8)
+        pdf.drawRightString(right, height - 32 * mm, data.get("tracking_number") or "—")
 
     y = height - 50 * mm
 
@@ -118,6 +121,17 @@ def write_receipt_pdf(path, data):
     section_title("Request details")
     for label, value in data.get("details") or ():
         detail_row(label, value)
+
+    delivery_rows = [
+        (label, value)
+        for label, value in (data.get("delivery_rows") or ())
+        if str(value or "").strip()
+    ]
+    if delivery_rows:
+        y -= 2 * mm
+        section_title("Delivery details")
+        for label, value in delivery_rows:
+            detail_row(label, value)
 
     y -= 2 * mm
     section_title("Payment summary")
@@ -153,6 +167,16 @@ def write_receipt_pdf(path, data):
         y -= 9 * mm
     else:
         detail_row("Amount", data.get("amount") or "—")
+
+    payment_rows = [
+        (label, value)
+        for label, value in (data.get("payment_rows") or ())
+        if str(value or "").strip()
+    ]
+    if payment_rows:
+        y -= 1 * mm
+        for label, value in payment_rows:
+            detail_row(label, value)
 
     bring_items = list(data.get("bring_items") or ())
     if bring_items:

@@ -7,6 +7,7 @@ from flask import current_app
 
 from app.services.application_forms import specification_for
 from app.services.application_service import field_map, read_details, write_details
+from app.services.barangay_delivery import delivery_address, delivery_for
 from app.services.barangay_payment import payment_summary
 from app.services.passport_payment import METHOD_LABELS, latest_payment
 from app.services.receipt_pdf import write_receipt_pdf
@@ -83,11 +84,29 @@ def ensure_confirmation_pdf(application):
                 ("Date", appointment.get("appointment_date") or ""),
                 ("Time", appointment.get("appointment_time") or ""),
             )
+    delivery_rows = ()
+    if kind == "barangay":
+        delivery = delivery_for(application)
+        if delivery:
+            delivery_rows = (
+                (
+                    "Recipient",
+                    delivery.get("recipient_name") or full_name,
+                ),
+                (
+                    "Contact number",
+                    delivery.get("contact_number") or answers.get("contact_number") or "",
+                ),
+                ("Delivery address", delivery_address(delivery)),
+            )
+            if delivery.get("landmark"):
+                delivery_rows += (("Landmark", delivery["landmark"]),)
     write_receipt_pdf(
         absolute,
         {
             "confirmation_id": conf_id,
             "tracking_number": application.tracking_number,
+            "show_tracking_number": kind != "barangay",
             "subtitle": (
                 "Certificate of residency request confirmation"
                 if kind == "residency"
@@ -117,6 +136,7 @@ def ensure_confirmation_pdf(application):
                 ),
             )
             + appointment_rows,
+            "delivery_rows": delivery_rows,
             "fee_lines": (
                 {
                     "label": "Processing fee",

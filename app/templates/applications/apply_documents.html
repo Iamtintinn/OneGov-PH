@@ -5,7 +5,7 @@
 {% block content %}
 <div class="dash-page site-width">
     {% if spec.kind in ['barangay', 'residency', 'senior', 'nbi', 'birth', 'sss'] %}
-    {% set modern_doc_steps = (step_labels|length) if step_labels else (5 if spec.kind in ['barangay', 'residency', 'sss'] else 4) %}
+    {% set modern_doc_steps = (step_labels|length) if step_labels else (7 if spec.kind == 'barangay' else (5 if spec.kind in ['residency', 'sss'] else 4)) %}
     <section class="apply-card pay-shell confirm-shell documents-modern-shell" aria-labelledby="documents-heading">
         {% include "applications/_progress.html" %}
 

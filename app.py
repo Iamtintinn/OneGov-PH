@@ -69,6 +69,16 @@ def create_app():
     def forbidden(error):
         return render_template("errors/403.html", message=error.description), 403
 
+    @application.route("/")
+    def index():
+        from flask import redirect, url_for
+        from flask_login import current_user
+        from app.utils.helpers import home_endpoint_for_role
+
+        if current_user.is_authenticated:
+            return redirect(url_for(home_endpoint_for_role(current_user.role)))
+        return redirect(url_for("auth.login"))
+
     register_blueprints(application)
 
     try:
