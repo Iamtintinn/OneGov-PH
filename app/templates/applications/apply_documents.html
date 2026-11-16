@@ -4,8 +4,8 @@
 {% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
 {% block content %}
 <div class="dash-page site-width">
-    {% if spec.kind in ['barangay', 'residency', 'senior', 'nbi', 'birth', 'sss'] %}
-    {% set modern_doc_steps = (step_labels|length) if step_labels else (7 if spec.kind in ['barangay', 'residency'] else (5 if spec.kind in ['sss'] else 4)) %}
+    {% if spec.kind in ['barangay', 'residency', 'senior', 'nbi', 'birth', 'cenomar', 'sss'] %}
+    {% set modern_doc_steps = (step_labels|length) if step_labels else (7 if spec.kind in ['barangay', 'residency', 'cenomar'] else (5 if spec.kind in ['sss'] else 4)) %}
     <section class="apply-card pay-shell confirm-shell documents-modern-shell" aria-labelledby="documents-heading">
         {% include "applications/_progress.html" %}
 
@@ -20,6 +20,8 @@
                     Upload the required files for your selected NBI application type. Government IDs use the searchable list when shown.
                     {% elif spec.kind == 'birth' %}
                     Upload the required files for your selected birth certificate request type. Government IDs use the searchable list when shown.
+                    {% elif spec.kind == 'cenomar' %}
+                    Upload a valid government-issued ID for your selected CENOMAR application type.
                     {% elif spec.kind == 'residency' %}
                     Upload every required file for your selected residency purpose. The checklist changes with the application type you chose.
                     {% elif spec.kind == 'sss' %}
@@ -151,10 +153,10 @@
 
                 <section class="document-upload-panel" aria-label="Supporting documents">
                     <div class="document-upload-panel-head">
-                        <h2>{% if spec.kind in ['barangay', 'residency'] %}Other documents{% elif spec.kind in ['senior', 'nbi', 'birth', 'sss'] %}Document checklist{% else %}Required uploads{% endif %}</h2>
-                        <p>{% if spec.kind == 'senior' %}Select a valid government ID from the searchable list, then upload the files that apply. Representative and transfer files appear only when you chose Yes in application details.{% elif spec.kind == 'nbi' %}Select a valid government ID from the searchable list, then upload that ID and a second government-issued ID.{% elif spec.kind == 'birth' %}Select a valid government ID from the searchable list, then upload that same ID. The authorization letter appears only when you chose Yes for a representative.{% elif spec.kind == 'sss' %}Section A accepts one primary government ID. Section B appears only when you cannot provide a primary ID, and then two different alternative documents are required.{% elif spec.kind in ['barangay', 'residency'] %}Upload the remaining required files for your selected application type.{% else %}Upload each file in the shared list below.{% endif %}</p>
+                        <h2>{% if spec.kind in ['barangay', 'residency'] %}Other documents{% elif spec.kind in ['senior', 'nbi', 'birth', 'cenomar', 'sss'] %}Document checklist{% else %}Required uploads{% endif %}</h2>
+                        <p>{% if spec.kind == 'senior' %}Select a valid government ID from the searchable list, then upload the files that apply. Representative and transfer files appear only when you chose Yes in application details.{% elif spec.kind == 'nbi' %}Select a valid government ID from the searchable list, then upload that ID and a second government-issued ID.{% elif spec.kind == 'birth' %}Select a valid government ID from the searchable list, then upload that same ID. The authorization letter appears only when you chose Yes for a representative.{% elif spec.kind == 'cenomar' %}Select a valid government-issued ID from the searchable list, then upload a clear copy of that same ID.{% elif spec.kind == 'sss' %}Section A accepts one primary government ID. Section B appears only when you cannot provide a primary ID, and then two different alternative documents are required.{% elif spec.kind in ['barangay', 'residency'] %}Upload the remaining required files for your selected application type.{% else %}Upload each file in the shared list below.{% endif %}</p>
                     </div>
-                    {% if spec.kind in ['senior', 'nbi', 'birth', 'sss'] %}
+                    {% if spec.kind in ['senior', 'nbi', 'birth', 'cenomar', 'sss'] %}
                     <div class="document-upload-list document-upload-list--senior{% if spec.kind == 'birth' %} document-upload-list--birth{% endif %}">
                         {% for document in documents if (not document.required_when) or document.required or (requirements.get(document.key) and requirements.get(document.key).uploaded_file) %}
                         {% set row = requirements.get(document.key) %}

@@ -60,6 +60,18 @@ def ensure_confirmation_pdf(application):
     absolute.parent.mkdir(parents=True, exist_ok=True)
     watermark = "DEMONSTRATION ONLY – NOT AN OFFICIAL PSA CENOMAR"
     fee_lines = list(summary.get("fee_lines") or ())
+    from app.services.cenomar_delivery import delivery_address, delivery_for
+
+    delivery = delivery_for(application)
+    delivery_rows = ()
+    if delivery:
+        delivery_rows = (
+            ("Recipient", delivery.get("recipient_name") or requester or owner),
+            ("Contact number", delivery.get("contact_number") or answers.get("contact_number") or ""),
+            ("Delivery address", delivery_address(delivery)),
+        )
+        if delivery.get("landmark"):
+            delivery_rows += (("Landmark", delivery["landmark"]),)
     write_receipt_pdf(
         absolute,
         {
@@ -79,6 +91,7 @@ def ensure_confirmation_pdf(application):
                 ("Place of birth", answers.get("place_of_birth") or ""),
                 ("Civil status", answers.get("owner_civil_status") or ""),
                 ("Copies", summary.get("copies_display") or answers.get("copies") or "1"),
+                ("Application type", answers.get("application_type") or ""),
                 ("Purpose", summary.get("purpose") or ""),
                 (
                     "Date submitted",
@@ -87,6 +100,7 @@ def ensure_confirmation_pdf(application):
                     else "",
                 ),
             ),
+            "delivery_rows": delivery_rows,
             "fee_lines": fee_lines,
             "total_label": summary.get("total_label") or "TOTAL",
             "amount": summary.get("amount_display") or "₱365.00",

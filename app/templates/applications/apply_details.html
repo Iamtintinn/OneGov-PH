@@ -5,8 +5,8 @@
 {% block content %}
 <div class="dash-page site-width">
     {% if spec.kind in ['passport', 'barangay', 'residency', 'senior', 'nbi', 'birth', 'cenomar', 'philsys', 'sss'] %}
-    {% set modern_step_count = (step_labels|length) if step_labels else (7 if ((spec.kind == 'passport' and spec.type_first) or spec.kind in ['barangay', 'residency']) else (6 if spec.kind in ['passport', 'philsys'] else (5 if spec.kind in ['sss'] else 4))) %}
-    {% set next_action = 'review' if spec.kind in ['passport', 'cenomar', 'philsys'] else 'documents' %}
+    {% set modern_step_count = (step_labels|length) if step_labels else (7 if ((spec.kind == 'passport' and spec.type_first) or spec.kind in ['barangay', 'residency', 'cenomar']) else (6 if spec.kind in ['passport', 'philsys'] else (5 if spec.kind in ['sss'] else 4))) %}
+    {% set next_action = 'review' if spec.kind in ['passport', 'philsys'] else 'documents' %}
     <section class="apply-card pay-shell confirm-shell passport-details-shell" aria-labelledby="apply-heading">
         {% include "applications/_progress.html" %}
 

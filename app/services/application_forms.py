@@ -1746,13 +1746,12 @@ def compose_nbi_clearance(values=None):
             "1. Application type",
             "2. Application details",
             "3. Documents",
-            "4. Delivery",
-            "5. Review",
-            "6. Scheduling",
-            "7. Payment",
-            "8. Confirmation",
+            "4. Review",
+            "5. Scheduling",
+            "6. Payment",
+            "7. Confirmation",
         )
-        confirmation_step = 8
+        confirmation_step = 7
         submit_label = "Continue to scheduling"
         next_steps = [
             "Keep your OneGov PH reference number. It is separate from any reference number NBI gives you.",
@@ -1773,12 +1772,11 @@ def compose_nbi_clearance(values=None):
             "1. Application type",
             "2. Application details",
             "3. Documents",
-            "4. Delivery",
-            "5. Review",
-            "6. Payment",
-            "7. Confirmation",
+            "4. Review",
+            "5. Payment",
+            "6. Confirmation",
         )
-        confirmation_step = 7
+        confirmation_step = 6
         submit_label = "Continue to payment"
         next_steps = [
             "Keep your OneGov PH reference number. It is separate from any reference number NBI gives you.",
@@ -1849,11 +1847,10 @@ CENOMAR_FEE_NOTE = (
     "Demonstration total: ₱365.00 per copy "
     "(PSA Document Fee ₱155.00 + Processing, Convenience & Service Fees ₱160.00 + Courier / Delivery Fee ₱50.00). "
     "Two copies are charged ×2 (₱730.00). "
-    "Pay through OneGov PH after review (Maya sandbox or onsite demonstration). "
+    "Pay through OneGov PH after entering delivery details (Maya sandbox or onsite demonstration). "
     "Confirm the current PSA fee and ordering rules on the official PSA channel."
 )
 CENOMAR_URL = "https://www.psaserbilis.com.ph/"
-_CENOMAR_PURPOSE = ("Marriage", "Employment", "Legal Purposes", "Immigration", "Personal Records", "Other")
 _CENOMAR_REQUESTER = ("Self", "Child", "Parent", "Spouse")
 CENOMAR_PAYMENT_OPTIONS = ("Not yet paid", "Paid through an official PSA channel", "Not sure")
 CENOMAR_RECORDED_STATUSES = (
@@ -1881,6 +1878,7 @@ def cenomar_incomplete_step(values):
     """Return True when any required CENOMAR answer is still missing."""
     answers = values or {}
     required = (
+        "application_type",
         "first_name",
         "last_name",
         "date_of_birth",
@@ -1900,23 +1898,32 @@ def cenomar_incomplete_step(values):
         "father_name",
         "mother_maiden_name",
         "copies",
-        "purpose",
     )
     for key in required:
         if not str(answers.get(key) or "").strip():
             return True
-    if answers.get("purpose") == "Other" and not str(answers.get("purpose_other") or "").strip():
-        return True
     return None
 
 
 def compose_cenomar(values=None):
     """CENOMAR preparation and monitoring. PSA Serbilis still takes the official application."""
+    from app.services.cenomar_requirements import document_requirements_for
+
     requester = "Requester information"
     certificate = "Certificate details"
     parents = "Parents"
     request = "Request details"
-    fields = []
+    selected_type = (values or {}).get("application_type") or ""
+    fields = [
+        _field(
+            "application_type",
+            "Application type",
+            "Selected on step 1. This determines the required document to upload.",
+            field_type="hidden",
+            required=True,
+            section=request,
+        )
+    ]
     for field in PERSONAL_FIELDS:
         item = dict(field)
         item["section"] = requester
@@ -2002,26 +2009,9 @@ def compose_cenomar(values=None):
                 default="1",
                 section=request,
             ),
-            _field(
-                "purpose",
-                "Purpose of Request",
-                "Select why the certificate is being requested.",
-                field_type="select",
-                options=_CENOMAR_PURPOSE,
-                section=request,
-            ),
-            _field(
-                "purpose_other",
-                "Other purpose",
-                "Enter your purpose. This is shown only when you select Other.",
-                required=False,
-                max_length=200,
-                section=request,
-                show_when=("purpose", "Other"),
-                required_when_shown=True,
-            ),
         ]
     )
+    type_documents = document_requirements_for(selected_type)
     return {
         "kind": "cenomar",
         "kicker": "Civil registry assistance",
@@ -2032,7 +2022,17 @@ def compose_cenomar(values=None):
         ),
         "department_label": "PSA assistance",
         "fields": fields,
-        "documents": (),
+        "documents": tuple(
+            _document(
+                item["key"],
+                item["label"],
+                item["help"],
+                required=bool(item.get("required", True)),
+                id_choices=item.get("id_choices"),
+            )
+            for item in type_documents["documents"]
+        ),
+        "document_note": type_documents["note"],
         "fee_note": CENOMAR_FEE_NOTE,
         "catalog_fee": CENOMAR_FEE_NOTE,
         "disclaimer": CENOMAR_DISCLAIMER,
@@ -2042,19 +2042,23 @@ def compose_cenomar(values=None):
         "reference_label": "OneGov PH reference number",
         "show_submitted_details": True,
         "step_labels": (
-            "1. Application details",
-            "2. Review",
-            "3. Payment",
-            "4. Confirmation",
+            "1. Application type",
+            "2. Application details",
+            "3. Documents",
+            "4. Review",
+            "5. Delivery",
+            "6. Payment",
+            "7. Confirmation",
         ),
+        "type_first": True,
         "payment_after_review": True,
         "review_back": "details",
-        "submit_label": "Continue to payment",
-        "confirmation_step": 4,
+        "submit_label": "Continue to delivery",
+        "confirmation_step": 7,
         "reminders": [
             "OneGov PH prepares and tracks this CENOMAR request. PSA still issues the official certificate.",
             "The person named on the certificate, or that person's child, parent, or spouse, can prepare a request. PSA decides who is eligible.",
-            "Pay the demonstration total of ₱365.00 per copy after review (×2 for two copies), then keep your reference for tracking.",
+            "Pay the demonstration total of ₱365.00 per copy after entering delivery details (×2 for two copies), then keep your reference for tracking.",
             "You can still open PSA Serbilis for the official channel. OneGov PH does not create a PSA reference number.",
         ],
         "terms": "I confirm that the information in this request is accurate. " + CENOMAR_DISCLAIMER,

@@ -18,7 +18,7 @@
                     {% elif spec.kind == 'philsys' %}
                     Confirm your details and uploaded documents before you choose a demonstration registration appointment.
                     {% elif spec.kind == 'cenomar' %}
-                    Confirm the CENOMAR details below, then continue to pay the ₱365.00-per-copy demonstration total.
+                    Confirm the CENOMAR details and uploaded ID below, then continue to set your home delivery details.
                     {% elif spec.kind == 'barangay' %}
                     {{ spec.department_label or service.department.department_name }}{% if not spec.department_label and service.department.department_description %} — {{ service.department.department_description }}{% endif %}.
                     Confirm the details below, then continue to set your home delivery details.
@@ -89,20 +89,7 @@
                     </div>
                 </section>
 
-                {% if spec.kind == 'cenomar' and spec.official_url %}
-                <section class="pay-panel confirm-panel confirm-panel--next review-panel">
-                    <div class="pay-panel-head confirm-panel-head">
-                        <span class="confirm-panel-icon confirm-panel-icon--green" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M14 3h7v7h-2V6.4l-9.3 9.3-1.4-1.4L17.6 5H14V3zM5 5h6v2H7v10h10v-4h2v6H5V5z"/></svg>
-                        </span>
-                        <div>
-                            <h2>Official PSA channel</h2>
-                            <p>OneGov PH tracks this request and collects a demonstration payment. PSA Serbilis remains the official application channel.</p>
-                        </div>
-                    </div>
-                    <p><a class="dash-button pay-btn-primary" href="{{ spec.official_url }}" target="_blank" rel="noopener noreferrer">Open PSA Serbilis</a></p>
-                </section>
-                {% elif spec.kind == 'sss' and spec.official_url %}
+                {% if spec.kind == 'sss' and spec.official_url %}
                 <section class="pay-panel confirm-panel confirm-panel--next review-panel">
                     <div class="pay-panel-head confirm-panel-head">
                         <span class="confirm-panel-icon confirm-panel-icon--green" aria-hidden="true">
@@ -320,7 +307,9 @@
                     Accept the terms, then continue to the free payment step for this new application.
                     {% elif spec.kind == 'sss' %}
                     Accept the terms, then continue to the free payment step. OneGov PH does not issue an SS Number.
-                    {% elif spec.kind in ['birth', 'cenomar'] %}
+                    {% elif spec.kind == 'cenomar' %}
+                    Accept the terms, then continue to set your home delivery details.
+                    {% elif spec.kind == 'birth' %}
                     Accept the terms, then continue to pay the ₱365.00-per-copy demonstration total.
                     {% else %}
                     Confirm the details above, accept the terms, then submit this request.

@@ -41,6 +41,28 @@ def _is_reviewed(application):
     return bool(read_details(application).get("cenomar_reviewed"))
 
 
+def _type_is_ready(application):
+    from app.services.application_service import cenomar_type_ready
+
+    return cenomar_type_ready(application)
+
+
+def _delivery_is_ready(application):
+    from app.services.cenomar_delivery import delivery_ready
+
+    return delivery_ready(application)
+
+
+def _request_is_complete(application, spec):
+    from app.services.application_forms import cenomar_incomplete_step
+
+    return (
+        _type_is_ready(application)
+        and not cenomar_incomplete_step(field_map(application))
+        and not missing_documents(application, spec)
+    )
+
+
 def _copy_count(application):
     raw = (field_map(application).get("copies") or "1").strip()
     try:
@@ -156,10 +178,14 @@ def finalize_cenomar_application(application, user, new_status):
     """Leave draft after CENOMAR review and payment are recorded."""
     values = field_map(application)
     spec = specification_for(application.service, values) or {}
-    if missing_documents(application, spec):
-        return "Upload every required document before you continue."
+    if not _type_is_ready(application):
+        return "Select a CENOMAR application type before you continue."
+    if not _request_is_complete(application, spec):
+        return "Complete your CENOMAR details and upload the required ID before you continue."
     if not _is_reviewed(application):
         return "Review your application before payment."
+    if not _delivery_is_ready(application):
+        return "Set your delivery details before payment."
     if application.application_status != "draft":
         return None
     now = _now()
@@ -217,39 +243,36 @@ def finalize_cenomar_application(application, user, new_status):
 
 
 def record_demo_payment(application, user, choice, online_method=None):
-    """Record onsite or non-Maya simulated online payment and finalize the draft."""
+    """Record an online demonstration payment and finalize the CENOMAR draft."""
+    if choice != "online":
+        return "Choose an online payment method for this CENOMAR request."
+    spec = specification_for(application.service, field_map(application)) or {}
+    if not _type_is_ready(application):
+        return "Select a CENOMAR application type before payment."
+    if not _request_is_complete(application, spec):
+        return "Complete your CENOMAR details and upload the required ID before payment."
     if not _is_reviewed(application):
         return "Review your application before payment."
+    if not _delivery_is_ready(application):
+        return "Set your delivery details before payment."
     existing = latest_payment(application)
     if application.application_status != "draft" and existing is not None:
         return None
 
     amount = demo_fee(application)
     now = _now()
-    if choice == "online":
-        method = str(online_method or "").strip()
-        if method == "maya":
-            return "Use Pay Now to open Maya Checkout sandbox."
-        if method not in ONLINE_METHODS:
-            return "Select an online payment method."
-        status = "paid"
-        app_status = "paid"
-        title = "Demonstration payment successful"
-        message = (
-            f"Your simulated CENOMAR payment of ₱{amount:,.2f} was recorded as paid. "
-            "No real payment was collected."
-        )
-    elif choice == "onsite":
-        method = "over_the_counter"
-        status = "pending"
-        app_status = "submitted"
-        title = "Onsite payment selected"
-        message = (
-            f"You chose to pay ₱{amount:,.2f} onsite for this CENOMAR request. "
-            "No real payment was collected."
-        )
-    else:
-        return "Choose pay online or pay onsite."
+    method = str(online_method or "").strip()
+    if method == "maya":
+        return "Use Pay Now to open Maya Checkout sandbox."
+    if method not in ONLINE_METHODS:
+        return "Select an online payment method."
+    status = "paid"
+    app_status = "paid"
+    title = "Demonstration payment successful"
+    message = (
+        f"Your simulated CENOMAR payment of ₱{amount:,.2f} was recorded as paid. "
+        "No real payment was collected."
+    )
 
     if existing is not None:
         existing.amount = amount
@@ -287,8 +310,15 @@ def record_demo_payment(application, user, choice, online_method=None):
 
 def start_maya_checkout(application, user):
     """Create a pending Maya payment row and a sandbox checkout session."""
+    spec = specification_for(application.service, field_map(application)) or {}
+    if not _type_is_ready(application):
+        return None, "Select a CENOMAR application type before payment."
+    if not _request_is_complete(application, spec):
+        return None, "Complete your CENOMAR details and upload the required ID before payment."
     if not _is_reviewed(application):
         return None, "Review your application before payment."
+    if not _delivery_is_ready(application):
+        return None, "Set your delivery details before payment."
     if application.application_status != "draft":
         return None, "This application is no longer awaiting payment."
 

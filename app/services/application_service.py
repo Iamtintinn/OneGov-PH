@@ -1556,6 +1556,33 @@ def mark_cenomar_reviewed(application):
     write_details(application, details)
 
 
+def cenomar_type_ready(application):
+    """True when a CENOMAR request type was selected on step 1."""
+    from app.services.cenomar_requirements import CENOMAR_APPLICATION_TYPES, normalize_cenomar_type
+
+    selected = normalize_cenomar_type(field_map(application).get("application_type"))
+    return selected in CENOMAR_APPLICATION_TYPES
+
+
+def save_cenomar_application_type(application, application_type):
+    """Store the CENOMAR application type without wiping other draft answers."""
+    from app.services.cenomar_requirements import CENOMAR_APPLICATION_TYPES, normalize_cenomar_type
+
+    selected = normalize_cenomar_type(application_type)
+    if selected not in CENOMAR_APPLICATION_TYPES:
+        return "Select a CENOMAR application type."
+    details = read_details(application)
+    details["fields"] = _upsert_field(
+        details["fields"],
+        "application_type",
+        "Application type",
+        selected,
+        "Request type",
+    )
+    write_details(application, details)
+    return None
+
+
 def philsys_review_ready(application):
     """True when the PhilSys review step was accepted."""
     return bool(read_details(application).get("philsys_reviewed"))
@@ -1690,20 +1717,30 @@ def continue_target(application):
         if not delivery_ready(application):
             return "delivery"
         return "payment"
-    if spec.get("kind") in {"cenomar", "sss"}:
+    if spec.get("kind") == "cenomar":
+        if spec.get("type_first") and not cenomar_type_ready(application):
+            return "type"
+        if not read_fields(application):
+            return "details"
+        from app.services.application_forms import cenomar_incomplete_step
+
+        if cenomar_incomplete_step(field_map(application)):
+            return "details"
+        if missing_documents(application, spec):
+            return "documents"
+        if not cenomar_review_ready(application):
+            return "review"
+        from app.services.cenomar_delivery import delivery_ready
+
+        if not delivery_ready(application):
+            return "delivery"
+        return "payment"
+    if spec.get("kind") == "sss":
         if not read_fields(application):
             return "details"
         if missing_documents(application, spec):
             return "documents"
-        if spec.get("kind") == "cenomar":
-            from app.services.application_forms import cenomar_incomplete_step
-
-            incomplete = cenomar_incomplete_step(field_map(application))
-            if incomplete:
-                return "details"
-            reviewed = cenomar_review_ready(application)
-        else:
-            reviewed = sss_review_ready(application)
+        reviewed = sss_review_ready(application)
         if not reviewed:
             return "review"
         return "payment"

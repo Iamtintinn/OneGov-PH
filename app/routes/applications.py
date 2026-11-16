@@ -27,6 +27,7 @@ from app.services.application_service import (
     birth_review_ready,
     birth_type_ready,
     cenomar_review_ready,
+    cenomar_type_ready,
     mark_barangay_reviewed,
     mark_birth_reviewed,
     mark_cenomar_reviewed,
@@ -57,6 +58,7 @@ from app.services.application_service import (
     save_barangay_application_type,
     save_barangay_id,
     save_birth_application_type,
+    save_cenomar_application_type,
     save_draft,
     save_nbi_application_type,
     save_passport_application_type,
@@ -136,7 +138,7 @@ def apply_type(service_id):
     kind = spec.get("kind")
     if not (
         spec.get("type_first")
-        and kind in {"passport", "barangay", "residency", "senior", "nbi", "birth"}
+        and kind in {"passport", "barangay", "residency", "senior", "nbi", "birth", "cenomar"}
     ):
         return redirect(url_for("citizen.apply_details", service_id=service.service_id))
 
@@ -200,6 +202,15 @@ def apply_type(service_id):
             "Choose the birth certificate request that matches your situation. "
             "Required document uploads depend on this choice."
         )
+    elif kind == "cenomar":
+        from app.services.cenomar_requirements import CENOMAR_TYPE_OPTIONS as TYPE_OPTIONS
+
+        save_type = save_cenomar_application_type
+        next_endpoint = "citizen.apply_details"
+        next_kwargs = {"service_id": service.service_id}
+        continue_label = "Continue to application details"
+        type_heading = "CENOMAR application types"
+        type_intro = "Choose the purpose that matches your request. A valid government-issued ID is required for every type."
     else:
         from app.services.passport_requirements import PASSPORT_TYPE_OPTIONS as TYPE_OPTIONS
 
@@ -308,6 +319,8 @@ def apply_details(service_id):
         return redirect(url_for("citizen.apply_type", service_id=service.service_id))
     if spec.get("kind") == "birth" and spec.get("type_first") and not birth_type_ready(draft):
         return redirect(url_for("citizen.apply_type", service_id=service.service_id))
+    if spec.get("kind") == "cenomar" and spec.get("type_first") and not cenomar_type_ready(draft):
+        return redirect(url_for("citizen.apply_type", service_id=service.service_id))
     if request.method == "POST":
         stored, errors = validate_answers(
             service,
@@ -317,14 +330,11 @@ def apply_details(service_id):
         )
         if not errors:
             draft = save_draft(current_user, service, stored, draft)
-            if spec.get("kind") == "cenomar":
-                return redirect(url_for("citizen.apply_review", application_id=draft.application_id))
             return redirect(url_for("citizen.apply_documents", application_id=draft.application_id))
         values = {item["key"]: item["value"] for item in stored}
         if spec.get("kind") in {"barangay", "residency", "cenomar", "birth", "senior", "nbi", "sss"}:
-            next_label = "review" if spec.get("kind") == "cenomar" else "documents"
             flash(
-                f"This application cannot continue to {next_label} yet. "
+                "This application cannot continue to documents yet. "
                 "Fix the highlighted fields below, then try Continue again.",
                 "warning",
             )
@@ -338,7 +348,7 @@ def apply_details(service_id):
     details_step = (
         2
         if (
-            spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth"}
+            spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar"}
             and spec.get("type_first")
         )
         else 1
@@ -379,14 +389,20 @@ def apply_documents(application_id):
         return redirect(url_for("citizen.apply_type", service_id=application.service_id))
     if spec.get("kind") == "birth" and spec.get("type_first") and not birth_type_ready(application):
         return redirect(url_for("citizen.apply_type", service_id=application.service_id))
+    if spec.get("kind") == "cenomar" and spec.get("type_first") and not cenomar_type_ready(application):
+        return redirect(url_for("citizen.apply_type", service_id=application.service_id))
+    if spec.get("kind") == "cenomar":
+        from app.services.application_forms import cenomar_incomplete_step
+
+        if cenomar_incomplete_step(field_map(application)):
+            flash("Complete every required CENOMAR detail before uploading documents.", "warning")
+            return redirect(url_for("citizen.apply_details", service_id=application.service_id))
     if not (spec.get("kind") == "passport" or spec.get("documents_first")) and not read_fields(application):
         return redirect(url_for("citizen.apply_details", service_id=application.service_id))
-    if spec.get("kind") == "cenomar":
-        return redirect(url_for("citizen.apply_review", application_id=application.application_id))
     if spec.get("kind") == "passport" and spec.get("type_first"):
         document_step = 2
     elif (
-        spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth"}
+        spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar"}
         and spec.get("type_first")
     ):
         document_step = 3
@@ -437,7 +453,7 @@ def apply_documents(application_id):
             ),
             None,
         )
-    elif context["spec"].get("kind") in {"barangay", "residency", "senior", "nbi", "birth"}:
+    elif context["spec"].get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar"}:
         from app.services.barangay_ids import barangay_id_groups
 
         context["id_picker_groups"] = barangay_id_groups()
@@ -818,6 +834,25 @@ def apply_delivery(application_id):
             save_delivery,
             validate_delivery_form,
         )
+    elif kind == "cenomar":
+        if not cenomar_review_ready(application):
+            flash("Review your application before setting the delivery details.", "warning")
+            return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+        from app.services.cenomar_delivery import (
+            CITY,
+            DEFAULT_LAT,
+            DEFAULT_LNG,
+            DELIVERY_FEE,
+            DEMO_BARANGAYS,
+            PROVINCE,
+            REGION,
+            cenomar_center,
+            delivery_ready,
+            delivery_values,
+            save_delivery,
+            validate_delivery_form,
+        )
+        from app.services.cenomar_payment import payment_summary as cenomar_payment_summary
     else:
         return redirect(url_for("citizen.application_continue", application_id=application.application_id))
 
@@ -848,6 +883,12 @@ def apply_delivery(application_id):
                 initial_lat, initial_lng = center
             else:
                 initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
+        elif kind == "cenomar":
+            center = cenomar_center(values.get("barangay") or field_map(application).get("barangay"))
+            if center:
+                initial_lat, initial_lng = center
+            else:
+                initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
         else:
             center = barangay_center(values.get("barangay") or field_map(application).get("barangay"))
             if center:
@@ -860,6 +901,9 @@ def apply_delivery(application_id):
     if kind == "birth":
         birth_summary = birth_payment_summary(application)
         context["birth_payment_summary"] = birth_summary
+    elif kind == "cenomar":
+        cenomar_summary = cenomar_payment_summary(application)
+        context["cenomar_payment_summary"] = cenomar_summary
     context.update(
         {
             "values": values,
@@ -876,6 +920,8 @@ def apply_delivery(application_id):
     )
     if kind == "birth":
         context["delivery_fee"] = birth_summary["courier_fee"]
+    elif kind == "cenomar":
+        context["delivery_fee"] = cenomar_summary["courier_fee"]
     return render_template("applications/apply_delivery.html", **context)
 
 
@@ -889,6 +935,16 @@ def apply_payment(application_id):
     kind = spec.get("kind")
     if kind not in {"passport", "barangay", "residency", "senior", "nbi", "birth", "cenomar", "philsys", "sss"}:
         return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+
+    if kind == "cenomar" and not cenomar_type_ready(application):
+        flash("Select a request type before payment.", "warning")
+        return redirect(url_for("citizen.apply_type", service_id=application.service_id))
+    if kind == "cenomar":
+        from app.services.application_forms import cenomar_incomplete_step
+
+        if cenomar_incomplete_step(values):
+            flash("Complete the application details before payment.", "warning")
+            return redirect(url_for("citizen.apply_details", service_id=application.service_id))
 
     if missing_documents(application, spec) and kind != "barangay":
         flash("Upload every required document before payment.", "warning")
@@ -1035,11 +1091,19 @@ def apply_payment(application_id):
         if not read_fields(application):
             flash("Complete the application details before payment.", "warning")
             return redirect(url_for("citizen.apply_details", service_id=application.service_id))
+        if missing_documents(application, spec):
+            flash("Upload the required ID before payment.", "warning")
+            return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
         if not cenomar_review_ready(application):
             flash("Review your application before payment.", "warning")
             return redirect(url_for("citizen.apply_review", application_id=application.application_id))
-        payment_step = 3
-        back_endpoint = "citizen.apply_review"
+        from app.services.cenomar_delivery import delivery_ready
+
+        if not delivery_ready(application):
+            flash("Set your delivery details before payment.", "warning")
+            return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
+        payment_step = 6 if spec.get("type_first") else 5
+        back_endpoint = "citizen.apply_delivery"
         free_payment = False
     else:
         from app.services.barangay_payment import (
@@ -1169,6 +1233,7 @@ def apply_payment(application_id):
         "barangay",
         "residency",
         "birth",
+        "cenomar",
     }
     if not free_payment and not context["online_payment_only"]:
         from app.services.passport_payment import ONSITE_LOCATIONS
@@ -1293,9 +1358,10 @@ def apply_review(application_id):
     if spec.get("kind") == "cenomar":
         from app.services.application_forms import cenomar_incomplete_step
 
-        incomplete = cenomar_incomplete_step(field_map(application))
-        if incomplete:
-            flash("Complete the CENOMAR details before reviewing this request.", "warning")
+        if not cenomar_type_ready(application):
+            return redirect(url_for("citizen.apply_type", service_id=application.service_id))
+        if cenomar_incomplete_step(field_map(application)):
+            flash("Complete every required CENOMAR detail before review.", "warning")
             return redirect(url_for("citizen.apply_details", service_id=application.service_id))
     missing = missing_documents(application, spec)
     if spec.get("kind") in {"passport", "philsys"}:
@@ -1310,14 +1376,12 @@ def apply_review(application_id):
         return redirect(url_for("citizen.application_continue", application_id=application.application_id))
     if spec.get("kind") == "passport" and spec.get("type_first"):
         review_step = 4
-    elif spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth"} and spec.get(
+    elif spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar"} and spec.get(
         "type_first"
     ):
         review_step = 4
     elif spec.get("kind") in {"passport", "philsys"}:
         review_step = 3
-    elif spec.get("kind") == "cenomar":
-        review_step = 2
     else:
         review_step = 3
     context = _common(application, review_step)
@@ -1342,6 +1406,12 @@ def apply_review(application_id):
         ensure_confirmation_pdf(application)
         context["summary"] = payment_summary(application)
         context["confirmation_id"] = confirmation_id_for(application)
+        delivery = delivery_for(application)
+        context["delivery"] = delivery
+        context["delivery_address"] = delivery_address(delivery) if delivery else ""
+    elif spec.get("kind") == "cenomar":
+        from app.services.cenomar_delivery import delivery_address, delivery_for
+
         delivery = delivery_for(application)
         context["delivery"] = delivery
         context["delivery_address"] = delivery_address(delivery) if delivery else ""
@@ -1394,6 +1464,15 @@ def apply_submit(application_id):
         if spec.get("review_before_schedule"):
             return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
         return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+    if spec.get("kind") == "cenomar" and not cenomar_type_ready(application):
+        flash("Select an application type before continuing.", "warning")
+        return redirect(url_for("citizen.apply_type", service_id=application.service_id))
+    if spec.get("kind") == "cenomar":
+        from app.services.application_forms import cenomar_incomplete_step
+
+        if cenomar_incomplete_step(field_map(application)):
+            flash("Complete every required CENOMAR detail before continuing.", "warning")
+            return redirect(url_for("citizen.apply_details", service_id=application.service_id))
     if spec.get("kind") == "barangay" and spec.get("review_before_schedule"):
         if missing_documents(application, spec):
             flash("Upload every required document before scheduling.", "warning")
@@ -1439,7 +1518,7 @@ def apply_submit(application_id):
             mark_sss_reviewed(application)
         else:
             mark_barangay_reviewed(application)
-        if spec.get("kind") in {"barangay", "residency", "birth"}:
+        if spec.get("kind") in {"barangay", "residency", "birth", "cenomar"}:
             return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
         return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
     error = submit_application(application, current_user)
@@ -1609,11 +1688,16 @@ def apply_confirmation(application_id):
         )
     elif spec.get("kind") == "cenomar":
         from app.services.cenomar_confirmation_pdf import confirmation_id_for, ensure_confirmation_pdf
+        from app.services.cenomar_delivery import delivery_address, delivery_for
         from app.services.cenomar_payment import payment_summary
 
         ensure_confirmation_pdf(application)
         context["summary"] = payment_summary(application)
         context["confirmation_id"] = confirmation_id_for(application)
+        context["delivery"] = delivery_for(application)
+        context["delivery_address"] = (
+            delivery_address(context["delivery"]) if context["delivery"] else ""
+        )
     elif spec.get("kind") == "philsys":
         from app.services.philsys_confirmation_pdf import confirmation_id_for, ensure_confirmation_pdf
         from app.services.philsys_payment import payment_summary

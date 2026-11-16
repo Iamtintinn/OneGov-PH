@@ -13,9 +13,9 @@
         <header class="pay-hero confirm-hero delivery-page-hero">
             <div class="pay-hero-copy">
                 <p class="pay-kicker">Home delivery</p>
-                <h1 id="delivery-heading">{% if spec.kind in ['residency', 'birth'] %}Where should we deliver your certificate?{% else %}Where should we deliver your clearance?{% endif %}</h1>
+                <h1 id="delivery-heading">{% if spec.kind in ['residency', 'birth', 'cenomar'] %}Where should we deliver your certificate?{% else %}Where should we deliver your clearance?{% endif %}</h1>
                 <p class="welcome-text">
-                    Pin the exact delivery location on the map first, then complete the recipient and address details below. {% if spec.kind == 'residency' %}Certificate of Residency{% elif spec.kind == 'birth' %}Birth Certificate{% else %}Barangay Clearance{% endif %} is delivered to this address only.
+                    Pin the exact delivery location on the map first, then complete the recipient and address details below. {% if spec.kind == 'residency' %}Certificate of Residency{% elif spec.kind == 'birth' %}Birth Certificate{% elif spec.kind == 'cenomar' %}CENOMAR{% else %}Barangay Clearance{% endif %} is delivered to this address only.
                 </p>
             </div>
             <div class="confirm-success-chip" aria-hidden="true">
@@ -90,7 +90,7 @@
                     <div class="passport-details-fields delivery-fields">
                         <div class="apply-field{% if errors.get('recipient_name') %} has-error{% endif %}">
                             <label for="recipient_name">Recipient full name</label>
-                            <p class="field-help" id="recipient_name-help">Enter the name of the person who will receive the {% if spec.kind in ['residency', 'birth'] %}certificate{% else %}clearance{% endif %}.</p>
+                            <p class="field-help" id="recipient_name-help">Enter the name of the person who will receive the {% if spec.kind in ['residency', 'birth', 'cenomar'] %}certificate{% else %}clearance{% endif %}.</p>
                             <div class="text-input">
                                 <input id="recipient_name" name="recipient_name" type="text" maxlength="200" autocomplete="off" value="{{ values.recipient_name }}" required aria-describedby="recipient_name-help{% if errors.get('recipient_name') %} recipient_name-error{% endif %}">
                             </div>
@@ -199,22 +199,23 @@
                             <span class="delivery-summary-badge">Home delivery</span>
                         </div>
                         <dl class="passport-notice-meta">
-                            {% if spec.kind == 'birth' %}
+                            {% if spec.kind in ['birth', 'cenomar'] %}
+                            {% set payment_summary = birth_payment_summary if spec.kind == 'birth' else cenomar_payment_summary %}
                             <div>
                                 <dt>PSA document fee</dt>
-                                <dd>{{ birth_payment_summary.application_fee_display }}</dd>
+                                <dd>{{ payment_summary.application_fee_display }}</dd>
                             </div>
                             <div>
                                 <dt>Processing, convenience and service fees</dt>
-                                <dd>{{ birth_payment_summary.processing_fee_display }}</dd>
+                                <dd>{{ payment_summary.processing_fee_display }}</dd>
                             </div>
                             <div>
                                 <dt>Courier / delivery fee</dt>
-                                <dd>{{ birth_payment_summary.courier_fee_display }}</dd>
+                                <dd>{{ payment_summary.courier_fee_display }}</dd>
                             </div>
                             <div>
                                 <dt>Total at payment</dt>
-                                <dd>{{ birth_payment_summary.amount_display }}</dd>
+                                <dd>{{ payment_summary.amount_display }}</dd>
                             </div>
                             {% else %}
                             <div>

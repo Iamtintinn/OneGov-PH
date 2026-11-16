@@ -1596,6 +1596,15 @@
                                 <strong>{{ summary.copies_display if summary and summary.copies_display else "1" }}</strong>
                             </div>
                         </div>
+                        <div class="confirm-info-card confirm-info-card--blue">
+                            <span class="confirm-info-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M4 4h16v2H4zm0 5h16v2H4zm0 5h10v2H4zm0 5h10v2H4z"/></svg>
+                            </span>
+                            <div>
+                                <span class="confirm-info-label">Application type</span>
+                                <strong>{{ fields|selectattr('key', 'equalto', 'application_type')|map(attribute='value')|first|default('Not provided', true) }}</strong>
+                            </div>
+                        </div>
                         <div class="confirm-info-card confirm-info-card--maroon">
                             <span class="confirm-info-icon" aria-hidden="true">
                                 <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5L4 8V6l8 5 8-5z"/></svg>
@@ -1616,6 +1625,35 @@
                         </div>
                     </div>
                 </section>
+
+                {% if delivery %}
+                <section class="passport-notice-card review-delivery-card" aria-labelledby="cenomar-confirmation-delivery-heading">
+                    <div class="passport-notice-top">
+                        <strong id="cenomar-confirmation-delivery-heading">Delivery details</strong>
+                    </div>
+                    <dl class="passport-notice-meta">
+                        <div>
+                            <dt>Recipient</dt>
+                            <dd>{{ delivery.recipient_name or "Not provided" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Contact number</dt>
+                            <dd>{{ delivery.contact_number or "Not provided" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Delivery address</dt>
+                            <dd>{{ delivery_address or "Not provided" }}</dd>
+                        </div>
+                        {% if delivery.landmark %}
+                        <div>
+                            <dt>Landmark</dt>
+                            <dd>{{ delivery.landmark }}</dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                    <p class="passport-details-disclaimer">Home delivery is a demonstration record. No courier is dispatched.</p>
+                </section>
+                {% endif %}
 
                 <section class="pay-panel confirm-panel confirm-panel--payment">
                     <div class="pay-panel-head confirm-panel-head">
