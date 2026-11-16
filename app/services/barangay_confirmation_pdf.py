@@ -101,6 +101,24 @@ def ensure_confirmation_pdf(application):
             )
             if delivery.get("landmark"):
                 delivery_rows += (("Landmark", delivery["landmark"]),)
+    elif kind == "residency":
+        from app.services.residency_delivery import delivery_address, delivery_for
+
+        delivery = delivery_for(application)
+        if delivery:
+            delivery_rows = (
+                (
+                    "Recipient",
+                    delivery.get("recipient_name") or full_name,
+                ),
+                (
+                    "Contact number",
+                    delivery.get("contact_number") or answers.get("contact_number") or "",
+                ),
+                ("Delivery address", delivery_address(delivery)),
+            )
+            if delivery.get("landmark"):
+                delivery_rows += (("Landmark", delivery["landmark"]),)
     write_receipt_pdf(
         absolute,
         {
