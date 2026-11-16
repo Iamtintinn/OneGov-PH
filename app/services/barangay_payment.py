@@ -104,7 +104,7 @@ def finalize_barangay_application(application, user, new_status):
     values = field_map(application)
     spec = specification_for(application.service, values) or {}
     kind = spec.get("kind") or "barangay"
-    if missing_documents(application, spec):
+    if kind != "barangay" and missing_documents(application, spec):
         return "Upload every required document before you continue."
     if not _is_reviewed(application, kind):
         return "Review your application before payment."

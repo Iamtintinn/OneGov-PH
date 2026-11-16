@@ -721,14 +721,14 @@ def compose_barangay_clearance(values=None):
             "2. Application details",
             "3. Documents",
             "4. Review",
-            "5. Scheduling",
+            "5. Delivery",
             "6. Payment",
             "7. Confirmation",
         ),
         "type_first": True,
-        "review_before_schedule": True,
+        "review_before_schedule": False,
         "payment_after_review": False,
-        "submit_label": "Continue to scheduling",
+        "submit_label": "Continue to delivery",
         "confirmation_step": 7,
         "terms": "I confirm that the information and documents in this request are accurate. " + BARANGAY_DISCLAIMER,
         "next_steps": [
@@ -1745,12 +1745,13 @@ def compose_nbi_clearance(values=None):
             "1. Application type",
             "2. Application details",
             "3. Documents",
-            "4. Review",
-            "5. Scheduling",
-            "6. Payment",
-            "7. Confirmation",
+            "4. Delivery",
+            "5. Review",
+            "6. Scheduling",
+            "7. Payment",
+            "8. Confirmation",
         )
-        confirmation_step = 7
+        confirmation_step = 8
         submit_label = "Continue to scheduling"
         next_steps = [
             "Keep your OneGov PH reference number. It is separate from any reference number NBI gives you.",
@@ -1771,11 +1772,12 @@ def compose_nbi_clearance(values=None):
             "1. Application type",
             "2. Application details",
             "3. Documents",
-            "4. Review",
-            "5. Payment",
-            "6. Confirmation",
+            "4. Delivery",
+            "5. Review",
+            "6. Payment",
+            "7. Confirmation",
         )
-        confirmation_step = 6
+        confirmation_step = 7
         submit_label = "Continue to payment"
         next_steps = [
             "Keep your OneGov PH reference number. It is separate from any reference number NBI gives you.",

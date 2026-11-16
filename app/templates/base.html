@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/payment.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
+    {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
     <a class="skip-link" href="#content">Skip to content</a>

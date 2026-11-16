@@ -410,6 +410,44 @@
                     </div>
                 </section>
 
+                {% if delivery %}
+                <section class="pay-panel confirm-panel" aria-labelledby="brgy-delivery-heading">
+                    <div class="pay-panel-head confirm-panel-head">
+                        <span class="confirm-panel-icon confirm-panel-icon--green" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M20 8h-3V4H3a1 1 0 0 0-1 1v11h2a3 3 0 0 0 6 0h6a3 3 0 0 0 6 0h1v-5l-3-4zM6 18a1 1 0 1 1 1-1 1 1 0 0 1-1 1zm12 0a1 1 0 1 1 1-1 1 1 0 0 1-1 1zm0-6V9h2.2l1.8 3h-4z"/></svg>
+                        </span>
+                        <div>
+                            <h2 id="brgy-delivery-heading">Home delivery</h2>
+                            <p>Your clearance will be delivered to the details below. No courier is dispatched in this demonstration.</p>
+                        </div>
+                    </div>
+                    <div class="confirm-info-grid">
+                        <div class="confirm-info-card confirm-info-card--maroon">
+                            <span class="confirm-info-label">Recipient</span>
+                            <strong>{{ delivery.recipient_name or "Not provided" }}</strong>
+                        </div>
+                        <div class="confirm-info-card confirm-info-card--gold">
+                            <span class="confirm-info-label">Contact number</span>
+                            <strong>{{ delivery.contact_number or "Not provided" }}</strong>
+                        </div>
+                        <div class="confirm-info-card confirm-info-card--blue">
+                            <span class="confirm-info-label">Barangay</span>
+                            <strong>{{ delivery.barangay or "Not provided" }}</strong>
+                        </div>
+                        <div class="confirm-info-card confirm-info-card--green">
+                            <span class="confirm-info-label">Delivery address</span>
+                            <strong>{{ delivery_address or "Not provided" }}</strong>
+                        </div>
+                        {% if delivery.landmark %}
+                        <div class="confirm-info-card confirm-info-card--blue">
+                            <span class="confirm-info-label">Landmark</span>
+                            <strong>{{ delivery.landmark }}</strong>
+                        </div>
+                        {% endif %}
+                    </div>
+                </section>
+                {% endif %}
+
                 {% if appointment %}
                 <section class="pay-panel confirm-panel" aria-labelledby="brgy-appointment-heading">
                     <div class="pay-panel-head confirm-panel-head">

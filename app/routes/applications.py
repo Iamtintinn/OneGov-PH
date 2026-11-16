@@ -634,7 +634,7 @@ def continue_documents(application_id):
             return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
         return redirect(url_for("citizen.apply_review", application_id=application.application_id))
     missing = missing_documents(application, spec)
-    if missing:
+    if missing and spec.get("kind") != "barangay":
         flash(f"Still needed before you continue: {', '.join(missing)}.", "warning")
         return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
     if spec.get("kind") == "passport" or spec.get("documents_first"):
@@ -652,7 +652,7 @@ def apply_schedule(application_id):
     kind = spec.get("kind")
     if kind not in {"passport", "nbi", "philsys", "barangay", "residency", "senior"}:
         return redirect(url_for("citizen.apply_review", application_id=application.application_id))
-    if missing_documents(application, spec):
+    if missing_documents(application, spec) and kind != "barangay":
         flash("Upload every required document before scheduling.", "warning")
         return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
     if kind == "passport":
@@ -772,6 +772,75 @@ def apply_schedule(application_id):
 
 
 @role_required(User.ROLE_CITIZEN)
+def apply_delivery(application_id):
+    application = _draft_or_404(application_id)
+    if application.application_status != "draft":
+        return redirect(url_for("citizen.apply_confirmation", application_id=application.application_id))
+    spec = specification_for(application.service, field_map(application))
+    if spec.get("kind") != "barangay":
+        return redirect(url_for("citizen.application_continue", application_id=application.application_id))
+    if not read_fields(application):
+        flash("Complete the application details before delivery.", "warning")
+        return redirect(url_for("citizen.apply_details", service_id=application.service_id))
+    if not barangay_review_ready(application):
+        flash("Review your application before setting the delivery details.", "warning")
+        return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+
+    from app.services.barangay_delivery import (
+        CITY,
+        DEFAULT_LAT,
+        DEFAULT_LNG,
+        DELIVERY_FEE,
+        DEMO_BARANGAYS,
+        PROVINCE,
+        REGION,
+        barangay_center,
+        delivery_ready,
+        delivery_values,
+        save_delivery,
+        validate_delivery_form,
+    )
+
+    values = delivery_values(application)
+    errors = {}
+    if request.method == "POST":
+        values, errors = validate_delivery_form(request.form)
+        if not errors:
+            error = save_delivery(application, current_user, values)
+            if error:
+                flash(error, "warning")
+            else:
+                flash("Delivery details saved.", "success")
+                return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+
+    initial_lat = values.get("latitude")
+    initial_lng = values.get("longitude")
+    if not (initial_lat and initial_lng):
+        center = barangay_center(values.get("barangay") or field_map(application).get("barangay"))
+        if center:
+            initial_lat, initial_lng = center
+        else:
+            initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
+
+    context = _common(application, 5)
+    context.update(
+        {
+            "values": values,
+            "errors": errors,
+            "barangay_options": DEMO_BARANGAYS,
+            "delivery_region": REGION,
+            "delivery_province": PROVINCE,
+            "delivery_city": CITY,
+            "delivery_fee": DELIVERY_FEE,
+            "delivery_saved": delivery_ready(application),
+            "initial_lat": initial_lat,
+            "initial_lng": initial_lng,
+        }
+    )
+    return render_template("applications/apply_delivery.html", **context)
+
+
+@role_required(User.ROLE_CITIZEN)
 def apply_payment(application_id):
     application = _draft_or_404(application_id)
     if application.application_status != "draft":
@@ -782,7 +851,7 @@ def apply_payment(application_id):
     if kind not in {"passport", "barangay", "residency", "senior", "nbi", "birth", "cenomar", "philsys", "sss"}:
         return redirect(url_for("citizen.apply_review", application_id=application.application_id))
 
-    if missing_documents(application, spec):
+    if missing_documents(application, spec) and kind != "barangay":
         flash("Upload every required document before payment.", "warning")
         return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
 
@@ -947,6 +1016,12 @@ def apply_payment(application_id):
         if not reviewed:
             flash("Review your application before payment.", "warning")
             return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+        if kind == "barangay":
+            from app.services.barangay_delivery import delivery_ready
+
+            if not delivery_ready(application):
+                flash("Set your delivery details before payment.", "warning")
+                return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
         if kind in {"barangay", "residency"} and spec.get("review_before_schedule"):
             from app.services.barangay_scheduling import appointment_for
 
@@ -955,6 +1030,9 @@ def apply_payment(application_id):
                 return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
             payment_step = 6 if spec.get("type_first") else 5
             back_endpoint = "citizen.apply_schedule"
+        elif kind == "barangay":
+            payment_step = 6
+            back_endpoint = "citizen.apply_delivery"
         else:
             payment_step = 4
             back_endpoint = "citizen.apply_review"
@@ -1180,7 +1258,7 @@ def apply_review(application_id):
         if not passport_details_ready(application, spec):
             flash("Complete the application details before review.", "warning")
             return redirect(url_for("citizen.apply_details", service_id=application.service_id))
-    elif not read_fields(application) or missing:
+    elif not read_fields(application) or (missing and spec.get("kind") != "barangay"):
         flash("Complete the application details and required documents before review.", "warning")
         return redirect(url_for("citizen.application_continue", application_id=application.application_id))
     if spec.get("kind") == "passport" and spec.get("type_first"):
@@ -1200,6 +1278,12 @@ def apply_review(application_id):
     context["requirements"] = {item.requirement_name: item for item in application.requirements}
     context["checklist"] = read_checklist(application)
     context["terms"] = spec.get("terms") or TERMS_TEXT
+    if spec.get("kind") == "barangay":
+        from app.services.barangay_delivery import delivery_address, delivery_for
+
+        delivery = delivery_for(application)
+        context["delivery"] = delivery
+        context["delivery_address"] = delivery_address(delivery) if delivery else ""
     if spec.get("kind") == "philsys":
         from app.services.philsys_national_id import readiness_message
 
@@ -1250,7 +1334,7 @@ def apply_submit(application_id):
             return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
         return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
     if spec.get("kind") in {"barangay", "residency"} and spec.get("review_before_schedule"):
-        if missing_documents(application, spec):
+        if missing_documents(application, spec) and spec.get("kind") != "barangay":
             flash("Upload every required document before scheduling.", "warning")
             return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
         if not read_fields(application):
@@ -1284,7 +1368,7 @@ def apply_submit(application_id):
     if spec.get("kind") in {"barangay", "residency", "senior", "birth", "cenomar", "sss"} or spec.get(
         "payment_after_review"
     ):
-        if missing_documents(application, spec):
+        if missing_documents(application, spec) and spec.get("kind") != "barangay":
             flash("Upload every required document before payment.", "warning")
             return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
         if not read_fields(application):
@@ -1302,6 +1386,8 @@ def apply_submit(application_id):
             mark_sss_reviewed(application)
         else:
             mark_barangay_reviewed(application)
+        if spec.get("kind") == "barangay":
+            return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
         return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
     error = submit_application(application, current_user)
     if error:
@@ -1407,6 +1493,7 @@ def apply_confirmation(application_id):
         context["bring_requirements"] = bring_requirements_for(field_map(application).get("application_type"))
     elif spec.get("kind") in {"barangay", "residency"}:
         from app.services.barangay_confirmation_pdf import confirmation_id_for, ensure_confirmation_pdf
+        from app.services.barangay_delivery import delivery_address, delivery_for
         from app.services.barangay_payment import payment_summary
         from app.services.barangay_scheduling import appointment_for
 
@@ -1414,6 +1501,10 @@ def apply_confirmation(application_id):
         context["summary"] = payment_summary(application)
         context["confirmation_id"] = confirmation_id_for(application)
         context["appointment"] = appointment_for(application)
+        context["delivery"] = delivery_for(application)
+        context["delivery_address"] = (
+            delivery_address(context["delivery"]) if context["delivery"] else ""
+        )
     elif spec.get("kind") == "senior":
         from app.services.senior_confirmation_pdf import confirmation_id_for, ensure_confirmation_pdf
         from app.services.senior_payment import payment_summary
@@ -1678,6 +1769,8 @@ def application_continue(application_id):
         return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
     if target == "schedule":
         return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
+    if target == "delivery":
+        return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
     if target == "payment":
         return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
     if target == "review":
@@ -1713,6 +1806,12 @@ def register(blueprint):
             apply_schedule,
             ["GET", "POST"],
             "apply_schedule",
+        ),
+        (
+            "/citizen/applications/<int:application_id>/delivery",
+            apply_delivery,
+            ["GET", "POST"],
+            "apply_delivery",
         ),
         (
             "/citizen/applications/<int:application_id>/payment",

@@ -19,7 +19,10 @@
                     Confirm your details and uploaded documents before you choose a demonstration registration appointment.
                     {% elif spec.kind == 'cenomar' %}
                     Confirm the CENOMAR details below, then continue to pay the ₱365.00-per-copy demonstration total.
-                    {% elif spec.kind in ['birth', 'barangay', 'residency', 'senior', 'sss'] %}
+                    {% elif spec.kind == 'barangay' %}
+                    {{ spec.department_label or service.department.department_name }}{% if not spec.department_label and service.department.department_description %} — {{ service.department.department_description }}{% endif %}.
+                    Confirm the details below, then continue to set your home delivery details.
+                    {% elif spec.kind in ['birth', 'residency', 'senior', 'sss'] %}
                     {{ spec.department_label or service.department.department_name }}{% if not spec.department_label and service.department.department_description %} — {{ service.department.department_description }}{% endif %}.
                     Confirm the details below, then continue to payment.
                     {% else %}
@@ -206,6 +209,40 @@
                 </section>
                 {% endif %}
 
+                {% if delivery %}
+                <section class="passport-notice-card review-delivery-card" aria-labelledby="review-delivery-heading">
+                    <div class="passport-notice-top">
+                        <strong id="review-delivery-heading">Delivery details</strong>
+                        <a class="review-edit-link" href="{{ url_for('citizen.apply_delivery', application_id=application.application_id) }}">Edit</a>
+                    </div>
+                    <dl class="passport-notice-meta">
+                        <div>
+                            <dt>Recipient</dt>
+                            <dd>{{ delivery.recipient_name or "Not provided" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Contact number</dt>
+                            <dd>{{ delivery.contact_number or "Not provided" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Barangay</dt>
+                            <dd>{{ delivery.barangay or "Not provided" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Delivery address</dt>
+                            <dd>{{ delivery_address or "Not provided" }}</dd>
+                        </div>
+                        {% if delivery.landmark %}
+                        <div>
+                            <dt>Landmark</dt>
+                            <dd>{{ delivery.landmark }}</dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                    <p class="passport-details-disclaimer">Home delivery is a demonstration record. No courier is dispatched.</p>
+                </section>
+                {% endif %}
+
                 {% if spec.local_office %}
                 <section class="passport-notice-card review-office-card" aria-labelledby="review-office-heading">
                     <div class="passport-notice-top">
@@ -275,7 +312,9 @@
                 <p>
                     {% if spec.kind in ['passport', 'philsys', 'nbi'] %}
                     Accept the terms, then continue to choose your demonstration appointment.
-                    {% elif spec.kind in ['barangay', 'residency'] %}
+                    {% elif spec.kind == 'barangay' %}
+                    Accept the terms, then continue to set your home delivery details.
+                    {% elif spec.kind == 'residency' %}
                     Accept the terms, then continue to pay the ₱50.00 processing fee.
                     {% elif spec.kind == 'senior' %}
                     Accept the terms, then continue to the free payment step for this new application.

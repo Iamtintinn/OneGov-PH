@@ -64,6 +64,8 @@ def read_details(application):
     }
     if raw.get("appointment"):
         details["appointment"] = raw["appointment"]
+    if raw.get("delivery"):
+        details["delivery"] = raw["delivery"]
     if raw.get("confirmation"):
         details["confirmation"] = raw["confirmation"]
     if raw.get("payment"):
@@ -98,6 +100,8 @@ def write_details(application, details, commit=True):
         payload["philsys_reviewed"] = True
     if details.get("appointment"):
         payload["appointment"] = details["appointment"]
+    if details.get("delivery"):
+        payload["delivery"] = details["delivery"]
     if details.get("confirmation"):
         payload["confirmation"] = details["confirmation"]
     if details.get("payment"):
@@ -1634,7 +1638,7 @@ def continue_target(application):
                 return "type"
         if not read_fields(application):
             return "details"
-        if missing_documents(application, spec):
+        if missing_documents(application, spec) and spec.get("kind") != "barangay":
             return "documents"
         reviewed = (
             barangay_review_ready(application)
@@ -1648,6 +1652,11 @@ def continue_target(application):
 
             if appointment_for(application) is None:
                 return "schedule"
+        if spec.get("kind") == "barangay":
+            from app.services.barangay_delivery import delivery_ready
+
+            if not delivery_ready(application):
+                return "delivery"
         return "payment"
     if spec.get("kind") == "senior":
         if spec.get("type_first") and not senior_type_ready(application):

@@ -1779,3 +1779,347 @@
         width: 100%;
     }
 }
+
+/* Delivery page layout */
+.delivery-content-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    width: 100%;
+}
+
+.delivery-form-panel {
+    min-width: 0;
+    flex: 1 1 auto;
+    padding: 1rem 1.05rem 1.1rem;
+}
+
+.delivery-form-panel .pay-panel-head {
+    margin-bottom: 0.75rem;
+}
+
+.delivery-summary-panel {
+    min-width: 0;
+    flex: 0 0 24rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.delivery-summary-card {
+    position: static;
+    order: 1;
+}
+
+.delivery-summary-card .passport-notice-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.delivery-summary-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.28rem 0.65rem;
+    border-radius: 999px;
+    border: 1px solid #d7e5f0;
+    background: #f3f8fc;
+    color: #005ea2;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+@media (max-width: 1080px) {
+    .delivery-content-wrapper {
+        flex-direction: column;
+    }
+
+    .delivery-summary-panel {
+        flex: 1 1 auto;
+        max-width: none;
+    }
+
+    .delivery-summary-card {
+        position: static;
+    }
+}
+
+@media (max-width: 900px) {
+    .delivery-page {
+        padding-inline: 0.9rem;
+    }
+}
+
+@media (max-width: 720px) {
+    .delivery-page {
+        padding-inline: 0.75rem;
+    }
+
+    .delivery-map-panel {
+        padding: 0.9rem;
+        border-radius: 16px;
+    }
+
+    .delivery-map {
+        height: clamp(15rem, 58vw, 20rem);
+    }
+
+    .delivery-content-wrapper {
+        gap: 1rem;
+    }
+
+    .delivery-form-panel {
+        padding: 0.85rem 0.9rem 0.95rem;
+    }
+
+    .delivery-summary-panel {
+        flex: 1 1 auto;
+    }
+}
+
+@media (max-width: 420px) {
+    .delivery-map {
+        height: 14.5rem;
+    }
+}
+
+/* Barangay delivery step */
+.delivery-page-wrap {
+    width: 100%;
+    max-width: none;
+    margin-inline: 0;
+    box-sizing: border-box;
+}
+
+.apply-card.delivery-page {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: clamp(1.1rem, 2.4vw, 1.9rem);
+    border: 1px solid #dbe6f1;
+    border-radius: 22px;
+    background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+    box-shadow: 0 18px 50px rgba(12, 46, 82, 0.09);
+}
+
+.delivery-page-hero {
+    align-items: center;
+}
+
+.delivery-map-panel {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 1.5rem;
+    padding: clamp(1rem, 2vw, 1.35rem);
+    border: 1px solid #dae7f3;
+    border-radius: 20px;
+    background: #ffffff;
+    box-shadow: 0 10px 30px rgba(15, 55, 95, 0.07);
+}
+
+.delivery-map-panel.is-confirmed {
+    border-color: #9fd6bf;
+    box-shadow: 0 10px 30px rgba(20, 110, 75, 0.1);
+}
+
+.delivery-map-panel-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.9rem;
+}
+
+.delivery-map-panel-title {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.delivery-map-panel-title h2 {
+    margin: 0 0 0.2rem;
+    font-size: 1.08rem;
+    color: #0c2e52;
+}
+
+.delivery-map-panel-title .field-help {
+    margin: 0;
+    max-width: 46rem;
+}
+
+.delivery-map-panel-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 2.4rem;
+    height: 2.4rem;
+    border-radius: 12px;
+    color: #005ea2;
+    background: #eaf4fd;
+    border: 1px solid #cfe4f5;
+}
+
+.delivery-map-frame {
+    position: relative;
+    width: 100%;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid #d7e5f0;
+    background: #e9f1f8;
+}
+
+.delivery-map {
+    width: 100%;
+    height: clamp(21rem, 34vw, 34rem);
+    min-height: 20rem;
+    border-radius: 16px;
+    z-index: 0;
+}
+
+.delivery-map-chip {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid #d7e5f0;
+    color: #0c2e52;
+    font-size: 0.74rem;
+    font-weight: 700;
+    box-shadow: 0 4px 14px rgba(12, 46, 82, 0.12);
+}
+
+.delivery-map-panel-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+    margin-top: 0.9rem;
+}
+
+.delivery-map-status {
+    margin: 0;
+    flex: 1 1 16rem;
+    min-width: 0;
+    color: #5a6b7d;
+    font-size: 0.86rem;
+    font-weight: 600;
+}
+
+.delivery-map-status.is-confirmed {
+    color: #146e4b;
+}
+
+.delivery-map-note {
+    margin: 0.75rem 0 0;
+    color: #7a8794;
+    font-size: 0.76rem;
+    line-height: 1.5;
+}
+
+.delivery-map-detect,
+.delivery-map-confirm {
+    white-space: nowrap;
+}
+
+.delivery-content-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    width: 100%;
+}
+
+.delivery-form-panel {
+    width: 100%;
+    box-sizing: border-box;
+    padding: clamp(1rem, 2vw, 1.4rem);
+    border: 1px solid #e0eaf4;
+    border-radius: 20px;
+    background: #ffffff;
+    box-shadow: 0 10px 30px rgba(15, 55, 95, 0.06);
+}
+
+.delivery-fields {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem 1.35rem;
+    margin-top: 0.4rem;
+}
+
+.delivery-fields .apply-field {
+    min-width: 0;
+}
+
+.delivery-summary-panel {
+    width: 100%;
+    flex: 1 1 auto;
+}
+
+.delivery-summary-card {
+    position: static;
+    width: 100%;
+}
+
+.delivery-page-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+    margin-top: 1.5rem;
+    padding-top: 1.15rem;
+    border-top: 1px solid #e6eef6;
+}
+
+@media (max-width: 1100px) {
+    .delivery-fields {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .delivery-map-panel-head,
+    .delivery-map-panel-foot {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .delivery-map-detect,
+    .delivery-map-confirm {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 700px) {
+    .delivery-fields {
+        grid-template-columns: 1fr;
+    }
+
+    .apply-card.delivery-page {
+        max-width: none;
+        border-radius: 18px;
+    }
+
+    .delivery-map {
+        height: clamp(16rem, 62vw, 22rem);
+        min-height: 15rem;
+    }
+}
+
+@media (max-width: 420px) {
+    .delivery-map {
+        height: 14.5rem;
+    }
+}

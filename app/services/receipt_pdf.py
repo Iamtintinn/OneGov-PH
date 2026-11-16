@@ -154,10 +154,6 @@ def write_receipt_pdf(path, data):
     else:
         detail_row("Amount", data.get("amount") or "—")
 
-    for label, value in data.get("payment_rows") or ():
-        cleaned = str(value or "").replace(" (demo)", "").replace("(demo)", "").strip()
-        detail_row(label, cleaned)
-
     bring_items = list(data.get("bring_items") or ())
     if bring_items:
         if y < 55 * mm:

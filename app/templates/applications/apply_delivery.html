@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+{% block title %}Delivery address · {{ service.service_name }} · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard{% endblock %}
+{% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+{% endblock %}
+{% block content %}
+<div class="dash-page site-width delivery-page-wrap">
+    <section class="apply-card pay-shell confirm-shell delivery-page" aria-labelledby="delivery-heading">
+        {% include "applications/_progress.html" %}
+
+        <header class="pay-hero confirm-hero delivery-page-hero">
+            <div class="pay-hero-copy">
+                <p class="pay-kicker">Home delivery</p>
+                <h1 id="delivery-heading">Where should we deliver your clearance?</h1>
+                <p class="welcome-text">
+                    Pin the exact delivery location on the map first, then complete the recipient and address details below. Barangay Clearance is delivered to this address only.
+                </p>
+            </div>
+            <div class="confirm-success-chip" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/></svg>
+                <span>Step {{ step }} of {{ step_labels|length }}</span>
+            </div>
+        </header>
+
+        <form class="apply-form delivery-page-form" method="post" action="{{ url_for('citizen.apply_delivery', application_id=application.application_id) }}" id="delivery-form" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="latitude" id="delivery-latitude" value="{{ values.latitude }}">
+            <input type="hidden" name="longitude" id="delivery-longitude" value="{{ values.longitude }}">
+            <input type="hidden" name="delivery_location_confirmed" id="delivery-location-confirmed" value="{{ 'yes' if values.location_confirmed else '' }}">
+
+            <section class="delivery-map-panel{% if values.location_confirmed %} is-confirmed{% endif %}" aria-labelledby="delivery-map-heading">
+                <div class="delivery-map-panel-head">
+                    <div class="delivery-map-panel-title">
+                        <span class="delivery-map-panel-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/></svg>
+                            </span>
+                        <div>
+                            <h2 id="delivery-map-heading">Pin the delivery location</h2>
+                            <p class="field-help">Select a demonstration barangay, then click the map or drag the pin to the exact delivery point.</p>
+                        </div>
+                    </div>
+                    <button class="dash-button apply-cancel pay-btn-ghost delivery-map-detect" type="button" id="detect-location">
+                        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8 3h-2.07A6 6 0 0 0 13 6.07V4h-2v2.07A6 6 0 0 0 6.07 11H4v2h2.07A6 6 0 0 0 11 17.93V20h2v-2.07A6 6 0 0 0 17.93 13H20v-2z"/></svg>
+                        <span>Use my current location</span>
+                    </button>
+                </div>
+
+                <div class="delivery-map-frame">
+                    <div id="map" class="delivery-map" role="application" aria-label="Delivery location map"></div>
+                    <span class="delivery-map-chip" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/></svg>
+                        <span>Quezon City · demo area</span>
+                    </span>
+                </div>
+
+                <div class="delivery-map-panel-foot">
+                    <p class="delivery-map-status{% if values.location_confirmed %} is-confirmed{% endif %}" id="location-status" role="status">
+                        {% if values.location_confirmed %}
+                        Delivery location confirmed.
+                        {% else %}
+                        No delivery location confirmed yet.
+                        {% endif %}
+                    </p>
+                    <button class="dash-button pay-btn-primary delivery-map-confirm" type="button" id="confirm-location">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg>
+                        <span>Confirm pinned location</span>
+                    </button>
+                </div>
+
+                {% if errors.get('latitude') %}<p class="field-error">{{ errors.latitude }}</p>{% endif %}
+                {% if errors.get('longitude') %}<p class="field-error">{{ errors.longitude }}</p>{% endif %}
+                {% if errors.get('location_confirmed') %}<p class="field-error">{{ errors.location_confirmed }}</p>{% endif %}
+                <p class="delivery-map-note">Map data uses OpenStreetMap. The saved pin is the delivery coordinate used for this prototype.</p>
+            </section>
+
+            <div class="delivery-content-wrapper">
+                <section class="delivery-form-panel">
+                    <div class="pay-panel-head confirm-panel-head">
+                        <span class="confirm-panel-icon confirm-panel-icon--maroon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4 0-8 2-8 4v2h16v-2c0-2-4-4-8-4z"/></svg>
+                        </span>
+                        <div>
+                            <h2>Recipient and address</h2>
+                            <p>Required fields are marked. The region, province, and city are fixed to the demonstration delivery area.</p>
+                        </div>
+                    </div>
+
+                    <div class="passport-details-fields delivery-fields">
+                        <div class="apply-field{% if errors.get('recipient_name') %} has-error{% endif %}">
+                            <label for="recipient_name">Recipient full name</label>
+                            <p class="field-help" id="recipient_name-help">Enter the name of the person who will receive the clearance.</p>
+                            <div class="text-input">
+                                <input id="recipient_name" name="recipient_name" type="text" maxlength="200" autocomplete="off" value="{{ values.recipient_name }}" required aria-describedby="recipient_name-help{% if errors.get('recipient_name') %} recipient_name-error{% endif %}">
+                            </div>
+                            {% if errors.get('recipient_name') %}<p class="field-error" id="recipient_name-error">{{ errors.recipient_name }}</p>{% endif %}
+                        </div>
+
+                        <div class="apply-field{% if errors.get('contact_number') %} has-error{% endif %}">
+                            <label for="contact_number">Contact number</label>
+                            <p class="field-help" id="contact_number-help">Enter the mobile or telephone number used for delivery updates.</p>
+                            <div class="text-input">
+                                <input id="contact_number" name="contact_number" type="tel" maxlength="20" autocomplete="off" value="{{ values.contact_number }}" required aria-describedby="contact_number-help{% if errors.get('contact_number') %} contact_number-error{% endif %}">
+                            </div>
+                            {% if errors.get('contact_number') %}<p class="field-error" id="contact_number-error">{{ errors.contact_number }}</p>{% endif %}
+                        </div>
+
+                        <div class="apply-field">
+                            <label for="delivery_region">Region</label>
+                            <div class="text-input">
+                                <input id="delivery_region" name="region" type="text" value="{{ delivery_region }}" readonly>
+                            </div>
+                            {% if errors.get('region') %}<p class="field-error">{{ errors.region }}</p>{% endif %}
+                        </div>
+
+                        <div class="apply-field">
+                            <label for="delivery_province">Province</label>
+                            <div class="text-input">
+                                <input id="delivery_province" name="province" type="text" value="{{ delivery_province }}" readonly>
+                            </div>
+                            {% if errors.get('province') %}<p class="field-error">{{ errors.province }}</p>{% endif %}
+                        </div>
+
+                        <div class="apply-field">
+                            <label for="delivery_city">City / municipality</label>
+                            <div class="text-input">
+                                <input id="delivery_city" name="city" type="text" value="{{ delivery_city }}" readonly>
+                            </div>
+                            {% if errors.get('city') %}<p class="field-error">{{ errors.city }}</p>{% endif %}
+                        </div>
+
+                        <div class="apply-field{% if errors.get('barangay') %} has-error{% endif %}">
+                            <label for="delivery_barangay">Barangay</label>
+                            <p class="field-help" id="delivery_barangay-help">Selecting a barangay centers the map on that demonstration area.</p>
+                            <div class="select-input">
+                                <select id="delivery_barangay" name="barangay" required aria-describedby="delivery_barangay-help{% if errors.get('barangay') %} delivery_barangay-error{% endif %}">
+                                    <option value="">Select barangay</option>
+                                    {% for item in barangay_options %}
+                                    <option value="{{ item.name }}" data-lat="{{ item.latitude }}" data-lng="{{ item.longitude }}" {% if values.barangay == item.name %}selected{% endif %}>{{ item.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% if errors.get('barangay') %}<p class="field-error" id="delivery_barangay-error">{{ errors.barangay }}</p>{% endif %}
+                        </div>
+
+                        <div class="apply-field{% if errors.get('house_number') %} has-error{% endif %}">
+                            <label for="house_number">House or building number</label>
+                            <div class="text-input">
+                                <input id="house_number" name="house_number" type="text" maxlength="120" autocomplete="off" value="{{ values.house_number }}" required>
+                            </div>
+                            {% if errors.get('house_number') %}<p class="field-error">{{ errors.house_number }}</p>{% endif %}
+                        </div>
+
+                        <div class="apply-field{% if errors.get('street') %} has-error{% endif %}">
+                            <label for="street">Street</label>
+                            <div class="text-input">
+                                <input id="street" name="street" type="text" maxlength="200" autocomplete="off" value="{{ values.street }}" required>
+                            </div>
+                            {% if errors.get('street') %}<p class="field-error">{{ errors.street }}</p>{% endif %}
+                        </div>
+
+                        <div class="apply-field">
+                            <label for="subdivision">Subdivision or purok <span class="optional">(optional)</span></label>
+                            <div class="text-input">
+                                <input id="subdivision" name="subdivision" type="text" maxlength="200" autocomplete="off" value="{{ values.subdivision }}">
+                            </div>
+                        </div>
+
+                        <div class="apply-field">
+                            <label for="landmark">Landmark <span class="optional">(optional)</span></label>
+                            <div class="text-input">
+                                <input id="landmark" name="landmark" type="text" maxlength="200" autocomplete="off" value="{{ values.landmark }}">
+                            </div>
+                        </div>
+
+                        <div class="apply-field">
+                            <label for="delivery_latitude_display">Latitude</label>
+                            <p class="field-help" id="delivery_latitude_help">Automatically set from the pinned map location.</p>
+                            <div class="text-input">
+                                <input id="delivery_latitude_display" type="text" value="{{ values.latitude }}" readonly aria-describedby="delivery_latitude_help">
+                            </div>
+                        </div>
+
+                        <div class="apply-field">
+                            <label for="delivery_longitude_display">Longitude</label>
+                            <p class="field-help" id="delivery_longitude_help">Automatically set from the pinned map location.</p>
+                            <div class="text-input">
+                                <input id="delivery_longitude_display" type="text" value="{{ values.longitude }}" readonly aria-describedby="delivery_longitude_help">
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <aside class="delivery-summary-panel">
+                    <div class="passport-notice-card delivery-summary-card" role="note">
+                        <div class="passport-notice-top">
+                            <strong>Delivery summary</strong>
+                            <span class="delivery-summary-badge">Home delivery</span>
+                        </div>
+                        <dl class="passport-notice-meta">
+                            <div>
+                                <dt>Barangay clearance fee</dt>
+                                <dd>₱50.00</dd>
+                            </div>
+                            <div>
+                                <dt>Home delivery</dt>
+                                <dd>{% if delivery_fee and delivery_fee > 0 %}₱{{ "%.2f"|format(delivery_fee) }}{% else %}Included (demo){% endif %}</dd>
+                            </div>
+                            <div>
+                                <dt>Total at payment</dt>
+                                <dd>₱{{ "%.2f"|format(delivery_fee + 50) }}</dd>
+                            </div>
+                            <div>
+                                <dt>Delivery coverage</dt>
+                                <dd>Quezon City demonstration barangays only</dd>
+                            </div>
+                        </dl>
+                        <p class="passport-details-disclaimer">This is a demonstration delivery record. No courier is dispatched.</p>
+                    </div>
+                </aside>
+            </div>
+
+            <div class="pay-actions apply-actions delivery-page-actions">
+                <a class="dash-button apply-cancel pay-btn-ghost" href="{{ url_for('citizen.apply_review', application_id=application.application_id) }}">Back</a>
+                <button class="dash-button dash-button-apply pay-btn-primary" type="submit">
+                    Continue to payment
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+                </button>
+            </div>
+        </form>
+    </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+window.ONE_GOV_DELIVERY = {
+    initialLat: {{ initial_lat|tojson }},
+    initialLng: {{ initial_lng|tojson }},
+    savedLat: {{ values.latitude|tojson }},
+    savedLng: {{ values.longitude|tojson }},
+    confirmed: {{ 'true' if values.location_confirmed else 'false' }}
+};
+</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+    var config = window.ONE_GOV_DELIVERY || {};
+    var mapElement = document.getElementById("map");
+    var latInput = document.getElementById("delivery-latitude");
+    var lngInput = document.getElementById("delivery-longitude");
+    var latDisplay = document.getElementById("delivery_latitude_display");
+    var lngDisplay = document.getElementById("delivery_longitude_display");
+    var confirmedInput = document.getElementById("delivery-location-confirmed");
+    var statusText = document.getElementById("location-status");
+    var confirmButton = document.getElementById("confirm-location");
+    var detectButton = document.getElementById("detect-location");
+    var barangaySelect = document.getElementById("delivery_barangay");
+    if (!mapElement || !window.L) {
+        return;
+    }
+
+    var map = L.map(mapElement).setView(
+        [Number(config.initialLat) || 14.5995, Number(config.initialLng) || 120.9842],
+        15
+    );
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+    var marker = null;
+
+    setTimeout(function () {
+        map.invalidateSize();
+    }, 200);
+
+    function setStatus(message) {
+        if (statusText) {
+            statusText.textContent = message;
+        }
+    }
+
+    function placeMarker(lat, lng, confirmed) {
+        latInput.value = Number(lat).toFixed(7);
+        lngInput.value = Number(lng).toFixed(7);
+        if (latDisplay) {
+            latDisplay.value = latInput.value;
+        }
+        if (lngDisplay) {
+            lngDisplay.value = lngInput.value;
+        }
+        confirmedInput.value = confirmed ? "yes" : "";
+        if (marker) {
+            marker.setLatLng([lat, lng]);
+        } else {
+            marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+            marker.on("dragend", function () {
+                var point = marker.getLatLng();
+                placeMarker(point.lat, point.lng, false);
+                setStatus("Pin moved. Press Confirm pinned location to save it.");
+            });
+        }
+        if (confirmed) {
+            setStatus("Delivery location confirmed.");
+        }
+    }
+
+    if (config.savedLat && config.savedLng) {
+        placeMarker(Number(config.savedLat), Number(config.savedLng), Boolean(config.confirmed));
+    } else {
+        placeMarker(
+            Number(config.initialLat) || 14.5995,
+            Number(config.initialLng) || 120.9842,
+            false
+        );
+        setStatus("Drag the pin or click the map to set your delivery point, then confirm.");
+    }
+
+    map.on("click", function (event) {
+        placeMarker(event.latlng.lat, event.latlng.lng, false);
+        setStatus("Pin placed. Press Confirm pinned location to save it.");
+    });
+
+    barangaySelect.addEventListener("change", function () {
+        var option = barangaySelect.options[barangaySelect.selectedIndex];
+        var lat = Number(option.getAttribute("data-lat"));
+        var lng = Number(option.getAttribute("data-lng"));
+        if (!lat || !lng) {
+            return;
+        }
+        map.setView([lat, lng], 14);
+        if (marker) {
+            map.removeLayer(marker);
+            marker = null;
+        }
+        latInput.value = "";
+        lngInput.value = "";
+        if (latDisplay) {
+            latDisplay.value = "";
+        }
+        if (lngDisplay) {
+            lngDisplay.value = "";
+        }
+        confirmedInput.value = "";
+        setStatus("Barangay selected. Click the map or drag the pin to the delivery point.");
+    });
+
+    confirmButton.addEventListener("click", function () {
+        if (!latInput.value || !lngInput.value) {
+            setStatus("Place the pin on the map first.");
+            return;
+        }
+        confirmedInput.value = "yes";
+        setStatus("Delivery location confirmed.");
+    });
+
+    detectButton.addEventListener("click", function () {
+        if (!navigator.geolocation) {
+            setStatus("Location detection is not available in this browser.");
+            return;
+        }
+        setStatus("Detecting your current location...");
+        navigator.geolocation.getCurrentPosition(function (position) {
+            var lat = position.coords.latitude;
+            var lng = position.coords.longitude;
+            map.setView([lat, lng], 16);
+            placeMarker(lat, lng, false);
+            setStatus("Current location pinned. Press Confirm pinned location to save it.");
+        }, function () {
+            setStatus("Current location could not be detected. Pin the address manually.");
+        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+    });
+
+    document.getElementById("delivery-form").addEventListener("submit", function (event) {
+        if (!confirmedInput.value) {
+            event.preventDefault();
+            setStatus("Confirm the pinned delivery location before continuing.");
+            mapElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    });
+})();
+</script>
+{% endblock %}
