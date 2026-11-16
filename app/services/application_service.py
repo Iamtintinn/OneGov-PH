@@ -1685,6 +1685,10 @@ def continue_target(application):
             return "documents"
         if not birth_review_ready(application):
             return "review"
+        from app.services.birth_delivery import delivery_ready
+
+        if not delivery_ready(application):
+            return "delivery"
         return "payment"
     if spec.get("kind") in {"cenomar", "sss"}:
         if not read_fields(application):

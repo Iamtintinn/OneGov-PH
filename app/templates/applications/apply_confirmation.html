@@ -1319,6 +1319,35 @@
                     </div>
                 </section>
 
+                {% if delivery %}
+                <section class="passport-notice-card review-delivery-card" aria-labelledby="birth-confirmation-delivery-heading">
+                    <div class="passport-notice-top">
+                        <strong id="birth-confirmation-delivery-heading">Delivery details</strong>
+                    </div>
+                    <dl class="passport-notice-meta">
+                        <div>
+                            <dt>Recipient</dt>
+                            <dd>{{ delivery.recipient_name or "Not provided" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Contact number</dt>
+                            <dd>{{ delivery.contact_number or "Not provided" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Delivery address</dt>
+                            <dd>{{ delivery_address or "Not provided" }}</dd>
+                        </div>
+                        {% if delivery.landmark %}
+                        <div>
+                            <dt>Landmark</dt>
+                            <dd>{{ delivery.landmark }}</dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                    <p class="passport-details-disclaimer">Home delivery is a demonstration record. No courier is dispatched.</p>
+                </section>
+                {% endif %}
+
                 <section class="pay-panel confirm-panel confirm-panel--payment">
                     <div class="pay-panel-head confirm-panel-head">
                         <span class="confirm-panel-icon confirm-panel-icon--gold" aria-hidden="true">

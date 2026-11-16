@@ -777,6 +777,25 @@ def apply_delivery(application_id):
             save_delivery,
             validate_delivery_form,
         )
+    elif kind == "birth":
+        if not birth_review_ready(application):
+            flash("Review your application before setting the delivery details.", "warning")
+            return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+        from app.services.birth_delivery import (
+            CITY,
+            DEFAULT_LAT,
+            DEFAULT_LNG,
+            DELIVERY_FEE,
+            DEMO_BARANGAYS,
+            PROVINCE,
+            REGION,
+            birth_center,
+            delivery_ready,
+            delivery_values,
+            save_delivery,
+            validate_delivery_form,
+        )
+        from app.services.birth_payment import payment_summary as birth_payment_summary
     elif kind == "residency":
         if not residency_review_ready(application):
             flash("Review your application before setting the delivery details.", "warning")
@@ -802,10 +821,7 @@ def apply_delivery(application_id):
     else:
         return redirect(url_for("citizen.application_continue", application_id=application.application_id))
 
-    if kind == "barangay":
-        values = delivery_values(application)
-    else:
-        values = delivery_values(application)
+    values = delivery_values(application)
     errors = {}
     if request.method == "POST":
         values, errors = validate_delivery_form(request.form)
@@ -826,6 +842,12 @@ def apply_delivery(application_id):
                 initial_lat, initial_lng = center
             else:
                 initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
+        elif kind == "birth":
+            center = birth_center(values.get("barangay") or field_map(application).get("barangay"))
+            if center:
+                initial_lat, initial_lng = center
+            else:
+                initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
         else:
             center = barangay_center(values.get("barangay") or field_map(application).get("barangay"))
             if center:
@@ -835,6 +857,9 @@ def apply_delivery(application_id):
 
     delivery_region_val = REGION
     context = _common(application, 5)
+    if kind == "birth":
+        birth_summary = birth_payment_summary(application)
+        context["birth_payment_summary"] = birth_summary
     context.update(
         {
             "values": values,
@@ -849,6 +874,8 @@ def apply_delivery(application_id):
             "initial_lng": initial_lng,
         }
     )
+    if kind == "birth":
+        context["delivery_fee"] = birth_summary["courier_fee"]
     return render_template("applications/apply_delivery.html", **context)
 
 
@@ -989,8 +1016,13 @@ def apply_payment(application_id):
         if not birth_review_ready(application):
             flash("Review your application before payment.", "warning")
             return redirect(url_for("citizen.apply_review", application_id=application.application_id))
-        payment_step = 5 if spec.get("type_first") else 4
-        back_endpoint = "citizen.apply_review"
+        from app.services.birth_delivery import delivery_ready
+
+        if not delivery_ready(application):
+            flash("Set your delivery details before payment.", "warning")
+            return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
+        payment_step = 6 if spec.get("type_first") else 5
+        back_endpoint = "citizen.apply_delivery"
         free_payment = False
     elif kind == "cenomar":
         from app.services.cenomar_payment import (
@@ -1302,6 +1334,17 @@ def apply_review(application_id):
         delivery = delivery_for(application)
         context["delivery"] = delivery
         context["delivery_address"] = delivery_address(delivery) if delivery else ""
+    elif spec.get("kind") == "birth":
+        from app.services.birth_confirmation_pdf import confirmation_id_for, ensure_confirmation_pdf
+        from app.services.birth_delivery import delivery_address, delivery_for
+        from app.services.birth_payment import payment_summary
+
+        ensure_confirmation_pdf(application)
+        context["summary"] = payment_summary(application)
+        context["confirmation_id"] = confirmation_id_for(application)
+        delivery = delivery_for(application)
+        context["delivery"] = delivery
+        context["delivery_address"] = delivery_address(delivery) if delivery else ""
     if spec.get("kind") == "philsys":
         from app.services.philsys_national_id import readiness_message
 
@@ -1396,7 +1439,7 @@ def apply_submit(application_id):
             mark_sss_reviewed(application)
         else:
             mark_barangay_reviewed(application)
-        if spec.get("kind") in {"barangay", "residency"}:
+        if spec.get("kind") in {"barangay", "residency", "birth"}:
             return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
         return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
     error = submit_application(application, current_user)
@@ -1554,11 +1597,16 @@ def apply_confirmation(application_id):
             context["appointment"] = (context["summary"] or {}).get("appointment")
     elif spec.get("kind") == "birth":
         from app.services.birth_confirmation_pdf import confirmation_id_for, ensure_confirmation_pdf
+        from app.services.birth_delivery import delivery_address, delivery_for
         from app.services.birth_payment import payment_summary
 
         ensure_confirmation_pdf(application)
         context["summary"] = payment_summary(application)
         context["confirmation_id"] = confirmation_id_for(application)
+        context["delivery"] = delivery_for(application)
+        context["delivery_address"] = (
+            delivery_address(context["delivery"]) if context["delivery"] else ""
+        )
     elif spec.get("kind") == "cenomar":
         from app.services.cenomar_confirmation_pdf import confirmation_id_for, ensure_confirmation_pdf
         from app.services.cenomar_payment import payment_summary

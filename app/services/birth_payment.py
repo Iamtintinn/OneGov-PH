@@ -41,6 +41,12 @@ def _is_reviewed(application):
     return bool(read_details(application).get("birth_reviewed"))
 
 
+def _delivery_is_ready(application):
+    from app.services.birth_delivery import delivery_ready
+
+    return delivery_ready(application)
+
+
 def _copy_count(application):
     raw = (field_map(application).get("copies") or "1").strip()
     try:
@@ -145,6 +151,8 @@ def finalize_birth_application(application, user, new_status):
         return "Upload every required document before you continue."
     if not _is_reviewed(application):
         return "Review your application before payment."
+    if not _delivery_is_ready(application):
+        return "Set your delivery details before payment."
     if application.application_status != "draft":
         return None
     now = _now()
@@ -205,6 +213,8 @@ def record_demo_payment(application, user, choice, online_method=None):
     """Record onsite or non-Maya simulated online payment and finalize the draft."""
     if not _is_reviewed(application):
         return "Review your application before payment."
+    if not _delivery_is_ready(application):
+        return "Set your delivery details before payment."
     existing = latest_payment(application)
     if application.application_status != "draft" and existing is not None:
         return None
@@ -267,6 +277,8 @@ def start_maya_checkout(application, user):
     """Create a pending Maya payment row and a sandbox checkout session."""
     if not _is_reviewed(application):
         return None, "Review your application before payment."
+    if not _delivery_is_ready(application):
+        return None, "Set your delivery details before payment."
     if application.application_status != "draft":
         return None, "This application is no longer awaiting payment."
 
