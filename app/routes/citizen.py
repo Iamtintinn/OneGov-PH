@@ -12,7 +12,7 @@ from app.models.notification import Notification
 from app.models.payment import Payment
 from app.models.service import Service
 from app.models.user import User
-from app.utils.decorators import role_required
+from app.utils.decorators import citizen_portal_required
 from app.utils.validators import clean_text, validate_name, normalize_contact_number
 
 PENDING_STATUSES = frozenset({
@@ -204,7 +204,10 @@ def _citizen_notifications(user_id):
 
 @citizen_bp.context_processor
 def citizen_navigation():
-    if not current_user.is_authenticated or current_user.role != User.ROLE_CITIZEN:
+    if not current_user.is_authenticated or current_user.role not in {
+        User.ROLE_CITIZEN,
+        User.ROLE_SYSTEM_ADMIN,
+    }:
         return {}
     notices, unread = _citizen_notifications(current_user.user_id)
     from app.services.application_forms import applicable_service_names, specification_for
@@ -248,7 +251,7 @@ def citizen_navigation():
 
 
 @citizen_bp.route("/citizen/dashboard")
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def dashboard():
     service_query = " ".join((request.args.get("q") or "").split())[:80]
     services = _active_services(service_query)
@@ -264,7 +267,7 @@ def dashboard():
 
 
 @citizen_bp.route("/citizen/applications/<int:application_id>")
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def application_detail(application_id):
     application = db.session.scalars(
         db.select(Application)
@@ -369,7 +372,7 @@ def application_detail(application_id):
 
 
 @citizen_bp.route("/citizen/services")
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def services():
     service_query = " ".join((request.args.get("q") or "").split())[:80]
     service_category = _service_category(request.args.get("category"))
@@ -390,7 +393,7 @@ def services():
 
 
 @citizen_bp.route("/citizen/applications")
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def applications():
     return render_template(
         "citizen/application_history.html",
@@ -401,7 +404,7 @@ def applications():
 
 
 @citizen_bp.route("/citizen/tracking")
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def tracking():
     applications = _owned_applications(current_user.user_id)
     from app.services.tracking_service import events_by_application as group_events
@@ -417,7 +420,7 @@ def tracking():
 
 
 @citizen_bp.route("/citizen/payments")
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def payments():
     records = db.session.scalars(
         db.select(Payment)
@@ -435,7 +438,7 @@ def payments():
 
 
 @citizen_bp.route("/citizen/notifications")
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def notifications():
     notices = db.session.scalars(
         db.select(Notification)
@@ -446,7 +449,7 @@ def notifications():
 
 
 @citizen_bp.route("/citizen/profile", methods=["GET", "POST"])
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def profile():
     errors = {}
     if request.method == "POST":
@@ -481,7 +484,7 @@ def profile():
 
 
 @citizen_bp.route("/citizen/settings", methods=["GET", "POST"])
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def settings():
     errors = {}
     if request.method == "POST":

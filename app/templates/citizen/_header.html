@@ -1,15 +1,23 @@
 {% set page = request.endpoint %}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap">
-<aside id="citizen-sidebar" class="dash-sidebar" aria-label="Citizen navigation">
+<aside id="citizen-sidebar" class="dash-sidebar" aria-label="{% if current_user.role == 'system_admin' %}Admin and citizen navigation{% else %}Citizen navigation{% endif %}">
     <a class="dash-brand sidebar-brand" href="{{ url_for('citizen.dashboard') }}">
         <img class="dash-logo" src="{{ url_for('static', filename='images/onegov-ph-logo-sidebar.png') }}" alt="" width="72" height="52">
         <span class="dash-brand-copy">
-            <span class="dash-brand-kicker">Citizen</span>
+            <span class="dash-brand-kicker">{% if current_user.role == 'system_admin' %}Admin / Citizen{% else %}Citizen{% endif %}</span>
             <span class="dash-brand-name">OneGov PH</span>
         </span>
     </a>
     <nav class="sidebar-nav" aria-label="Citizen">
         <ul>
+            {% if current_user.role == 'system_admin' %}
+            <li>
+                <a class="sidebar-link{% if page and page.startswith('admin.') %} is-active{% endif %}" href="{{ url_for('admin.dashboard') }}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>
+                    <span>Admin Console</span>
+                </a>
+            </li>
+            {% endif %}
             <li>
                 <a class="sidebar-link{% if page == 'citizen.dashboard' %} is-active{% endif %}" href="{{ url_for('citizen.dashboard') }}"{% if page == 'citizen.dashboard' %} aria-current="page"{% endif %}>
                     <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>

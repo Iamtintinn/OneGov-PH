@@ -75,7 +75,7 @@ from app.services.application_service import (
     validate_answers,
     write_details,
 )
-from app.utils.decorators import role_required
+from app.utils.decorators import citizen_portal_required
 from app.routes.citizen import STATUS_LABELS
 
 
@@ -128,7 +128,7 @@ def _common(application, step):
     }
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def apply_type(service_id):
     """Step 1 for type-first services: choose the application type."""
     service = _service_or_404(service_id)
@@ -247,7 +247,7 @@ def apply_type(service_id):
     )
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def apply_details(service_id):
     service = _service_or_404(service_id)
     draft = find_draft(current_user.user_id, service.service_id)
@@ -371,7 +371,7 @@ def validate_and_store(service, spec):
     return validate_answers(service, spec, request.form)
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def apply_documents(application_id):
     application = _draft_or_404(application_id)
     if application.application_status != "draft":
@@ -477,7 +477,7 @@ def apply_documents(application_id):
     return render_template("applications/apply_documents.html", **context)
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def upload_document(application_id, document_key):
     application = _draft_or_404(application_id)
     if application.application_status != "draft":
@@ -584,7 +584,7 @@ def upload_document(application_id, document_key):
     return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def remove_document(application_id, document_key):
     application = _draft_or_404(application_id)
     if application.application_status != "draft":
@@ -613,7 +613,7 @@ def remove_document(application_id, document_key):
     return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def continue_documents(application_id):
     application = _draft_or_404(application_id)
     if application.application_status != "draft":
@@ -658,7 +658,7 @@ def continue_documents(application_id):
     return redirect(url_for("citizen.apply_review", application_id=application.application_id))
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def apply_schedule(application_id):
     application = _draft_or_404(application_id)
     if application.application_status != "draft":
@@ -768,7 +768,7 @@ def apply_schedule(application_id):
     return render_template("applications/apply_schedule.html", **context)
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def apply_delivery(application_id):
     application = _draft_or_404(application_id)
     if application.application_status != "draft":
@@ -925,7 +925,7 @@ def apply_delivery(application_id):
     return render_template("applications/apply_delivery.html", **context)
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def apply_payment(application_id):
     application = _draft_or_404(application_id)
     if application.application_status != "draft":
@@ -1349,7 +1349,7 @@ def apply_maya_result(application_id):
     return _continue("citizen.apply_payment")
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def apply_review(application_id):
     application = _draft_or_404(application_id)
     if application.application_status != "draft":
@@ -1425,7 +1425,7 @@ def apply_review(application_id):
     return render_template("applications/apply_review.html", **context)
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def apply_submit(application_id):
     application = _draft_or_404(application_id)
     if request.form.get("accept_terms") != "yes":
@@ -1528,7 +1528,7 @@ def apply_submit(application_id):
     return redirect(url_for("citizen.apply_confirmation", application_id=application.application_id))
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def record_sss_tracking(application_id):
     """Store an SS Number or transaction number the citizen already received from SSS."""
     application = _draft_or_404(application_id)
@@ -1546,6 +1546,7 @@ def record_sss_tracking(application_id):
     return redirect(url_for("citizen.application_detail", application_id=application.application_id))
 
 
+@citizen_portal_required
 def record_cenomar_tracking(application_id):
     """Store a PSA reference the citizen already has. This does not submit the request to PSA."""
     application = _draft_or_404(application_id)
@@ -1563,7 +1564,7 @@ def record_cenomar_tracking(application_id):
     return redirect(url_for("citizen.application_detail", application_id=application.application_id))
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def record_philsys_reference(application_id):
     """Let the owner store a PSA reference later. This does not mark the person registered."""
     application = _draft_or_404(application_id)
@@ -1578,7 +1579,7 @@ def record_philsys_reference(application_id):
     return redirect(url_for("citizen.application_detail", application_id=application.application_id))
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def apply_cancel(application_id):
     application = owned_application(current_user.user_id, application_id)
     if application is None:
@@ -1595,7 +1596,7 @@ def apply_cancel(application_id):
     return redirect(url_for("citizen.application_detail", application_id=application.application_id))
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def apply_confirmation(application_id):
     application = _draft_or_404(application_id)
     if application.application_status == "draft":
@@ -1732,7 +1733,7 @@ def apply_confirmation(application_id):
     return render_template("applications/apply_confirmation.html", **context)
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def passport_confirmation_pdf(application_id):
     application = _draft_or_404(application_id)
     spec = specification_for(application.service, field_map(application))
@@ -1751,7 +1752,7 @@ def passport_confirmation_pdf(application_id):
     )
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def barangay_confirmation_pdf(application_id):
     application = _draft_or_404(application_id)
     spec = specification_for(application.service, field_map(application))
@@ -1771,7 +1772,7 @@ def barangay_confirmation_pdf(application_id):
     )
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def senior_confirmation_pdf(application_id):
     application = _draft_or_404(application_id)
     spec = specification_for(application.service, field_map(application))
@@ -1790,7 +1791,7 @@ def senior_confirmation_pdf(application_id):
     )
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def nbi_confirmation_pdf(application_id):
     application = _draft_or_404(application_id)
     spec = specification_for(application.service, field_map(application))
@@ -1809,7 +1810,7 @@ def nbi_confirmation_pdf(application_id):
     )
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def birth_confirmation_pdf(application_id):
     application = _draft_or_404(application_id)
     spec = specification_for(application.service, field_map(application))
@@ -1828,7 +1829,7 @@ def birth_confirmation_pdf(application_id):
     )
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def sss_confirmation_pdf(application_id):
     application = _draft_or_404(application_id)
     spec = specification_for(application.service, field_map(application))
@@ -1848,7 +1849,7 @@ def sss_confirmation_pdf(application_id):
     )
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def philsys_confirmation_pdf(application_id):
     application = _draft_or_404(application_id)
     spec = specification_for(application.service, field_map(application))
@@ -1867,7 +1868,7 @@ def philsys_confirmation_pdf(application_id):
     )
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def cenomar_confirmation_pdf(application_id):
     application = _draft_or_404(application_id)
     spec = specification_for(application.service, field_map(application))
@@ -1886,7 +1887,7 @@ def cenomar_confirmation_pdf(application_id):
     )
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def application_document(application_id, requirement_id):
     application = _draft_or_404(application_id)
     row = next(
@@ -1899,7 +1900,7 @@ def application_document(application_id, requirement_id):
     return send_file(path, as_attachment=False, download_name=row.remarks or path.name)
 
 
-@role_required(User.ROLE_CITIZEN)
+@citizen_portal_required
 def application_continue(application_id):
     application = _draft_or_404(application_id)
     target = continue_target(application)

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Government services · OneGov PH{% endblock %}
+{% block body_class %}admin-dashboard{% endblock %}
+{% block site_header %}{% include "admin/_header.html" %}{% endblock %}
+{% block content %}
+<div class="admin-main">
+    <header class="admin-page-heading">
+        <div><p class="admin-eyebrow">ADMINISTRATION / SERVICES</p><h1>Government services</h1><p>Manage availability and review requests by service.</p></div>
+        <span class="admin-count-chip">{{ service_rows|length }} configured</span>
+    </header>
+    <section class="admin-service-cards" aria-label="Government services">
+        {% for service, application_count in service_rows %}
+        <article class="admin-panel admin-service-card">
+            <div class="admin-service-card-top">
+                <span class="admin-service-mark admin-service-mark--large">{{ service.service_name[:1]|upper }}</span>
+                <span class="admin-status-pill admin-status-pill--{{ service.service_status }}">{{ service.service_status|title }}</span>
+            </div>
+            <p class="admin-eyebrow">{{ service.department.department_name if service.department else "Government service" }}</p>
+            <h2>{{ service.service_name }}</h2>
+            <p class="admin-service-description">{{ service.description or "No service description has been added." }}</p>
+            <div class="admin-service-meta">
+                <span><strong>{{ application_count }}</strong> applications</span>
+                <span>{% if service.processing_fee %}₱{{ "{:,.2f}".format(service.processing_fee) }}{% else %}No listed fee{% endif %}</span>
+            </div>
+            <div class="admin-service-actions">
+                <a class="admin-button admin-button--primary" href="{{ url_for('admin.applications', service=service.service_id) }}">View applications</a>
+                <form method="post" action="{{ url_for('admin.service_status', service_id=service.service_id) }}" onsubmit="return confirm('Change availability for {{ service.service_name|e }}?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="service_status" value="{{ 'inactive' if service.service_status == 'active' else 'active' }}">
+                    <button class="admin-button admin-button--quiet" type="submit">{{ "Deactivate" if service.service_status == "active" else "Activate" }}</button>
+                </form>
+            </div>
+        </article>
+        {% else %}
+        <div class="admin-panel"><p class="admin-empty">No government services are configured in the database.</p></div>
+        {% endfor %}
+    </section>
+</div>
+{% endblock %}

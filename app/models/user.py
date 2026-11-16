@@ -58,11 +58,18 @@ class User(UserMixin, db.Model):
         default="unverified",
         server_default="unverified",
     )
+    department_id = db.Column(
+        INTEGER(unsigned=True),
+        db.ForeignKey("departments.department_id"),
+    )
+    admin_permissions = db.Column(db.JSON)
     date_registered = db.Column(
         db.DateTime,
         nullable=False,
         server_default=db.text("CURRENT_TIMESTAMP"),
     )
+
+    department = db.relationship("Department", foreign_keys=[department_id])
 
     @property
     def is_active(self):
@@ -133,3 +140,34 @@ class User(UserMixin, db.Model):
 
     def __repr__(self):
         return f"<User {self.user_id} role={self.role} status={self.account_status}>"
+
+
+class AccountActivityLog(db.Model):
+    """Records administrator actions on accounts."""
+
+    __tablename__ = "account_activity_logs"
+
+    activity_id = db.Column(INTEGER(unsigned=True), primary_key=True, autoincrement=True)
+    target_user_id = db.Column(
+        INTEGER(unsigned=True),
+        db.ForeignKey("users.user_id"),
+        nullable=False,
+        index=True,
+    )
+    actor_user_id = db.Column(
+        INTEGER(unsigned=True),
+        db.ForeignKey("users.user_id"),
+        nullable=False,
+        index=True,
+    )
+    action = db.Column(db.String(80), nullable=False)
+    description = db.Column(db.String(500), nullable=False)
+    recorded_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        server_default=db.text("CURRENT_TIMESTAMP"),
+        index=True,
+    )
+
+    target_user = db.relationship("User", foreign_keys=[target_user_id])
+    actor_user = db.relationship("User", foreign_keys=[actor_user_id])

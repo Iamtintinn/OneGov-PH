@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Applications · OneGov PH{% endblock %}
+{% block body_class %}admin-dashboard{% endblock %}
+{% block site_header %}{% include "admin/_header.html" %}{% endblock %}
+{% block content %}
+<div class="admin-main">
+    <header class="admin-page-heading">
+        <div><p class="admin-eyebrow">WORKSPACE / REQUESTS</p><h1>Applications</h1><p>Search requests, review submissions, and manage their status.</p></div>
+    </header>
+    <section class="admin-panel admin-filter-panel">
+        <form class="admin-filter-form" method="get">
+            <label class="admin-search-field"><span class="visually-hidden">Search applications</span><input type="search" name="q" value="{{ search }}" placeholder="Tracking number or citizen name"></label>
+            <label><span class="visually-hidden">Filter by service</span><select name="service"><option value="">All services</option>{% for service in services %}<option value="{{ service.service_id }}" {% if selected_service == service.service_id|string %}selected{% endif %}>{{ service.service_name }}</option>{% endfor %}</select></label>
+            <label><span class="visually-hidden">Filter by status</span><select name="status"><option value="">All statuses</option>{% for status in statuses if status != 'draft' %}<option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ status_labels[status] }}</option>{% endfor %}</select></label>
+            <button class="admin-button admin-button--primary" type="submit">Filter</button>
+            {% if search or selected_status or selected_service %}<a class="admin-button admin-button--quiet" href="{{ url_for('admin.applications') }}">Clear</a>{% endif %}
+        </form>
+    </section>
+    <section class="admin-panel admin-table-panel">
+        <div class="admin-panel-heading"><div><p class="admin-eyebrow">LIVE DATABASE RECORDS</p><h2>Application requests</h2></div><span class="admin-count-chip">{{ applications|length }} shown</span></div>
+        {% if applications %}
+        <div class="admin-table-scroll">
+            <table class="admin-table">
+                <thead><tr><th>Tracking number</th><th>Citizen</th><th>Service</th><th>Submitted</th><th>Status</th><th>Payment</th><th></th></tr></thead>
+                <tbody>
+                    {% for application in applications %}
+                    {% set applicant = applicants.get(application.applicant_id) %}
+                    <tr>
+                        <td><strong class="admin-mono">{{ application.tracking_number }}</strong></td>
+                        <td>{{ applicant.full_name if applicant else "Unknown account" }}<small>{{ applicant.email if applicant else "" }}</small></td>
+                        <td>{{ application.service.service_name }}</td>
+                        <td>{{ application.submission_date.strftime("%d %b %Y") }}</td>
+                        <td><span class="admin-status-pill admin-status-pill--{{ application.application_status }}">{{ status_labels[application.application_status] }}</span></td>
+                        <td>{{ application.payment_status|replace("_", " ")|title if application.payment_status else "—" }}</td>
+                        <td><a class="admin-row-action" href="{{ url_for('admin.application_detail', application_id=application.application_id) }}">Review <span aria-hidden="true">→</span></a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="admin-empty">No applications match these filters.</p>
+        {% endif %}
+        {% if applications|length >= 200 %}<p class="admin-table-note">Showing the most recent 200 matching applications. Refine your search to find older requests.</p>{% endif %}
+    </section>
+</div>
+{% endblock %}

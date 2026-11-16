@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Review {{ application.tracking_number }} · OneGov PH{% endblock %}
+{% block body_class %}admin-dashboard{% endblock %}
+{% block site_header %}{% include "admin/_header.html" %}{% endblock %}
+{% block content %}
+<div class="admin-main">
+    <p class="admin-breadcrumb"><a href="{{ url_for('admin.applications') }}">Applications</a><span>/</span>{{ application.tracking_number }}</p>
+    <header class="admin-page-heading">
+        <div><p class="admin-eyebrow">{{ application.service.service_name }} / {{ application.tracking_number }}</p><h1>Application review</h1><p>Submitted {{ application.submission_date.strftime("%d %B %Y at %H:%M") }} · {{ applicant.full_name if applicant else "Citizen account unavailable" }}</p></div>
+        <span class="admin-status-pill admin-status-pill--{{ application.application_status }}">{{ status_labels[application.application_status] }}</span>
+    </header>
+    <div class="admin-detail-grid">
+        <div class="admin-detail-main">
+            <section class="admin-panel">
+                <div class="admin-panel-heading"><div><p class="admin-eyebrow">SUBMITTED FORM</p><h2>Application information</h2></div></div>
+                {% if fields %}
+                <dl class="admin-definition-list">
+                    {% for key, value in fields.items() %}
+                    {% if value is not none and value|string|trim %}
+                    <div><dt>{{ key|replace("_", " ")|title }}</dt><dd>{{ value }}</dd></div>
+                    {% endif %}
+                    {% endfor %}
+                </dl>
+                {% else %}<p class="admin-empty">No application details were saved.</p>{% endif %}
+                <div class="admin-applicant-strip"><span class="admin-avatar">{{ applicant.first_name[:1]|upper if applicant else "?" }}</span><div><strong>{{ applicant.full_name if applicant else "Unknown citizen" }}</strong><small>{{ applicant.email if applicant else "" }}{% if applicant and applicant.contact_number %} · {{ applicant.contact_number }}{% endif %}</small></div><a href="{{ url_for('admin.account_detail', user_id=applicant.user_id) if current_user.role == 'system_admin' and applicant else '#' }}">Account profile →</a></div>
+            </section>
+
+            <section class="admin-panel">
+                <div class="admin-panel-heading"><div><p class="admin-eyebrow">DOCUMENT CHECKLIST</p><h2>Submitted documents</h2></div><span class="admin-count-chip">{{ application.requirements|length }} files</span></div>
+                {% if application.requirements %}
+                <div class="admin-document-list">
+                    {% for requirement in application.requirements %}
+                    <article class="admin-document-row">
+                        <span class="admin-document-icon">▤</span>
+                        <div class="admin-document-copy"><strong>{{ requirement.requirement_name|replace("_", " ")|title }}</strong><small>{{ requirement.remarks or "No file name provided" }}</small><span class="admin-status-pill admin-status-pill--{{ requirement.verification_status }}">{{ requirement.verification_status|title }}</span></div>
+                        {% if requirement.uploaded_file %}<a class="admin-button admin-button--quiet" href="{{ url_for('admin.application_document', application_id=application.application_id, requirement_id=requirement.requirement_id) }}" target="_blank" rel="noopener">View file</a>{% else %}<span class="admin-muted">No upload</span>{% endif %}
+                        <form class="admin-document-review" method="post" action="{{ url_for('admin.update_requirement', application_id=application.application_id, requirement_id=requirement.requirement_id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <select name="verification_status" aria-label="Review status for {{ requirement.requirement_name }}">
+                                {% for value in ['pending', 'verified', 'rejected'] %}<option value="{{ value }}" {% if requirement.verification_status == value %}selected{% endif %}>{{ value|title }}</option>{% endfor %}
+                            </select>
+                            <input type="text" name="remarks" maxlength="500" value="{{ requirement.remarks or '' }}" placeholder="Review note or correction reason" aria-label="Document review note">
+                            <button class="admin-button admin-button--quiet" type="submit">Save review</button>
+                        </form>
+                    </article>
+                    {% endfor %}
+                </div>
+                {% else %}<p class="admin-empty">No document uploads are associated with this request.</p>{% endif %}
+            </section>
+
+            <section class="admin-panel">
+                <div class="admin-panel-heading"><div><p class="admin-eyebrow">AUDIT TRAIL</p><h2>Status history</h2></div></div>
+                {% if events %}
+                <div class="admin-history-list">{% for event in events %}<article class="admin-history-row"><span class="admin-history-marker"></span><div><strong>{{ status_labels[event.new_status] }}</strong><p>{{ event.update_description }}</p><small>{{ event.recorded_at.strftime("%d %b %Y, %H:%M") }} · {{ actors.get(event.updated_by, "System") if event.updated_by else "System" }}</small></div></article>{% endfor %}</div>
+                {% else %}<p class="admin-empty">No status updates have been recorded.</p>{% endif %}
+            </section>
+        </div>
+        <aside class="admin-detail-side">
+            <section class="admin-panel">
+                <div class="admin-panel-heading"><div><p class="admin-eyebrow">ADMIN ACTION</p><h2>Update request</h2></div></div>
+                <form class="admin-form-stack" method="post" action="{{ url_for('admin.update_application', application_id=application.application_id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <label>Application status<select name="application_status" required>{% for status in statuses if status != 'draft' %}<option value="{{ status }}" {% if application.application_status == status %}selected{% endif %}>{{ status_labels[status] }}</option>{% endfor %}</select></label>
+                    <label>Remarks / correction request<textarea name="remarks" maxlength="500" rows="5" placeholder="Explain the status update or tell the citizen what to correct."></textarea><small>Required for rejection or correction requests. Up to 500 characters.</small></label>
+                    <button class="admin-button admin-button--primary admin-button--full" type="submit" onclick="return confirm('Save this application status and notify the citizen?');">Save update</button>
+                </form>
+            </section>
+            <section class="admin-panel admin-payment-summary">
+                <p class="admin-eyebrow">PAYMENT RECORDS</p><h2>{{ application.payments|length }} payment(s)</h2>
+                {% for payment in application.payments %}
+                <div class="admin-payment-row"><span>{{ payment.payment_method|replace("_", " ")|title }}<small>{{ payment.payment_reference }}</small></span><strong>₱{{ "{:,.2f}".format(payment.amount) }}<small>{{ payment.payment_status|title }}</small></strong></div>
+                {% else %}<p class="admin-muted">No payment has been recorded.</p>{% endfor %}
+            </section>
+        </aside>
+    </div>
+</div>
+{% endblock %}

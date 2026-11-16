@@ -1,0 +1,68 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+<header class="admin-topbar">
+    <a class="admin-brand" href="{{ url_for('admin.dashboard') }}">
+        <img src="{{ url_for('static', filename='images/onegov-ph-logo-sidebar.png') }}" alt="" width="58" height="42">
+        <span><strong>OneGov PH</strong><small>ADMIN CONSOLE</small></span>
+    </a>
+    <div class="admin-topbar-right">
+        <span class="admin-live"><i></i> System online</span>
+        <span class="admin-user">{{ current_user.full_name }}</span>
+        <form method="post" action="{{ url_for('auth.logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="admin-logout">Sign out</button>
+        </form>
+    </div>
+</header>
+<aside class="admin-sidebar" aria-label="Administrator navigation">
+    <p class="admin-nav-label">WORKSPACE</p>
+    <a class="admin-nav-link{% if request.endpoint == 'admin.dashboard' %} is-active{% endif %}" href="{{ url_for('admin.dashboard') }}">
+        <span class="admin-nav-icon">◫</span> Dashboard
+    </a>
+    {% if current_user.role == 'system_admin' or 'services.manage' in (current_user.admin_permissions or []) %}
+    <a class="admin-nav-link{% if request.endpoint == 'admin.services' %} is-active{% endif %}" href="{{ url_for('admin.services') }}">
+        <span class="admin-nav-icon">▦</span> Government services
+    </a>
+    {% endif %}
+    {% if current_user.role == 'system_admin' or 'applications.review' in (current_user.admin_permissions or []) %}
+    <a class="admin-nav-link{% if request.endpoint in ['admin.applications', 'admin.application_detail', 'admin.application_document'] %} is-active{% endif %}" href="{{ url_for('admin.applications') }}">
+        <span class="admin-nav-icon">▤</span> Applications
+    </a>
+    {% endif %}
+    {% if current_user.role == 'system_admin' %}
+    <p class="admin-nav-label admin-nav-label--spaced">ADMINISTRATION</p>
+    <a class="admin-nav-link{% if request.endpoint in ['admin.accounts', 'admin.create_account', 'admin.account_detail'] %} is-active{% endif %}" href="{{ url_for('admin.accounts') }}">
+        <span class="admin-nav-icon">♙</span> Account management
+    </a>
+    {% endif %}
+    {% if current_user.role == 'system_admin' %}
+    <p class="admin-nav-label admin-nav-label--spaced">CITIZEN PORTAL</p>
+    <a class="admin-nav-link{% if request.endpoint == 'citizen.dashboard' %} is-active{% endif %}" href="{{ url_for('citizen.dashboard') }}">
+        <span class="admin-nav-icon">◫</span> Citizen dashboard
+    </a>
+    <a class="admin-nav-link{% if request.endpoint == 'citizen.services' %} is-active{% endif %}" href="{{ url_for('citizen.services') }}">
+        <span class="admin-nav-icon">▦</span> Government services
+    </a>
+    <a class="admin-nav-link{% if request.endpoint in ['citizen.applications', 'citizen.application_detail'] %} is-active{% endif %}" href="{{ url_for('citizen.applications') }}">
+        <span class="admin-nav-icon">▤</span> My applications
+    </a>
+    <a class="admin-nav-link{% if request.endpoint == 'citizen.tracking' %} is-active{% endif %}" href="{{ url_for('citizen.tracking') }}">
+        <span class="admin-nav-icon">◷</span> Application tracking
+    </a>
+    <a class="admin-nav-link{% if request.endpoint == 'citizen.payments' %} is-active{% endif %}" href="{{ url_for('citizen.payments') }}">
+        <span class="admin-nav-icon">₱</span> Payments
+    </a>
+    <a class="admin-nav-link{% if request.endpoint == 'citizen.notifications' %} is-active{% endif %}" href="{{ url_for('citizen.notifications') }}">
+        <span class="admin-nav-icon">♧</span> Notifications
+    </a>
+    <a class="admin-nav-link{% if request.endpoint == 'citizen.profile' %} is-active{% endif %}" href="{{ url_for('citizen.profile') }}">
+        <span class="admin-nav-icon">♙</span> My profile
+    </a>
+    <a class="admin-nav-link{% if request.endpoint == 'citizen.settings' %} is-active{% endif %}" href="{{ url_for('citizen.settings') }}">
+        <span class="admin-nav-icon">⚙</span> Settings
+    </a>
+    {% endif %}
+    <div class="admin-sidebar-footer">
+        <span class="admin-avatar">{{ current_user.first_name[:1]|upper }}</span>
+        <span><strong>{{ current_user.first_name }}</strong><small>{{ current_user.role_label }}</small></span>
+    </div>
+</aside>

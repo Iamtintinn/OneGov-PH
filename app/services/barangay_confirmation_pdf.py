@@ -102,9 +102,12 @@ def ensure_confirmation_pdf(application):
             if delivery.get("landmark"):
                 delivery_rows += (("Landmark", delivery["landmark"]),)
     elif kind == "residency":
-        from app.services.residency_delivery import delivery_address, delivery_for
+        from app.services.residency_delivery import (
+            delivery_address as residency_delivery_address,
+            delivery_for as residency_delivery_for,
+        )
 
-        delivery = delivery_for(application)
+        delivery = residency_delivery_for(application)
         if delivery:
             delivery_rows = (
                 (
@@ -115,7 +118,7 @@ def ensure_confirmation_pdf(application):
                     "Contact number",
                     delivery.get("contact_number") or answers.get("contact_number") or "",
                 ),
-                ("Delivery address", delivery_address(delivery)),
+                ("Delivery address", residency_delivery_address(delivery)),
             )
             if delivery.get("landmark"):
                 delivery_rows += (("Landmark", delivery["landmark"]),)

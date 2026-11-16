@@ -5,12 +5,13 @@ from app.models.notification import Notification
 from app.models.passport_appointment import PassportAppointment
 from app.models.payment import Payment
 from app.models.service import Service
-from app.models.user import User
+from app.models.user import AccountActivityLog, User
 
 __all__ = [
     "Application",
     "ApplicationEvent",
     "ApplicationRequirement",
+    "AccountActivityLog",
     "Department",
     "NbiAppointment",
     "Notification",

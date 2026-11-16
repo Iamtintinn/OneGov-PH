@@ -1,21 +1,84 @@
 {% extends "base.html" %}
-{% block title %}{{ page_title }} · OneGov PH{% endblock %}
+{% block title %}Admin dashboard · OneGov PH{% endblock %}
+{% block body_class %}admin-dashboard{% endblock %}
+{% block site_header %}{% include "admin/_header.html" %}{% endblock %}
 {% block content %}
-<section class="page">
-    <div class="site-width">
-        <p class="kicker">{{ current_user.role_label }}</p>
-        <h1>{{ page_title }}</h1>
-        <p class="lede">{{ page_text }}</p>
-        <dl class="summary">
-            <div>
-                <dt>Name</dt>
-                <dd>{{ current_user.full_name }}</dd>
+<div class="admin-main">
+    <header class="admin-page-heading">
+        <div>
+            <p class="admin-eyebrow">OVERVIEW / SYSTEM</p>
+            <h1>Good day, {{ current_user.first_name }}</h1>
+            <p>Here’s the latest activity across OneGov PH services.</p>
+        </div>
+        <span class="admin-date">{{ current_date.strftime("%A, %d %B %Y") }}</span>
+    </header>
+
+    <section class="admin-stat-grid" aria-label="Platform statistics">
+        <article class="admin-stat-card"><span class="admin-stat-icon admin-icon-blue">♙</span><span class="admin-stat-label">Total citizens</span><strong>{{ "{:,}".format(total_citizens) }}</strong><small>Registered citizen accounts</small></article>
+        <article class="admin-stat-card"><span class="admin-stat-icon admin-icon-violet">▦</span><span class="admin-stat-label">Government services</span><strong>{{ "{:,}".format(total_services) }}</strong><small>Configured services</small></article>
+        <article class="admin-stat-card"><span class="admin-stat-icon admin-icon-teal">▤</span><span class="admin-stat-label">Applications</span><strong>{{ "{:,}".format(total_applications) }}</strong><small>All recorded requests</small></article>
+        <article class="admin-stat-card"><span class="admin-stat-icon admin-icon-amber">◷</span><span class="admin-stat-label">Pending requests</span><strong>{{ "{:,}".format(pending_applications) }}</strong><small>Awaiting action</small></article>
+        <article class="admin-stat-card"><span class="admin-stat-icon admin-icon-green">✓</span><span class="admin-stat-label">Completed</span><strong>{{ "{:,}".format(completed_applications) }}</strong><small>Completed applications</small></article>
+        <article class="admin-stat-card"><span class="admin-stat-icon admin-icon-pink">₱</span><span class="admin-stat-label">Payments</span><strong>{{ "{:,}".format(total_payments) }}</strong><small>₱{{ "{:,.2f}".format(paid_amount) }} recorded as paid</small></article>
+    </section>
+
+    <div class="admin-dashboard-grid">
+        <section class="admin-panel admin-chart-panel">
+            <div class="admin-panel-heading">
+                <div><p class="admin-eyebrow">LAST 7 DAYS</p><h2>Application activity</h2></div>
+                <a class="admin-text-link" href="{{ url_for('admin.applications') }}">View applications <span aria-hidden="true">→</span></a>
             </div>
-            <div>
-                <dt>Role</dt>
-                <dd>{{ current_user.role_label }}</dd>
+            <div class="admin-chart" role="img" aria-label="Submitted applications during the last seven days">
+                {% for day in weekly_activity %}
+                <div class="admin-chart-column">
+                    <span class="admin-chart-value">{{ day.count }}</span>
+                    <div class="admin-chart-track"><i style="height: {{ (day.count / max_daily * 100)|round|int }}%"></i></div>
+                    <span class="admin-chart-label">{{ day.label }}</span>
+                </div>
+                {% endfor %}
             </div>
-        </dl>
+        </section>
+
+        <section class="admin-panel admin-quick-panel">
+            <div class="admin-panel-heading"><div><p class="admin-eyebrow">SHORTCUTS</p><h2>Quick actions</h2></div></div>
+            <a class="admin-quick-link" href="{{ url_for('admin.applications', status='submitted') }}"><span class="admin-quick-icon admin-icon-amber">◷</span><span><strong>Review new requests</strong><small>{{ pending_applications }} pending requests</small></span><b>→</b></a>
+            <a class="admin-quick-link" href="{{ url_for('admin.services') }}"><span class="admin-quick-icon admin-icon-violet">▦</span><span><strong>Manage services</strong><small>Review service availability</small></span><b>→</b></a>
+            <a class="admin-quick-link" href="{{ url_for('admin.accounts') }}"><span class="admin-quick-icon admin-icon-blue">♙</span><span><strong>Manage accounts</strong><small>Citizens and staff accounts</small></span><b>→</b></a>
+        </section>
     </div>
-</section>
+
+    <div class="admin-dashboard-grid admin-dashboard-grid--lower">
+        <section class="admin-panel">
+            <div class="admin-panel-heading"><div><p class="admin-eyebrow">LATEST UPDATES</p><h2>Recent activity</h2></div><a class="admin-text-link" href="{{ url_for('admin.applications') }}">All activity <span aria-hidden="true">→</span></a></div>
+            {% if recent_events %}
+            <div class="admin-activity-list">
+                {% for event in recent_events %}
+                <a class="admin-activity-row" href="{{ url_for('admin.application_detail', application_id=event.application_id) }}">
+                    <span class="admin-activity-dot"></span>
+                    <span class="admin-activity-copy"><strong>{{ event.application.service.service_name }} · {{ event.application.tracking_number }}</strong><small>{{ event.update_description }}{% if event.updated_by %} · {{ activity_users.get(event.updated_by, "Staff") }}{% endif %}</small></span>
+                    <time>{{ event.recorded_at.strftime("%d %b, %H:%M") }}</time>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="admin-empty">No application activity has been recorded yet.</p>
+            {% endif %}
+        </section>
+
+        <section class="admin-panel">
+            <div class="admin-panel-heading"><div><p class="admin-eyebrow">SERVICE DIRECTORY</p><h2>Government services</h2></div><a class="admin-text-link" href="{{ url_for('admin.services') }}">Manage <span aria-hidden="true">→</span></a></div>
+            <div class="admin-service-list">
+                {% for service, application_count in service_rows %}
+                <a class="admin-service-row" href="{{ url_for('admin.applications', service=service.service_id) }}">
+                    <span class="admin-service-mark">{{ service.service_name[:1]|upper }}</span>
+                    <span><strong>{{ service.service_name }}</strong><small>{{ application_count }} application{% if application_count != 1 %}s{% endif %}</small></span>
+                    <i class="admin-status-dot admin-status-dot--{{ service.service_status }}"></i>
+                </a>
+                {% else %}
+                <p class="admin-empty">No services are configured in the database.</p>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+</div>
 {% endblock %}

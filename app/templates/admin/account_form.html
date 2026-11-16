@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}{{ heading }} · OneGov PH{% endblock %}
+{% block body_class %}admin-dashboard{% endblock %}
+{% block site_header %}{% include "admin/_header.html" %}{% endblock %}
+{% block content %}
+<div class="admin-main">
+    <p class="admin-breadcrumb"><a href="{{ url_for('admin.accounts') }}">Accounts</a><span>/</span>{{ heading }}</p>
+    <header class="admin-page-heading">
+        <div><p class="admin-eyebrow">ADMINISTRATION / ACCOUNT PROFILE</p><h1>{{ heading }}</h1><p>{% if account %}Review profile information, access, and activity history.{% else %}Create a citizen or staff account with an initial role and permissions.{% endif %}</p></div>
+        {% if account %}<span class="admin-status-pill admin-status-pill--{{ account.account_status }}">{{ account.account_status|title }}</span>{% endif %}
+    </header>
+    {% if temporary_password %}
+    <section class="admin-panel admin-secret-panel" role="status">
+        <p class="admin-eyebrow">ONE-TIME TEMPORARY PASSWORD</p>
+        <h2>Copy this password now</h2>
+        <p>It is shown only in this response. Share it securely and have the account holder change it after signing in.</p>
+        <code>{{ temporary_password }}</code>
+    </section>
+    {% endif %}
+    {% if errors %}
+    <div class="admin-error-summary" role="alert"><strong>Check the highlighted information.</strong><ul>{% for message in errors.values() %}<li>{{ message }}</li>{% endfor %}</ul></div>
+    {% endif %}
+    <section class="admin-panel">
+        <div class="admin-panel-heading"><div><p class="admin-eyebrow">ACCOUNT INFORMATION</p><h2>Profile and access</h2></div></div>
+        <form class="admin-account-form" method="post" action="{{ url_for('admin.account_detail', user_id=account.user_id) if account else url_for('admin.create_account') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% if account %}<input type="hidden" name="action" value="update">{% endif %}
+            <div class="admin-form-grid">
+                <label>First name<input name="first_name" value="{{ form.first_name }}" maxlength="80" required>{% if errors.first_name %}<small class="admin-field-error">{{ errors.first_name }}</small>{% endif %}</label>
+                <label>Middle name<input name="middle_name" value="{{ form.middle_name }}" maxlength="80">{% if errors.middle_name %}<small class="admin-field-error">{{ errors.middle_name }}</small>{% endif %}</label>
+                <label>Last name<input name="last_name" value="{{ form.last_name }}" maxlength="80" required>{% if errors.last_name %}<small class="admin-field-error">{{ errors.last_name }}</small>{% endif %}</label>
+                <label>Email address<input type="email" name="email" value="{{ form.email }}" maxlength="255" required>{% if errors.email %}<small class="admin-field-error">{{ errors.email }}</small>{% endif %}</label>
+                <label>Contact number<input type="tel" name="contact_number" value="{{ form.contact_number }}" maxlength="20">{% if errors.contact_number %}<small class="admin-field-error">{{ errors.contact_number }}</small>{% endif %}</label>
+                <label class="admin-form-span">Address<input name="address" value="{{ form.address }}" maxlength="500">{% if errors.address %}<small class="admin-field-error">{{ errors.address }}</small>{% endif %}</label>
+                <label>Role<select name="role" id="account-role" required>{% for role in roles %}<option value="{{ role }}" {% if form.role == role %}selected{% endif %}>{{ role_labels[role] }}</option>{% endfor %}</select>{% if errors.role %}<small class="admin-field-error">{{ errors.role }}</small>{% endif %}</label>
+                <label>Account status<select name="account_status" required>{% for status in account_statuses %}<option value="{{ status }}" {% if form.account_status == status %}selected{% endif %}>{{ status|title }}</option>{% endfor %}</select>{% if errors.account_status %}<small class="admin-field-error">{{ errors.account_status }}</small>{% endif %}</label>
+                <label class="admin-staff-field">Department<select name="department_id"><option value="">Select a department</option>{% for department in departments %}<option value="{{ department.department_id }}" {% if form.department_id == department.department_id|string %}selected{% endif %}>{{ department.department_name }}</option>{% endfor %}</select>{% if errors.department_id %}<small class="admin-field-error">{{ errors.department_id }}</small>{% endif %}</label>
+                <fieldset class="admin-staff-field admin-permissions-field">
+                    <legend>Staff permissions</legend>
+                    <div class="admin-permission-grid">{% for key, label in permission_options %}<label><input type="checkbox" name="permissions" value="{{ key }}" {% if key in form.permissions %}checked{% endif %}> {{ label }}</label>{% endfor %}</div>
+                    {% if errors.permissions %}<small class="admin-field-error">{{ errors.permissions }}</small>{% endif %}
+                </fieldset>
+            </div>
+            <div class="admin-form-actions"><a class="admin-button admin-button--quiet" href="{{ url_for('admin.accounts') }}">Back to accounts</a><button class="admin-button admin-button--primary" type="submit" onclick="return confirm('{{ 'Save these account changes?' if account else 'Create this account?' }}');">{{ "Save account changes" if account else "Create account" }}</button></div>
+        </form>
+    </section>
+
+    {% if account %}
+    <section class="admin-panel admin-password-panel">
+        <div><p class="admin-eyebrow">CREDENTIALS</p><h2>Secure password reset</h2><p>Generate a new temporary password. The current password cannot be viewed.</p></div>
+        <form method="post" action="{{ url_for('admin.account_detail', user_id=account.user_id) }}" onsubmit="return confirm('Reset this account password? The current password will stop working.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="reset_password">
+            <button class="admin-button admin-button--danger" type="submit">Reset password</button>
+        </form>
+    </section>
+
+    <section class="admin-panel admin-table-panel">
+        <div class="admin-panel-heading"><div><p class="admin-eyebrow">ACCOUNT HISTORY</p><h2>Applications</h2></div><span class="admin-count-chip">{{ account_applications|length }} shown</span></div>
+        {% if account_applications %}
+        <div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Tracking number</th><th>Service</th><th>Submitted</th><th>Status</th><th>Payment</th><th></th></tr></thead><tbody>
+        {% for application in account_applications %}<tr><td><strong class="admin-mono">{{ application.tracking_number }}</strong></td><td>{{ application.service.service_name }}</td><td>{{ application.submission_date.strftime("%d %b %Y") }}</td><td><span class="admin-status-pill admin-status-pill--{{ application.application_status }}">{{ status_labels[application.application_status] }}</span></td><td>{{ application.payment_status|replace("_", " ")|title if application.payment_status else "—" }}</td><td><a class="admin-row-action" href="{{ url_for('admin.application_detail', application_id=application.application_id) }}">Review →</a></td></tr>{% endfor %}
+        </tbody></table></div>
+        {% else %}<p class="admin-empty">No applications are linked to this account.</p>{% endif %}
+    </section>
+
+    <section class="admin-panel">
+        <div class="admin-panel-heading"><div><p class="admin-eyebrow">SECURITY AUDIT</p><h2>Account activity log</h2></div></div>
+        {% if activity %}
+        <div class="admin-history-list">{% for item in activity %}<article class="admin-history-row"><span class="admin-history-marker"></span><div><strong>{{ item.action|replace("_", " ")|title }}</strong><p>{{ item.description }}</p><small>{{ item.recorded_at.strftime("%d %b %Y, %H:%M") }} · By {{ item.actor_user.full_name }}</small></div></article>{% endfor %}</div>
+        {% else %}<p class="admin-empty">No account management actions have been recorded.</p>{% endif %}
+    </section>
+    {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+(function () {
+    var role = document.getElementById("account-role");
+    if (!role) return;
+    var staffFields = document.querySelectorAll(".admin-staff-field");
+    function syncRoleFields() {
+        var staffRole = role.value === "department_staff" || role.value === "department_supervisor";
+        staffFields.forEach(function (field) {
+            field.hidden = !staffRole;
+            field.querySelectorAll("input, select").forEach(function (input) {
+                input.disabled = !staffRole;
+            });
+        });
+    }
+    role.addEventListener("change", syncRoleFields);
+    syncRoleFields();
+})();
+</script>
+{% endblock %}

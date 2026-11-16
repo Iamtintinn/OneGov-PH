@@ -91,6 +91,8 @@ class ApplicationEvent(db.Model):
     updated_by = db.Column(INTEGER(unsigned=True), db.ForeignKey("users.user_id"))
     recorded_at = db.Column(db.DateTime, nullable=False)
 
+    application = db.relationship("Application", foreign_keys=[application_id])
+
     def __repr__(self):
         return f"<ApplicationEvent {self.tracking_id} application={self.application_id}>"
 
