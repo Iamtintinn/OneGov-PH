@@ -650,7 +650,7 @@ def apply_schedule(application_id):
     values = field_map(application)
     spec = specification_for(application.service, values)
     kind = spec.get("kind")
-    if kind not in {"passport", "nbi", "philsys", "barangay", "residency", "senior"}:
+    if kind not in {"passport", "nbi", "philsys", "barangay", "senior"}:
         return redirect(url_for("citizen.apply_review", application_id=application.application_id))
     if missing_documents(application, spec) and kind != "barangay":
         flash("Upload every required document before scheduling.", "warning")
@@ -683,15 +683,6 @@ def apply_schedule(application_id):
             location_by_code,
             save_appointment,
         )
-    elif kind == "residency":
-        reviewed = residency_review_ready(application)
-        if not reviewed:
-            flash("Review your application before scheduling.", "warning")
-            return redirect(url_for("citizen.apply_review", application_id=application.application_id))
-        if not read_fields(application):
-            flash("Complete the application details before scheduling.", "warning")
-            return redirect(url_for("citizen.apply_details", service_id=application.service_id))
-        return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
     elif kind == "senior":
         if not senior_type_ready(application):
             flash("Select an application type before scheduling.", "warning")
@@ -840,10 +831,7 @@ def apply_delivery(application_id):
             else:
                 initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
 
-    if kind == "barangay":
-        delivery_region_val = REGION
-    else:
-        delivery_region_val = DEMO_BARANGAYS[0]["name"] if DEMO_BARANGAYS else ""
+    delivery_region_val = REGION
     context = _common(application, 5)
     context.update(
         {
@@ -1038,13 +1026,16 @@ def apply_payment(application_id):
         if not reviewed:
             flash("Review your application before payment.", "warning")
             return redirect(url_for("citizen.apply_review", application_id=application.application_id))
-        if kind == "barangay":
-            from app.services.barangay_delivery import delivery_ready
+        if kind in {"barangay", "residency"}:
+            if kind == "barangay":
+                from app.services.barangay_delivery import delivery_ready
+            else:
+                from app.services.residency_delivery import delivery_ready
 
             if not delivery_ready(application):
                 flash("Set your delivery details before payment.", "warning")
                 return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
-        if kind in {"barangay", "residency"} and spec.get("review_before_schedule"):
+        if kind == "barangay" and spec.get("review_before_schedule"):
             from app.services.barangay_scheduling import appointment_for
 
             if appointment_for(application) is None:
@@ -1052,7 +1043,7 @@ def apply_payment(application_id):
                 return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
             payment_step = 6 if spec.get("type_first") else 5
             back_endpoint = "citizen.apply_schedule"
-        elif kind == "barangay":
+        elif kind in {"barangay", "residency"}:
             payment_step = 6
             back_endpoint = "citizen.apply_delivery"
         else:
@@ -1300,8 +1291,11 @@ def apply_review(application_id):
     context["requirements"] = {item.requirement_name: item for item in application.requirements}
     context["checklist"] = read_checklist(application)
     context["terms"] = spec.get("terms") or TERMS_TEXT
-    if spec.get("kind") == "barangay":
-        from app.services.barangay_delivery import delivery_address, delivery_for
+    if spec.get("kind") in {"barangay", "residency"}:
+        if spec.get("kind") == "barangay":
+            from app.services.barangay_delivery import delivery_address, delivery_for
+        else:
+            from app.services.residency_delivery import delivery_address, delivery_for
 
         delivery = delivery_for(application)
         context["delivery"] = delivery
@@ -1355,25 +1349,17 @@ def apply_submit(application_id):
         if spec.get("review_before_schedule"):
             return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
         return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
-    if spec.get("kind") in {"barangay", "residency"} and spec.get("review_before_schedule"):
-        if missing_documents(application, spec) and spec.get("kind") != "barangay":
+    if spec.get("kind") == "barangay" and spec.get("review_before_schedule"):
+        if missing_documents(application, spec):
             flash("Upload every required document before scheduling.", "warning")
             return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
         if not read_fields(application):
             flash("Complete the application details before scheduling.", "warning")
             return redirect(url_for("citizen.apply_details", service_id=application.service_id))
-        type_ready = (
-            barangay_type_ready(application)
-            if spec.get("kind") == "barangay"
-            else residency_type_ready(application)
-        )
-        if not type_ready:
+        if not barangay_type_ready(application):
             flash("Select an application type before scheduling.", "warning")
             return redirect(url_for("citizen.apply_type", service_id=application.service_id))
-        if spec.get("kind") == "residency":
-            mark_residency_reviewed(application)
-        else:
-            mark_barangay_reviewed(application)
+        mark_barangay_reviewed(application)
         return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
     if spec.get("kind") == "senior" and spec.get("review_before_schedule"):
         if missing_documents(application, spec):
@@ -1408,7 +1394,7 @@ def apply_submit(application_id):
             mark_sss_reviewed(application)
         else:
             mark_barangay_reviewed(application)
-        if spec.get("kind") == "barangay":
+        if spec.get("kind") in {"barangay", "residency"}:
             return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
         return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
     error = submit_application(application, current_user)

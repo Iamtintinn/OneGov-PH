@@ -418,7 +418,7 @@
                         </span>
                         <div>
                             <h2 id="brgy-delivery-heading">Home delivery</h2>
-                            <p>Your clearance will be delivered to the details below. No courier is dispatched in this demonstration.</p>
+                            <p>Your {% if spec.kind == 'residency' %}certificate{% else %}clearance{% endif %} will be delivered to the details below. No courier is dispatched in this demonstration.</p>
                         </div>
                     </div>
                     <div class="confirm-info-grid">

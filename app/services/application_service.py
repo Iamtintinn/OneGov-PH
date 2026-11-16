@@ -1652,8 +1652,11 @@ def continue_target(application):
 
             if appointment_for(application) is None:
                 return "schedule"
-        if spec.get("kind") == "barangay":
-            from app.services.barangay_delivery import delivery_ready
+        if spec.get("kind") in {"barangay", "residency"}:
+            if spec.get("kind") == "barangay":
+                from app.services.barangay_delivery import delivery_ready
+            else:
+                from app.services.residency_delivery import delivery_ready
 
             if not delivery_ready(application):
                 return "delivery"
