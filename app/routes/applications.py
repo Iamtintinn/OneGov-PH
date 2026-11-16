@@ -791,6 +791,8 @@ def apply_delivery(application_id):
             LAT_MAX,
             LNG_MIN,
             LNG_MAX,
+            PROVINCE,
+            REGION,
             delivery_ready,
             delivery_values,
             residency_center,
