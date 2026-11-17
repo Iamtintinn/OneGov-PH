@@ -11,7 +11,7 @@
         <form class="admin-filter-form" method="get">
             <label class="admin-search-field"><span class="visually-hidden">Search applications</span><input type="search" name="q" value="{{ search }}" placeholder="Tracking number or citizen name"></label>
             <label><span class="visually-hidden">Filter by service</span><select name="service"><option value="">All services</option>{% for service in services %}<option value="{{ service.service_id }}" {% if selected_service == service.service_id|string %}selected{% endif %}>{{ service.service_name }}</option>{% endfor %}</select></label>
-            <label><span class="visually-hidden">Filter by status</span><select name="status"><option value="">All statuses</option>{% for status in statuses if status != 'draft' %}<option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ status_labels[status] }}</option>{% endfor %}</select></label>
+            <label><span class="visually-hidden">Filter by status</span><select name="status"><option value="">All statuses</option>{% for status in statuses %}<option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ status_labels[status] }}</option>{% endfor %}</select></label>
             <button class="admin-button admin-button--primary" type="submit">Filter</button>
             {% if search or selected_status or selected_service %}<a class="admin-button admin-button--quiet" href="{{ url_for('admin.applications') }}">Clear</a>{% endif %}
         </form>

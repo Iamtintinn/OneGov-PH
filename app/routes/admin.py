@@ -456,14 +456,25 @@ def dashboard():
 @role_required(User.ROLE_SYSTEM_ADMIN, User.ROLE_DEPARTMENT_STAFF, User.ROLE_DEPARTMENT_SUPERVISOR)
 def services():
     _require_permission("services.manage")
+    search = clean_text(request.args.get("q"))[:80]
     query = (
         db.select(Service, func.count(Application.application_id))
         .outerjoin(Application, Application.service_id == Service.service_id)
         .group_by(Service.service_id)
         .order_by(Service.service_name)
     )
-    service_rows = db.session.execute(visible_service_query(query)).all()
-    return render_template("admin/manage_services.html", service_rows=service_rows)
+    query = visible_service_query(query)
+    if search:
+        pattern = f"%{search}%"
+        query = query.where(
+            or_(
+                Service.service_name.ilike(pattern),
+                Service.description.ilike(pattern),
+                Service.department.has(Department.department_name.ilike(pattern)),
+            )
+        )
+    service_rows = db.session.execute(query).all()
+    return render_template("admin/manage_services.html", service_rows=service_rows, search=search)
 
 
 @admin_bp.route("/admin/services/<int:service_id>/status", methods=["POST"])
@@ -498,6 +509,8 @@ def applications():
         )
     if status in APPLICATION_STATUSES:
         query = query.where(Application.application_status == status)
+    else:
+        query = query.where(Application.application_status != "draft")
     service_id = int(service_raw) if service_raw.isdigit() else None
     if service_id:
         query = query.where(Application.service_id == service_id)

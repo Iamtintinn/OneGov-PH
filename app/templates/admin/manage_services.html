@@ -8,6 +8,13 @@
         <div><p class="admin-eyebrow">ADMINISTRATION / SERVICES</p><h1>Government services</h1><p>Manage availability and review requests by service.</p></div>
         <span class="admin-count-chip">{{ service_rows|length }} configured</span>
     </header>
+    <section class="admin-panel admin-filter-panel">
+        <form class="admin-filter-form" method="get">
+            <label class="admin-search-field"><span class="visually-hidden">Search government services</span><input type="search" name="q" value="{{ search }}" placeholder="Service name, department, or description"></label>
+            <button class="admin-button admin-button--primary" type="submit">Search</button>
+            {% if search %}<a class="admin-button admin-button--quiet" href="{{ url_for('admin.services') }}">Clear</a>{% endif %}
+        </form>
+    </section>
     <section class="admin-service-cards" aria-label="Government services">
         {% for service, application_count in service_rows %}
         <article class="admin-panel admin-service-card">
@@ -32,7 +39,7 @@
             </div>
         </article>
         {% else %}
-        <div class="admin-panel"><p class="admin-empty">No government services are configured in the database.</p></div>
+        <div class="admin-panel"><p class="admin-empty">{% if search %}No government services match your search.{% else %}No government services are configured in the database.{% endif %}</p></div>
         {% endfor %}
     </section>
 </div>
