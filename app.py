@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from flask import Flask, render_template, request
-from flask_login import LoginManager
+from flask import Flask, flash, redirect, render_template, request, url_for
+from flask_login import LoginManager, current_user
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -41,6 +41,16 @@ def create_app():
         if account is None or account.account_status != "active":
             return None
         return account
+
+    @application.before_request
+    def require_temporary_password_change():
+        if request.endpoint in {"static", "auth.login", "auth.logout", "auth.change_password"}:
+            return
+        if request.path.startswith("/webhooks/"):
+            return
+        if current_user.is_authenticated and current_user.must_change_password:
+            flash("Change your temporary password before continuing.", "warning")
+            return redirect(url_for("auth.change_password"))
 
     @application.before_request
     def protect_post_requests():

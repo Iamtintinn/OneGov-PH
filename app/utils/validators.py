@@ -37,6 +37,21 @@ def validate_name(value, label, required=True, max_length=80):
     return name, None
 
 
+def validate_new_password(password, confirm_password):
+    errors = {}
+    if not password:
+        errors["password"] = "Password is required."
+    elif not 8 <= len(password) <= 128:
+        errors["password"] = "Use a password between 8 and 128 characters."
+    elif not re.search(r"[A-Za-z]", password) or not re.search(r"\d", password):
+        errors["password"] = "Use at least one letter and one number."
+    if not confirm_password:
+        errors["confirm_password"] = "Confirm your password."
+    elif password != confirm_password:
+        errors["confirm_password"] = "Passwords do not match."
+    return errors
+
+
 def validate_registration(data, password, confirm_password):
     errors = {}
 
@@ -65,17 +80,7 @@ def validate_registration(data, password, confirm_password):
     elif not contact_digits.isdigit() or not 10 <= len(contact_digits) <= 15:
         errors["contact_number"] = "Enter a valid contact number."
 
-    if not password:
-        errors["password"] = "Password is required."
-    elif not 8 <= len(password) <= 128:
-        errors["password"] = "Use a password between 8 and 128 characters."
-    elif not re.search(r"[A-Za-z]", password) or not re.search(r"\d", password):
-        errors["password"] = "Use at least one letter and one number."
-
-    if not confirm_password:
-        errors["confirm_password"] = "Confirm your password."
-    elif password != confirm_password:
-        errors["confirm_password"] = "Passwords do not match."
+    errors.update(validate_new_password(password, confirm_password))
 
     cleaned = {
         "first_name": first_name or "",

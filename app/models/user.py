@@ -9,7 +9,9 @@ class User(UserMixin, db.Model):
     ROLE_CITIZEN = "citizen"
     ROLE_DEPARTMENT_STAFF = "department_staff"
     ROLE_DEPARTMENT_SUPERVISOR = "department_supervisor"
+    ROLE_DEPARTMENT_ADMIN = ROLE_DEPARTMENT_SUPERVISOR
     ROLE_SYSTEM_ADMIN = "system_admin"
+    TEMPORARY_PASSWORD_FLAG = "must_change_password"
     ROLES = (
         ROLE_CITIZEN,
         ROLE_DEPARTMENT_STAFF,
@@ -24,7 +26,7 @@ class User(UserMixin, db.Model):
     ROLE_LABELS = {
         ROLE_CITIZEN: "Citizen",
         ROLE_DEPARTMENT_STAFF: "Department staff",
-        ROLE_DEPARTMENT_SUPERVISOR: "Department supervisor",
+        ROLE_DEPARTMENT_SUPERVISOR: "Department administrator",
         ROLE_SYSTEM_ADMIN: "System administrator",
     }
 
@@ -92,6 +94,27 @@ class User(UserMixin, db.Model):
     def set_password(self, password):
         """Store a Werkzeug hash. The plaintext password is not kept."""
         self.password_hash = generate_password_hash(password)
+
+    @property
+    def must_change_password(self):
+        permissions = self.admin_permissions if isinstance(self.admin_permissions, dict) else {}
+        return bool(permissions.get(self.TEMPORARY_PASSWORD_FLAG))
+
+    def require_password_change(self):
+        if isinstance(self.admin_permissions, dict):
+            permissions = dict(self.admin_permissions)
+        else:
+            permissions = {key: True for key in (self.admin_permissions or ())}
+        permissions[self.TEMPORARY_PASSWORD_FLAG] = True
+        self.admin_permissions = permissions
+
+    def clear_password_change_requirement(self):
+        if isinstance(self.admin_permissions, dict):
+            permissions = dict(self.admin_permissions)
+        else:
+            permissions = {key: True for key in (self.admin_permissions or ())}
+        permissions.pop(self.TEMPORARY_PASSWORD_FLAG, None)
+        self.admin_permissions = permissions or None
 
     def check_password(self, password):
         if not self.password_hash:

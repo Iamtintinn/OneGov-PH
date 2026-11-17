@@ -14,7 +14,12 @@ from app.models.service import Service
 from app.models.user import User
 from app.utils.decorators import citizen_portal_required
 from app.utils.portal import portal_url_for as url_for
-from app.utils.validators import clean_text, validate_name, normalize_contact_number
+from app.utils.validators import (
+    clean_text,
+    normalize_contact_number,
+    validate_name,
+    validate_new_password,
+)
 
 PENDING_STATUSES = frozenset({
     "submitted",
@@ -171,18 +176,7 @@ def _active_services(term="", category=""):
 
 
 def _password_errors(password, confirm_password):
-    errors = {}
-    if not password:
-        errors["password"] = "Password is required."
-    elif not 8 <= len(password) <= 128:
-        errors["password"] = "Use a password between 8 and 128 characters."
-    elif not re.search(r"[A-Za-z]", password) or not re.search(r"\d", password):
-        errors["password"] = "Use at least one letter and one number."
-    if not confirm_password:
-        errors["confirm_password"] = "Confirm your password."
-    elif password != confirm_password:
-        errors["confirm_password"] = "Passwords do not match."
-    return errors
+    return validate_new_password(password, confirm_password)
 
 
 def _citizen_notifications(user_id):

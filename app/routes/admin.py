@@ -23,7 +23,13 @@ from app.models.service import Service
 from app.models.user import AccountActivityLog, User
 from app.services.application_service import absolute_upload, field_map
 from app.utils.decorators import role_required
-from app.utils.validators import clean_text, normalize_email, normalize_contact_number, validate_name
+from app.utils.validators import (
+    clean_text,
+    normalize_contact_number,
+    normalize_email,
+    validate_name,
+    validate_new_password,
+)
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -36,6 +42,14 @@ def admin_navigation():
 
 PENDING_STATUSES = ("submitted", "under_review", "pending_documents", "for_payment")
 ACCOUNT_STATUSES = ("active", "inactive", "suspended")
+CREATION_ROLES = (
+    (User.ROLE_CITIZEN, "Citizen"),
+    (User.ROLE_DEPARTMENT_ADMIN, "Department Administrator"),
+    (User.ROLE_SYSTEM_ADMIN, "System Admin"),
+)
+CREATION_ROLE_LABELS = dict(CREATION_ROLES)
+DEPARTMENT_ADMIN_PERMISSIONS = ("applications.review", "services.manage")
+DEPARTMENT_ADMIN_DEPARTMENTS = ("DFA", "LGU", "NBI", "PSA", "SSS")
 PERMISSION_OPTIONS = (
     ("applications.review", "Review applications"),
     ("services.manage", "Manage government services"),
@@ -193,7 +207,100 @@ def _account_form_from_request():
     }, errors
 
 
+def _generate_temporary_password():
+    alphabet = string.ascii_letters + string.digits + "!@#%"
+    characters = [
+        secrets.choice(string.ascii_letters),
+        secrets.choice(string.digits),
+        secrets.choice("!@#%"),
+    ]
+    characters.extend(secrets.choice(alphabet) for _ in range(21))
+    secrets.SystemRandom().shuffle(characters)
+    return "".join(characters)
+
+
+def _creation_form_values():
+    return {
+        "first_name": "",
+        "middle_name": "",
+        "last_name": "",
+        "email": "",
+        "contact_number": "",
+        "address": "",
+        "role": User.ROLE_CITIZEN,
+        "department_id": "",
+        "password_mode": "generate",
+        "confirm_create": "",
+    }
+
+
+def _creation_form_from_request(department_ids):
+    first_name, first_error = validate_name(request.form.get("first_name"), "First name")
+    middle_name, middle_error = validate_name(
+        request.form.get("middle_name"), "Middle name", required=False
+    )
+    last_name, last_error = validate_name(request.form.get("last_name"), "Last name")
+    email = normalize_email(request.form.get("email"))
+    contact_number = normalize_contact_number(request.form.get("contact_number"))
+    address = clean_text(request.form.get("address"))
+    role = clean_text(request.form.get("role"))
+    department_raw = clean_text(request.form.get("department_id"))
+    password_mode = clean_text(request.form.get("password_mode"))
+    custom_password = request.form.get("password") or ""
+    confirm_password = request.form.get("confirm_password") or ""
+
+    errors = {
+        key: message
+        for key, message in (
+            ("first_name", first_error),
+            ("middle_name", middle_error),
+            ("last_name", last_error),
+        )
+        if message
+    }
+    if not email or len(email) > 255 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        errors["email"] = "Enter a valid email address."
+    if not contact_number:
+        errors["contact_number"] = "Contact number is required."
+    elif not 10 <= len(contact_number.lstrip("+")) <= 15:
+        errors["contact_number"] = "Enter a valid contact number."
+    if len(address) > 500:
+        errors["address"] = "Use no more than 500 characters."
+    if role not in dict(CREATION_ROLES):
+        errors["role"] = "Choose a valid account role."
+
+    department_id = None
+    if role == User.ROLE_DEPARTMENT_ADMIN:
+        if not department_raw.isdigit() or int(department_raw) not in department_ids:
+            errors["department_id"] = "Choose an active department."
+        else:
+            department_id = int(department_raw)
+
+    if password_mode not in {"generate", "custom"}:
+        errors["password_mode"] = "Choose how the temporary password will be set."
+    elif password_mode == "custom":
+        errors.update(validate_new_password(custom_password, confirm_password))
+
+    if clean_text(request.form.get("confirm_create")).lower() not in {"yes", "on", "true", "1"}:
+        errors["confirm_create"] = "Confirm that you want to create this account."
+
+    return {
+        "first_name": first_name or "",
+        "middle_name": middle_name or "",
+        "last_name": last_name or "",
+        "email": email,
+        "contact_number": contact_number,
+        "address": address,
+        "role": role,
+        "department_id": department_raw,
+        "password_mode": password_mode,
+        "temporary_password": custom_password if password_mode == "custom" else "",
+        "department": department_id,
+    }, errors
+
+
 def _record_account_form(user, form, action):
+    required_password_change = user.must_change_password
     user.set_name(form["first_name"], form["last_name"], form["middle_name"])
     user.email = form["email"]
     user.contact_number = form["contact_number"] or None
@@ -202,6 +309,8 @@ def _record_account_form(user, form, action):
     user.account_status = form["account_status"]
     user.department_id = form["department_id"]
     user.admin_permissions = form["admin_permissions"]
+    if required_password_change:
+        user.require_password_change()
     _record_account_activity(
         user,
         action,
@@ -210,6 +319,8 @@ def _record_account_form(user, form, action):
 
 
 def _account_form_values(user=None):
+    permissions = list(user.admin_permissions or ()) if user else []
+    permissions = [value for value in permissions if value != User.TEMPORARY_PASSWORD_FLAG]
     return {
         "first_name": user.first_name if user else "",
         "middle_name": user.middle_name if user else "",
@@ -220,7 +331,7 @@ def _account_form_values(user=None):
         "role": user.role if user else User.ROLE_DEPARTMENT_STAFF,
         "account_status": user.account_status if user else "active",
         "department_id": str(user.department_id or "") if user else "",
-        "permissions": list(user.admin_permissions or ()) if user else [],
+        "permissions": permissions,
     }
 
 
@@ -524,6 +635,83 @@ def accounts():
     )
 
 
+@admin_bp.route("/admin/account-creation", methods=["GET", "POST"])
+@role_required(User.ROLE_SYSTEM_ADMIN)
+def account_creation():
+    departments = db.session.scalars(
+        db.select(Department)
+        .where(
+            Department.department_status == "active",
+            Department.department_name.in_(DEPARTMENT_ADMIN_DEPARTMENTS),
+        )
+        .order_by(Department.department_name)
+    ).all()
+    department_ids = {department.department_id for department in departments}
+    form = _creation_form_values()
+    errors = {}
+    temporary_password = None
+    created_account = None
+    if request.method == "POST":
+        form, errors = _creation_form_from_request(department_ids)
+        if not errors:
+            duplicate = db.session.scalar(
+                db.select(User.user_id).where(User.email == form["email"])
+            )
+            if duplicate is not None:
+                errors["email"] = "An account with this email already exists."
+        if not errors:
+            temporary_password = form["temporary_password"] or _generate_temporary_password()
+            account = User(
+                email=form["email"],
+                contact_number=form["contact_number"],
+                address=form["address"] or None,
+                role=form["role"],
+                account_status="active",
+                email_verification_status="unverified",
+                department_id=form["department"],
+            )
+            account.set_name(form["first_name"], form["last_name"], form["middle_name"])
+            account.set_password(temporary_password)
+            account.require_password_change()
+            if form["role"] == User.ROLE_DEPARTMENT_ADMIN:
+                account.admin_permissions = {
+                    permission: True for permission in DEPARTMENT_ADMIN_PERMISSIONS
+                }
+                account.require_password_change()
+            db.session.add(account)
+            try:
+                db.session.flush()
+                _record_account_activity(
+                    account,
+                    "account_created",
+                    f"Account created by {current_user.full_name} with role {CREATION_ROLE_LABELS[account.role]}"
+                    + (
+                        f" for {account.department.department_name}."
+                        if account.department
+                        else "."
+                    ),
+                )
+                db.session.commit()
+            except IntegrityError:
+                db.session.rollback()
+                temporary_password = None
+                errors["email"] = "An account with this email already exists."
+            else:
+                created_account = account
+                flash("Account created. Share the credentials shown below securely.", "success")
+                form = _creation_form_values()
+    return render_template(
+        "admin/account_creation.html",
+        form=form,
+        errors=errors,
+        departments=departments,
+        roles=CREATION_ROLES,
+        role_labels=CREATION_ROLE_LABELS,
+        temporary_password=temporary_password,
+        created_account=created_account,
+    )
+
+
 @admin_bp.route("/admin/accounts/new", methods=["GET", "POST"])
 @role_required(User.ROLE_SYSTEM_ADMIN)
 def create_account():
@@ -554,6 +742,7 @@ def create_account():
             )
             account.set_name(form["first_name"], form["last_name"], form["middle_name"])
             account.set_password(temporary_password)
+            account.require_password_change()
             db.session.add(account)
             try:
                 db.session.flush()
@@ -637,6 +826,7 @@ def account_detail(user_id):
                 for _ in range(24)
             )
             account.set_password(temporary_password)
+            account.require_password_change()
             _record_account_activity(
                 account,
                 "password_reset",

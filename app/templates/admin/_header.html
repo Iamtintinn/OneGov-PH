@@ -49,6 +49,12 @@
                     <span>Account Management</span>
                 </a>
             </li>
+            <li>
+                <a class="sidebar-link{% if page == 'admin.account_creation' %} is-active{% endif %}" href="{{ url_for('admin.account_creation') }}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3"></circle><path d="M4 19c1.2-2.7 3.4-4 6-4 1 0 1.9.2 2.7.6"></path><path d="M18 12v8"></path><path d="M14 16h8"></path></svg>
+                    <span>Account Creation</span>
+                </a>
+            </li>
         </ul>
 
         <p class="sidebar-section-label">Admin Portal</p>

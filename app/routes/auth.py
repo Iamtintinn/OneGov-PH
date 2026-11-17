@@ -1,11 +1,16 @@
 from flask import Blueprint, flash, redirect, render_template, request, url_for
-from flask_login import current_user, logout_user
+from flask_login import current_user, login_required, logout_user
 from sqlalchemy.exc import IntegrityError
 
 from app import db
-from app.models.user import User
+from app.models.user import AccountActivityLog, User
 from app.utils.helpers import establish_session, home_endpoint_for_role
-from app.utils.validators import clean_text, normalize_email, validate_registration
+from app.utils.validators import (
+    clean_text,
+    normalize_email,
+    validate_new_password,
+    validate_registration,
+)
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -100,6 +105,34 @@ def register():
                 return redirect(url_for("citizen.dashboard"))
 
     return render_template("auth/register.html", form=form, errors=errors)
+
+
+@auth_bp.route("/change-password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    errors = {}
+    if request.method == "POST":
+        current_password = request.form.get("current_password") or ""
+        password = request.form.get("password") or ""
+        confirm_password = request.form.get("confirm_password") or ""
+        if not current_user.check_password(current_password):
+            errors["current_password"] = "Current password is incorrect."
+        errors.update(validate_new_password(password, confirm_password))
+        if not errors:
+            current_user.set_password(password)
+            current_user.clear_password_change_requirement()
+            db.session.add(
+                AccountActivityLog(
+                    target_user_id=current_user.user_id,
+                    actor_user_id=current_user.user_id,
+                    action="password_changed",
+                    description=f"Password changed by {current_user.full_name}.",
+                )
+            )
+            db.session.commit()
+            flash("Your password has been updated.", "success")
+            return redirect(url_for(home_endpoint_for_role(current_user.role)))
+    return render_template("auth/change_password.html", errors=errors)
 
 
 @auth_bp.route("/logout", methods=["POST"])
