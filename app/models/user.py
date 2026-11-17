@@ -6,6 +6,7 @@ from app import db
 
 
 class User(UserMixin, db.Model):
+    DEPARTMENT_ADMIN_DEPARTMENTS = ("DFA", "LGU", "NBI", "PSA", "SSS")
     ROLE_CITIZEN = "citizen"
     ROLE_DEPARTMENT_STAFF = "department_staff"
     ROLE_DEPARTMENT_SUPERVISOR = "department_supervisor"
@@ -79,6 +80,10 @@ class User(UserMixin, db.Model):
 
     @property
     def role_label(self):
+        if self.role == self.ROLE_DEPARTMENT_SUPERVISOR:
+            name = self.department.department_name if self.department else ""
+            if name in self.DEPARTMENT_ADMIN_DEPARTMENTS:
+                return f"{name} Administrator"
         return self.ROLE_LABELS.get(self.role, "Account")
 
     def get_id(self):

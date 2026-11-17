@@ -70,6 +70,12 @@ def create_app():
 
         return {"url_for": portal_url_for}
 
+    @application.context_processor
+    def inject_access_context():
+        from app.utils.access import access_context, department_role_label
+
+        return {**access_context(), "department_role_label": department_role_label}
+
     @application.errorhandler(413)
     def request_too_large(_error):
         return render_template(

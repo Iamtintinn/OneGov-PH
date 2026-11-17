@@ -22,7 +22,15 @@ from app.models.payment import Payment
 from app.models.service import Service
 from app.models.user import AccountActivityLog, User
 from app.services.application_service import absolute_upload, field_map
-from app.utils.decorators import role_required
+from app.utils.access import (
+    is_department_admin,
+    is_system_admin,
+    managed_account_query,
+    visible_application_query,
+    visible_payment_query,
+    visible_service_query,
+)
+from app.utils.decorators import admin_console_required, role_required
 from app.utils.validators import (
     clean_text,
     normalize_contact_number,
@@ -49,7 +57,7 @@ CREATION_ROLES = (
 )
 CREATION_ROLE_LABELS = dict(CREATION_ROLES)
 DEPARTMENT_ADMIN_PERMISSIONS = ("applications.review", "services.manage")
-DEPARTMENT_ADMIN_DEPARTMENTS = ("DFA", "LGU", "NBI", "PSA", "SSS")
+DEPARTMENT_ADMIN_DEPARTMENTS = User.DEPARTMENT_ADMIN_DEPARTMENTS
 PERMISSION_OPTIONS = (
     ("applications.review", "Review applications"),
     ("services.manage", "Manage government services"),
@@ -110,10 +118,10 @@ def _log_application_event(application, previous_status, description):
 
 
 def _require_permission(permission):
-    if current_user.role == User.ROLE_SYSTEM_ADMIN:
+    if is_system_admin() or is_department_admin():
         return
     if (
-        current_user.role not in {User.ROLE_DEPARTMENT_STAFF, User.ROLE_DEPARTMENT_SUPERVISOR}
+        current_user.role != User.ROLE_DEPARTMENT_STAFF
         or permission not in set(current_user.admin_permissions or ())
         or not current_user.department_id
     ):
@@ -127,10 +135,9 @@ def _application_query_for_current_admin():
         joinedload(Application.requirements),
         joinedload(Application.payments),
     )
-    if current_user.role != User.ROLE_SYSTEM_ADMIN:
+    if not is_system_admin():
         _require_permission("applications.review")
-        query = query.where(Application.assigned_department_id == current_user.department_id)
-    return query
+    return visible_application_query(query)
 
 
 def _application_or_404(application_id):
@@ -142,7 +149,7 @@ def _application_or_404(application_id):
     return application
 
 
-def _account_form_from_request():
+def _account_form_from_request(allow_admin_fields=True):
     first_name, first_error = validate_name(request.form.get("first_name"), "First name")
     middle_name, middle_error = validate_name(
         request.form.get("middle_name"), "Middle name", required=False
@@ -171,7 +178,11 @@ def _account_form_from_request():
         errors["contact_number"] = "Enter a valid contact number."
     if len(address) > 500:
         errors["address"] = "Use no more than 500 characters."
-    if role not in User.ROLES:
+    if not allow_admin_fields:
+        role = User.ROLE_CITIZEN
+        department_raw = ""
+        permission_values = []
+    elif role not in User.ROLES:
         errors["role"] = "Choose a valid account role."
     if status not in ACCOUNT_STATUSES:
         errors["account_status"] = "Choose a valid account status."
@@ -234,7 +245,7 @@ def _creation_form_values():
     }
 
 
-def _creation_form_from_request(department_ids):
+def _creation_form_from_request(department_ids, allowed_roles=CREATION_ROLES):
     first_name, first_error = validate_name(request.form.get("first_name"), "First name")
     middle_name, middle_error = validate_name(
         request.form.get("middle_name"), "Middle name", required=False
@@ -266,7 +277,7 @@ def _creation_form_from_request(department_ids):
         errors["contact_number"] = "Enter a valid contact number."
     if len(address) > 500:
         errors["address"] = "Use no more than 500 characters."
-    if role not in dict(CREATION_ROLES):
+    if role not in dict(allowed_roles):
         errors["role"] = "Choose a valid account role."
 
     department_id = None
@@ -336,14 +347,16 @@ def _account_form_values(user=None):
 
 
 @admin_bp.route("/admin/dashboard")
-@role_required(User.ROLE_SYSTEM_ADMIN)
+@admin_console_required
 def dashboard():
     now = datetime.now()
     start = datetime.combine(now.date() - timedelta(days=6), time.min)
     weekly_rows = db.session.execute(
-        db.select(func.date(Application.submission_date), func.count(Application.application_id))
-        .where(Application.submission_date >= start, Application.application_status != "draft")
-        .group_by(func.date(Application.submission_date))
+        visible_application_query(
+            db.select(func.date(Application.submission_date), func.count(Application.application_id))
+            .where(Application.submission_date >= start, Application.application_status != "draft")
+            .group_by(func.date(Application.submission_date))
+        )
     ).all()
     weekly_counts = {str(day): count for day, count in weekly_rows}
     weekly_activity = [
@@ -357,10 +370,13 @@ def dashboard():
     max_daily = max((item["count"] for item in weekly_activity), default=0) or 1
 
     recent_events = db.session.scalars(
-        db.select(ApplicationEvent)
-        .options(joinedload(ApplicationEvent.application).joinedload(Application.service))
-        .order_by(ApplicationEvent.recorded_at.desc(), ApplicationEvent.tracking_id.desc())
-        .limit(8)
+        visible_application_query(
+            db.select(ApplicationEvent)
+            .join(Application, ApplicationEvent.application_id == Application.application_id)
+            .options(joinedload(ApplicationEvent.application).joinedload(Application.service))
+            .order_by(ApplicationEvent.recorded_at.desc(), ApplicationEvent.tracking_id.desc())
+            .limit(8)
+        )
     ).unique().all()
     activity_user_ids = {event.updated_by for event in recent_events if event.updated_by}
     activity_users = (
@@ -374,35 +390,56 @@ def dashboard():
         else {}
     )
     service_rows = db.session.execute(
-        db.select(Service, func.count(Application.application_id))
-        .outerjoin(Application, Application.service_id == Service.service_id)
-        .group_by(Service.service_id)
-        .order_by(Service.service_name)
+        visible_service_query(
+            db.select(Service, func.count(Application.application_id))
+            .outerjoin(Application, Application.service_id == Service.service_id)
+            .group_by(Service.service_id)
+            .order_by(Service.service_name)
+        )
     ).all()
     return render_template(
         "admin/dashboard.html",
         page_title="Admin dashboard",
         total_citizens=db.session.scalar(
-            db.select(func.count(User.user_id)).where(User.role == User.ROLE_CITIZEN)
+            managed_account_query(
+                db.select(func.count(User.user_id)).where(User.role == User.ROLE_CITIZEN)
+            )
         )
         or 0,
-        total_services=db.session.scalar(db.select(func.count(Service.service_id))) or 0,
-        total_applications=db.session.scalar(db.select(func.count(Application.application_id))) or 0,
+        total_services=db.session.scalar(
+            visible_service_query(db.select(func.count(Service.service_id)))
+        )
+        or 0,
+        total_applications=db.session.scalar(
+            visible_application_query(db.select(func.count(Application.application_id)))
+        )
+        or 0,
         pending_applications=db.session.scalar(
-            db.select(func.count(Application.application_id)).where(
-                Application.application_status.in_(PENDING_STATUSES)
+            visible_application_query(
+                db.select(func.count(Application.application_id)).where(
+                    Application.application_status.in_(PENDING_STATUSES)
+                )
             )
         )
         or 0,
         completed_applications=db.session.scalar(
-            db.select(func.count(Application.application_id)).where(
-                Application.application_status == "completed"
+            visible_application_query(
+                db.select(func.count(Application.application_id)).where(
+                    Application.application_status == "completed"
+                )
             )
         )
         or 0,
-        total_payments=db.session.scalar(db.select(func.count(Payment.payment_id))) or 0,
+        total_payments=db.session.scalar(
+            visible_payment_query(db.select(func.count(Payment.payment_id)))
+        )
+        or 0,
         paid_amount=db.session.scalar(
-            db.select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.payment_status == "paid")
+            visible_payment_query(
+                db.select(func.coalesce(func.sum(Payment.amount), 0)).where(
+                    Payment.payment_status == "paid"
+                )
+            )
         )
         or 0,
         weekly_activity=weekly_activity,
@@ -425,9 +462,7 @@ def services():
         .group_by(Service.service_id)
         .order_by(Service.service_name)
     )
-    if current_user.role != User.ROLE_SYSTEM_ADMIN:
-        query = query.where(Service.department_id == current_user.department_id)
-    service_rows = db.session.execute(query).all()
+    service_rows = db.session.execute(visible_service_query(query)).all()
     return render_template("admin/manage_services.html", service_rows=service_rows)
 
 
@@ -435,10 +470,10 @@ def services():
 @role_required(User.ROLE_SYSTEM_ADMIN, User.ROLE_DEPARTMENT_STAFF, User.ROLE_DEPARTMENT_SUPERVISOR)
 def service_status(service_id):
     _require_permission("services.manage")
-    service = db.session.get(Service, service_id)
+    service = db.session.scalar(
+        visible_service_query(db.select(Service).where(Service.service_id == service_id))
+    )
     if service is None:
-        abort(404)
-    if current_user.role != User.ROLE_SYSTEM_ADMIN and service.department_id != current_user.department_id:
         abort(404)
     target_status = clean_text(request.form.get("service_status"))
     if target_status not in {"active", "inactive"}:
@@ -477,7 +512,9 @@ def applications():
         "admin/manage_applications.html",
         applications=rows,
         applicants=applicants,
-        services=db.session.scalars(db.select(Service).order_by(Service.service_name)).all(),
+        services=db.session.scalars(
+            visible_service_query(db.select(Service).order_by(Service.service_name))
+        ).all(),
         statuses=APPLICATION_STATUSES,
         status_labels=STATUS_LABELS,
         selected_status=status,
@@ -603,9 +640,9 @@ def application_document(application_id, requirement_id):
 
 
 @admin_bp.route("/admin/accounts")
-@role_required(User.ROLE_SYSTEM_ADMIN)
+@admin_console_required
 def accounts():
-    query = db.select(User).options(joinedload(User.department))
+    query = managed_account_query(db.select(User).options(joinedload(User.department)))
     search = clean_text(request.args.get("q"))
     role = clean_text(request.args.get("role"))
     status = clean_text(request.args.get("status"))
@@ -626,10 +663,10 @@ def accounts():
     return render_template(
         "admin/manage_users.html",
         users=users,
-        roles=User.ROLES,
+        roles=(User.ROLE_CITIZEN,) if is_department_admin() else User.ROLES,
         role_labels=User.ROLE_LABELS,
         account_statuses=ACCOUNT_STATUSES,
-        selected_role=role,
+        selected_role=role if not is_department_admin() else "",
         selected_status=status,
         search=search,
     )
@@ -638,6 +675,7 @@ def accounts():
 @admin_bp.route("/admin/account-creation", methods=["GET", "POST"])
 @role_required(User.ROLE_SYSTEM_ADMIN)
 def account_creation():
+    creation_roles = CREATION_ROLES
     departments = db.session.scalars(
         db.select(Department)
         .where(
@@ -652,7 +690,7 @@ def account_creation():
     temporary_password = None
     created_account = None
     if request.method == "POST":
-        form, errors = _creation_form_from_request(department_ids)
+        form, errors = _creation_form_from_request(department_ids, creation_roles)
         if not errors:
             duplicate = db.session.scalar(
                 db.select(User.user_id).where(User.email == form["email"])
@@ -705,7 +743,7 @@ def account_creation():
         form=form,
         errors=errors,
         departments=departments,
-        roles=CREATION_ROLES,
+        roles=creation_roles,
         role_labels=CREATION_ROLE_LABELS,
         temporary_password=temporary_password,
         created_account=created_account,
@@ -774,25 +812,31 @@ def create_account():
 
 
 @admin_bp.route("/admin/accounts/<int:user_id>", methods=["GET", "POST"])
-@role_required(User.ROLE_SYSTEM_ADMIN)
+@admin_console_required
 def account_detail(user_id):
     account = db.session.scalar(
-        db.select(User).options(joinedload(User.department)).where(User.user_id == user_id)
+        managed_account_query(
+            db.select(User).options(joinedload(User.department)).where(User.user_id == user_id)
+        )
     )
     if account is None:
         abort(404)
-    departments = db.session.scalars(
-        db.select(Department).where(Department.department_status == "active").order_by(
-            Department.department_name
-        )
-    ).all()
+    departments = (
+        db.session.scalars(
+            db.select(Department).where(Department.department_status == "active").order_by(
+                Department.department_name
+            )
+        ).all()
+        if is_system_admin()
+        else []
+    )
     form = _account_form_values(account)
     errors = {}
     temporary_password = None
     if request.method == "POST":
         action = clean_text(request.form.get("action"))
         if action == "update":
-            form, errors = _account_form_from_request()
+            form, errors = _account_form_from_request(allow_admin_fields=is_system_admin())
             if not errors and account.user_id == current_user.user_id and (
                 form["role"] != User.ROLE_SYSTEM_ADMIN or form["account_status"] != "active"
             ):
@@ -845,11 +889,13 @@ def account_detail(user_id):
         .limit(50)
     ).all()
     account_applications = db.session.scalars(
-        db.select(Application)
-        .options(joinedload(Application.service), joinedload(Application.payments))
-        .where(Application.applicant_id == account.user_id)
-        .order_by(Application.submission_date.desc())
-        .limit(50)
+        visible_application_query(
+            db.select(Application)
+            .options(joinedload(Application.service), joinedload(Application.payments))
+            .where(Application.applicant_id == account.user_id)
+            .order_by(Application.submission_date.desc())
+            .limit(50)
+        )
     ).unique().all()
     return render_template(
         "admin/account_form.html",
@@ -857,10 +903,11 @@ def account_detail(user_id):
         form=form,
         errors=errors,
         departments=departments,
-        roles=User.ROLES,
+        roles=(User.ROLE_CITIZEN,) if is_department_admin() else User.ROLES,
         role_labels=User.ROLE_LABELS,
         account_statuses=ACCOUNT_STATUSES,
         permission_options=PERMISSION_OPTIONS,
+        allow_admin_fields=not is_department_admin(),
         temporary_password=temporary_password,
         account=account,
         activity=activity,

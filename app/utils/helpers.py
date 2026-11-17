@@ -25,7 +25,9 @@ def validate_csrf():
 def home_endpoint_for_role(role):
     if role == User.ROLE_CITIZEN:
         return "citizen.dashboard"
-    if role in (User.ROLE_DEPARTMENT_STAFF, User.ROLE_DEPARTMENT_SUPERVISOR):
+    if role == User.ROLE_DEPARTMENT_SUPERVISOR:
+        return "admin.dashboard"
+    if role == User.ROLE_DEPARTMENT_STAFF:
         return "admin.department_dashboard"
     if role == User.ROLE_SYSTEM_ADMIN:
         return "admin.dashboard"

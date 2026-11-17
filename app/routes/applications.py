@@ -11,6 +11,7 @@ from app.models.service import Service
 from app.models.user import User
 from app.services.application_forms import specification_for
 from app.services.tracking_service import cancel_application
+from app.utils.access import visible_service_query
 from app.services.application_service import (
     TERMS_TEXT,
     absolute_upload,
@@ -82,12 +83,14 @@ from app.routes.citizen import STATUS_LABELS
 
 def _service_or_404(service_id):
     service = db.session.scalar(
-        db.select(Service)
-        .join(Service.department)
-        .where(
-            Service.service_id == service_id,
-            Service.service_status == "active",
-            Department.department_status == "active",
+        visible_service_query(
+            db.select(Service)
+            .join(Service.department)
+            .where(
+                Service.service_id == service_id,
+                Service.service_status == "active",
+                Department.department_status == "active",
+            )
         )
     )
     if service is None or specification_for(service) is None:

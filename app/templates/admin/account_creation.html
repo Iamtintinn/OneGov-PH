@@ -56,7 +56,7 @@
         <dl>
             <dt>Name</dt><dd>{{ created_account.full_name }}</dd>
             <dt>Email</dt><dd>{{ created_account.email }}</dd>
-            <dt>Role</dt><dd>{{ role_labels[created_account.role] }}</dd>
+            <dt>Role</dt><dd>{{ department_role_label(created_account) }}</dd>
             {% if created_account.department %}<dt>Department</dt><dd>{{ created_account.department.department_name }}</dd>{% endif %}
         </dl>
         <code id="temporary-password">{{ temporary_password }}</code>

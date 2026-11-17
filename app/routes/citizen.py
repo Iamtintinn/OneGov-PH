@@ -12,8 +12,15 @@ from app.models.notification import Notification
 from app.models.payment import Payment
 from app.models.service import Service
 from app.models.user import User
+from app.utils.access import (
+    is_department_admin,
+    visible_application_query,
+    visible_notification_query,
+    visible_payment_query,
+    visible_service_query,
+)
 from app.utils.decorators import citizen_portal_required
-from app.utils.portal import portal_url_for as url_for
+from app.utils.portal import in_admin_portal, portal_url_for as url_for
 from app.utils.validators import (
     clean_text,
     normalize_contact_number,
@@ -79,12 +86,19 @@ def _search_pattern(term):
     return f"%{escaped}%"
 
 
+def _uses_department_scope():
+    return in_admin_portal() and is_department_admin()
+
+
 def _application_counts(user_id):
-    rows = db.session.execute(
-        db.select(Application.application_status, func.count())
-        .where(Application.applicant_id == user_id)
-        .group_by(Application.application_status)
-    ).all()
+    query = db.select(Application.application_status, func.count()).group_by(
+        Application.application_status
+    )
+    if _uses_department_scope():
+        query = visible_application_query(query)
+    else:
+        query = query.where(Application.applicant_id == user_id)
+    rows = db.session.execute(query).all()
     summary = {"total": 0, "pending": 0, "in_progress": 0, "completed": 0}
     for status, count in rows:
         summary["total"] += count
@@ -98,16 +112,20 @@ def _application_counts(user_id):
 
 
 def _owned_applications(user_id):
-    return db.session.scalars(
+    query = (
         db.select(Application)
         .options(
             joinedload(Application.service).joinedload(Service.department),
             joinedload(Application.department),
             joinedload(Application.payments),
         )
-        .where(Application.applicant_id == user_id)
         .order_by(Application.submission_date.desc(), Application.application_id.desc())
-    ).unique().all()
+    )
+    if _uses_department_scope():
+        query = visible_application_query(query)
+    else:
+        query = query.where(Application.applicant_id == user_id)
+    return db.session.scalars(query).unique().all()
 
 
 def _service_category(value):
@@ -165,7 +183,7 @@ def _active_services(term="", category=""):
                 Department.department_name.like(pattern, escape="\\"),
             )
         )
-    services = db.session.scalars(services_query).all()
+    services = db.session.scalars(visible_service_query(services_query)).all()
     if category == "id":
         return [service for service in services if _is_government_id(service)]
     if category == "clearance":
@@ -180,29 +198,33 @@ def _password_errors(password, confirm_password):
 
 
 def _citizen_notifications(user_id):
-    notices = db.session.scalars(
+    notices_query = (
         db.select(Notification)
-        .where(Notification.user_id == user_id)
         .order_by(Notification.created_date.desc(), Notification.notification_id.desc())
         .limit(6)
-    ).all()
-    unread = db.session.scalar(
+    )
+    unread_query = (
         db.select(func.count())
         .select_from(Notification)
-        .where(
-            Notification.user_id == user_id,
-            Notification.read_status == "unread",
-        )
+        .where(Notification.read_status == "unread")
     )
+    if _uses_department_scope():
+        notices_query = visible_notification_query(notices_query)
+        unread_query = visible_notification_query(unread_query)
+    else:
+        notices_query = notices_query.where(Notification.user_id == user_id)
+        unread_query = unread_query.where(Notification.user_id == user_id)
+    notices = db.session.scalars(notices_query).all()
+    unread = db.session.scalar(unread_query)
     return notices, unread or 0
 
 
 def portal_navigation_context():
-    if not current_user.is_authenticated or current_user.role not in {
-        User.ROLE_CITIZEN,
-        User.ROLE_SYSTEM_ADMIN,
-    }:
+    if not current_user.is_authenticated:
         return {}
+    if current_user.role not in {User.ROLE_CITIZEN, User.ROLE_SYSTEM_ADMIN}:
+        if not (in_admin_portal() and is_department_admin()):
+            return {}
     notices, unread = _citizen_notifications(current_user.user_id)
     from app.services.application_forms import applicable_service_names, specification_for
 
@@ -268,7 +290,7 @@ def dashboard():
 @citizen_bp.route("/citizen/applications/<int:application_id>")
 @citizen_portal_required
 def application_detail(application_id):
-    application = db.session.scalars(
+    query = visible_application_query(
         db.select(Application)
         .options(
             joinedload(Application.service).joinedload(Service.department),
@@ -276,11 +298,11 @@ def application_detail(application_id):
             joinedload(Application.requirements),
             joinedload(Application.payments),
         )
-        .where(
-            Application.application_id == application_id,
-            Application.applicant_id == current_user.user_id,
-        )
-    ).unique().first()
+        .where(Application.application_id == application_id)
+    )
+    if not _uses_department_scope():
+        query = query.where(Application.applicant_id == current_user.user_id)
+    application = db.session.scalars(query).unique().first()
     if application is None:
         abort(404)
     from app.services.application_forms import specification_for
@@ -421,13 +443,18 @@ def tracking():
 @citizen_bp.route("/citizen/payments")
 @citizen_portal_required
 def payments():
-    records = db.session.scalars(
+    query = (
         db.select(Payment)
-        .join(Application, Payment.application_id == Application.application_id)
-        .where(Application.applicant_id == current_user.user_id)
         .options(joinedload(Payment.application).joinedload(Application.service))
         .order_by(Payment.payment_id.desc())
-    ).unique().all()
+    )
+    if _uses_department_scope():
+        query = visible_payment_query(query)
+    else:
+        query = query.join(Application, Payment.application_id == Application.application_id).where(
+            Application.applicant_id == current_user.user_id
+        )
+    records = db.session.scalars(query).unique().all()
     return render_template(
         "payments/payment_history.html",
         payments=records,
@@ -439,11 +466,14 @@ def payments():
 @citizen_bp.route("/citizen/notifications")
 @citizen_portal_required
 def notifications():
-    notices = db.session.scalars(
-        db.select(Notification)
-        .where(Notification.user_id == current_user.user_id)
-        .order_by(Notification.created_date.desc(), Notification.notification_id.desc())
-    ).all()
+    query = db.select(Notification).order_by(
+        Notification.created_date.desc(), Notification.notification_id.desc()
+    )
+    if _uses_department_scope():
+        query = visible_notification_query(query)
+    else:
+        query = query.where(Notification.user_id == current_user.user_id)
+    notices = db.session.scalars(query).all()
     return render_template("citizen/notifications.html", notifications=notices)
 
 

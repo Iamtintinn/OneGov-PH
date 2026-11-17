@@ -32,14 +32,20 @@
                 <label>Email address<input type="email" name="email" value="{{ form.email }}" maxlength="255" required>{% if errors.email %}<small class="admin-field-error">{{ errors.email }}</small>{% endif %}</label>
                 <label>Contact number<input type="tel" name="contact_number" value="{{ form.contact_number }}" maxlength="20">{% if errors.contact_number %}<small class="admin-field-error">{{ errors.contact_number }}</small>{% endif %}</label>
                 <label class="admin-form-span">Address<input name="address" value="{{ form.address }}" maxlength="500">{% if errors.address %}<small class="admin-field-error">{{ errors.address }}</small>{% endif %}</label>
+                {% if is_system_admin %}
                 <label>Role<select name="role" id="account-role" required>{% for role in roles %}<option value="{{ role }}" {% if form.role == role %}selected{% endif %}>{{ role_labels[role] }}</option>{% endfor %}</select>{% if errors.role %}<small class="admin-field-error">{{ errors.role }}</small>{% endif %}</label>
+                {% else %}
+                <label>Role<input type="text" value="{{ department_role_label(account) }}" disabled><input type="hidden" name="role" value="{{ account.role if account else 'citizen' }}"></label>
+                {% endif %}
                 <label>Account status<select name="account_status" required>{% for status in account_statuses %}<option value="{{ status }}" {% if form.account_status == status %}selected{% endif %}>{{ status|title }}</option>{% endfor %}</select>{% if errors.account_status %}<small class="admin-field-error">{{ errors.account_status }}</small>{% endif %}</label>
+                {% if is_system_admin %}
                 <label class="admin-staff-field">Department<select name="department_id"><option value="">Select a department</option>{% for department in departments %}<option value="{{ department.department_id }}" {% if form.department_id == department.department_id|string %}selected{% endif %}>{{ department.department_name }}</option>{% endfor %}</select>{% if errors.department_id %}<small class="admin-field-error">{{ errors.department_id }}</small>{% endif %}</label>
                 <fieldset class="admin-staff-field admin-permissions-field">
                     <legend>Staff permissions</legend>
                     <div class="admin-permission-grid">{% for key, label in permission_options %}<label><input type="checkbox" name="permissions" value="{{ key }}" {% if key in form.permissions %}checked{% endif %}> {{ label }}</label>{% endfor %}</div>
                     {% if errors.permissions %}<small class="admin-field-error">{{ errors.permissions }}</small>{% endif %}
                 </fieldset>
+                {% endif %}
             </div>
             <div class="admin-form-actions"><a class="admin-button admin-button--quiet" href="{{ url_for('admin.accounts') }}">Back to accounts</a><button class="admin-button admin-button--primary" type="submit" onclick="return confirm('{{ 'Save these account changes?' if account else 'Create this account?' }}');">{{ "Save account changes" if account else "Create account" }}</button></div>
         </form>

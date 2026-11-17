@@ -6,7 +6,7 @@
 <div class="admin-main">
     <header class="admin-page-heading">
         <div><p class="admin-eyebrow">ADMINISTRATION / ACCESS CONTROL</p><h1>Account management</h1><p>Search citizen and staff accounts, review their access, and manage account status.</p></div>
-        <a class="admin-button admin-button--primary" href="{{ url_for('admin.create_account') }}">＋ Create staff account</a>
+        {% if is_system_admin %}<a class="admin-button admin-button--primary" href="{{ url_for('admin.create_account') }}">＋ Create staff account</a>{% endif %}
     </header>
     <section class="admin-panel admin-filter-panel">
         <form class="admin-filter-form" method="get">
@@ -26,7 +26,7 @@
                 <tbody>{% for user in users %}
                     <tr>
                         <td><span class="admin-account-cell"><span class="admin-avatar">{{ user.first_name[:1]|upper }}</span><span><strong>{{ user.full_name }}</strong><small>{{ user.email }}</small></span></span></td>
-                        <td>{{ role_labels[user.role] }}</td>
+                        <td>{{ department_role_label(user) }}</td>
                         <td>{{ user.department.department_name if user.department else "—" }}</td>
                         <td>{{ user.date_registered.strftime("%d %b %Y") }}</td>
                         <td><span class="admin-status-pill admin-status-pill--{{ user.account_status }}">{{ user.account_status|title }}</span></td>

@@ -23,7 +23,12 @@ from app.routes import citizen
 from app.routes.applications import register as register_application_routes
 from app.services.application_forms import specification_for
 from app.services.application_service import field_map, read_details
-from app.utils.decorators import role_required
+from app.utils.access import (
+    application_or_404,
+    visible_application_query,
+    visible_payment_query,
+)
+from app.utils.decorators import admin_console_required
 from app.utils.validators import clean_text, normalize_contact_number
 
 admin_portal_bp = Blueprint("admin_portal", __name__)
@@ -269,19 +274,7 @@ def _log_admin_status_event(application, previous_status, description):
 
 
 def _admin_application_or_404(application_id):
-    application = db.session.scalar(
-        db.select(Application)
-        .options(
-            joinedload(Application.service),
-            joinedload(Application.department),
-            joinedload(Application.requirements),
-            joinedload(Application.payments),
-        )
-        .where(Application.application_id == application_id)
-    )
-    if application is None:
-        abort(404)
-    return application
+    return application_or_404(application_id, include_documents=True, include_payments=True)
 
 
 def _tracking_redirect(application_id):
@@ -483,7 +476,7 @@ def _update_delivery_status(application):
 
 
 def _admin_only(view):
-    return role_required(User.ROLE_SYSTEM_ADMIN)(view)
+    return admin_console_required(view)
 
 
 def _add_rule(path, view, endpoint, methods=("GET",)):
@@ -501,13 +494,13 @@ def admin_portal_navigation():
 
 
 @admin_portal_bp.route("/admin/portal/dashboard")
-@role_required(User.ROLE_SYSTEM_ADMIN)
+@admin_console_required
 def dashboard():
     return redirect(url_for("admin.dashboard"))
 
 
 @admin_portal_bp.route("/admin/portal/tracking", methods=["GET", "POST"])
-@role_required(User.ROLE_SYSTEM_ADMIN)
+@admin_console_required
 def tracking():
     if request.method == "POST":
         application_id = clean_text(request.form.get("application_id"))
@@ -524,7 +517,7 @@ def tracking():
         abort(400, description="Choose a valid tracking action.")
 
     search = clean_text(request.args.get("q"))
-    query = (
+    query = visible_application_query(
         db.select(Application)
         .options(joinedload(Application.service))
         .where(Application.application_status != "draft")
@@ -595,12 +588,14 @@ _add_rule(
 
 
 @admin_portal_bp.route("/admin/portal/payments")
-@role_required(User.ROLE_SYSTEM_ADMIN)
+@admin_console_required
 def payments():
     records = db.session.scalars(
-        db.select(Payment)
-        .options(joinedload(Payment.application).joinedload(Application.service))
-        .order_by(Payment.payment_id.desc())
+        visible_payment_query(
+            db.select(Payment)
+            .options(joinedload(Payment.application).joinedload(Application.service))
+            .order_by(Payment.payment_id.desc())
+        )
     ).unique().all()
     applicant_ids = {
         record.application.applicant_id for record in records if record.application is not None

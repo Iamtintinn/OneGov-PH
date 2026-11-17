@@ -19,7 +19,7 @@
     <header class="review-header">
         <div class="review-header-main">
             <p class="review-reference">{{ application.tracking_number }}</p>
-            <h1>{{ application.service.service_name }}</h1>
+            <h1 style="background: transparent;">{{ application.service.service_name }}</h1>
             <p class="review-subtitle">{{ application_type }}<span>·</span>{{ applicant_name }}</p>
         </div>
         <dl class="review-header-meta">
@@ -119,7 +119,7 @@
                 <div><p class="review-kicker">DELIVERY MANAGEMENT</p><h2>Dispatch status</h2></div>
                 <span class="admin-status-pill admin-status-pill--{{ tracking.delivery.status or 'pending' }}">{{ tracking.delivery.label }}</span>
             </div>
-            {% if current_user.role == 'system_admin' %}
+            {% if is_system_admin or is_department_admin %}
             <fieldset class="review-delivery-fieldset" {% if not tracking.can_manage_delivery %}disabled{% endif %}>
             <div class="review-delivery-forms">
                 <form class="review-subform review-form" method="post" action="{{ url_for('admin_portal.tracking') }}">
@@ -150,7 +150,7 @@
             </div>
             </fieldset>
             {% if not tracking.can_manage_delivery %}<p class="review-hint">Set the application to Ready for Dispatch to enable courier and delivery updates.</p>{% elif tracking.delivery.status == "courier_assigned" %}<p class="review-hint">The animated route progresses once the courier marks the document Picked Up.</p>{% elif not tracking.delivery.status %}<p class="review-hint">Assign a courier, then set Picked Up to begin the animated delivery route.</p>{% endif %}
-            {% else %}<p class="admin-muted">Delivery controls are reserved for system administrators.</p>{% endif %}
+            {% else %}<p class="admin-muted">Delivery controls are reserved for administrators.</p>{% endif %}
         </div>
     </section>
 

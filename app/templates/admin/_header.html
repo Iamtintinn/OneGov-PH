@@ -1,8 +1,10 @@
 {% set page = request.endpoint %}
 {% set is_system_admin = current_user.role == 'system_admin' %}
-{% set can_manage_services = is_system_admin or 'services.manage' in (current_user.admin_permissions or []) %}
-{% set can_review_applications = is_system_admin or 'applications.review' in (current_user.admin_permissions or []) %}
-{% set admin_home = 'admin.dashboard' if is_system_admin else 'admin.department_dashboard' %}
+{% set is_department_admin = current_user.role == 'department_supervisor' and current_user.department_id %}
+{% set is_admin_console_user = is_system_admin or is_department_admin %}
+{% set can_manage_services = is_admin_console_user or 'services.manage' in (current_user.admin_permissions or []) %}
+{% set can_review_applications = is_admin_console_user or 'applications.review' in (current_user.admin_permissions or []) %}
+{% set admin_home = 'admin.dashboard' %}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
 <aside id="citizen-sidebar" class="dash-sidebar" aria-label="Administrator navigation">
@@ -40,7 +42,7 @@
             {% endif %}
         </ul>
 
-        {% if is_system_admin %}
+        {% if is_admin_console_user %}
         <p class="sidebar-section-label">Administration</p>
         <ul>
             <li>
@@ -49,34 +51,18 @@
                     <span>Account Management</span>
                 </a>
             </li>
+            {% if is_system_admin %}
             <li>
                 <a class="sidebar-link{% if page == 'admin.account_creation' %} is-active{% endif %}" href="{{ url_for('admin.account_creation') }}">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3"></circle><path d="M4 19c1.2-2.7 3.4-4 6-4 1 0 1.9.2 2.7.6"></path><path d="M18 12v8"></path><path d="M14 16h8"></path></svg>
                     <span>Account Creation</span>
                 </a>
             </li>
+            {% endif %}
         </ul>
 
         <p class="sidebar-section-label">Admin Portal</p>
         <ul>
-            <li>
-                <a class="sidebar-link{% if page == 'admin_portal.services' or (page and page.startswith('admin_portal.apply_')) %} is-active{% endif %}" href="{{ url_for('admin_portal.services') }}">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16"></path><path d="M6 20V9l6-5 6 5v11"></path><path d="M10 20v-6h4v6"></path></svg>
-                    <span>Government Services</span>
-                </a>
-            </li>
-            <li>
-                <a class="sidebar-link{% if page in ['admin_portal.applications', 'admin_portal.application_detail'] %} is-active{% endif %}" href="{{ url_for('admin_portal.applications') }}">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"></path><path d="M14 3v5h5"></path><path d="M9 13h6"></path><path d="M9 17h6"></path></svg>
-                    <span>My Applications</span>
-                </a>
-            </li>
-            <li>
-                <a class="sidebar-link{% if page == 'admin_portal.tracking' %} is-active{% endif %}" href="{{ url_for('admin_portal.tracking') }}">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v5l3 2"></path></svg>
-                    <span>Application Tracking</span>
-                </a>
-            </li>
             <li>
                 <a class="sidebar-link{% if page == 'admin_portal.payments' %} is-active{% endif %}" href="{{ url_for('admin_portal.payments') }}">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"></rect><path d="M3 10h18"></path></svg>
