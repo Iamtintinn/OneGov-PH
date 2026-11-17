@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Application tracking · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard admin-dashboard{% endblock %}
+{% block site_header %}{% include "admin/_header.html" %}{% endblock %}
+{% block content %}
+<div class="admin-main admin-tracking-page">
+    <header class="admin-page-heading">
+        <div>
+            <p class="admin-eyebrow">ADMIN TRACKING</p>
+            <h1>Application tracking</h1>
+            <p>Review submitted applications and open the full review page to manage status and delivery.</p>
+        </div>
+        <span class="admin-count-chip">{{ tracking_rows|length }} application{{ "" if tracking_rows|length == 1 else "s" }}</span>
+    </header>
+
+    <form class="admin-filter-panel admin-panel" method="get" action="{{ url_for('admin_portal.tracking') }}">
+        <div class="admin-filter-form">
+            <label class="admin-search-field"><span class="visually-hidden">Search applications</span><input type="search" name="q" value="{{ search }}" placeholder="Tracking number, citizen name, or email"></label>
+            <button class="admin-button admin-button--primary" type="submit">Search</button>
+            {% if search %}<a class="admin-button admin-button--quiet" href="{{ url_for('admin_portal.tracking') }}">Clear</a>{% endif %}
+        </div>
+    </form>
+
+    <section class="admin-panel admin-table-panel">
+        <div class="admin-panel-heading">
+            <div><p class="admin-eyebrow">TRACKING QUEUE</p><h2>Applications</h2></div>
+            <span class="admin-count-chip">{{ tracking_rows|length }} shown</span>
+        </div>
+        {% if tracking_rows %}
+        <div class="admin-table-scroll">
+            <table class="admin-table admin-tracking-table">
+                <thead>
+                    <tr>
+                        <th>Reference number</th>
+                        <th>Citizen name</th>
+                        <th>Government service</th>
+                        <th>Application type</th>
+                        <th>Submission date</th>
+                        <th>Current status</th>
+                        <th><span class="visually-hidden">Action</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in tracking_rows %}
+                    {% set application = row.application %}
+                    <tr>
+                        <td><a class="admin-track-reference" href="{{ url_for('admin.application_detail', application_id=application.application_id) }}">{{ application.tracking_number }}</a></td>
+                        <td>{% if row.applicant %}{{ row.applicant.full_name }}<small>{{ row.applicant.email }}</small>{% else %}Unknown citizen{% endif %}</td>
+                        <td>{{ application.service.service_name }}</td>
+                        <td>{{ row.application_type }}</td>
+                        <td>{{ application.submission_date.strftime("%d %b %Y") }}</td>
+                        <td><span class="admin-status-pill admin-status-pill--{{ application.application_status }}">{{ row.processing_label }}</span></td>
+                        <td class="admin-tracking-action"><a class="admin-button admin-button--quiet" href="{{ url_for('admin.application_detail', application_id=application.application_id) }}">Open full review <span aria-hidden="true">→</span></a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="admin-empty" role="status">No applications at the Confirmation stage or later were found.</p>
+        {% endif %}
+        {% if tracking_rows|length >= 200 %}<p class="admin-table-note">Showing the most recent 200 matching applications. Refine your search to find older requests.</p>{% endif %}
+    </section>
+</div>
+{% endblock %}

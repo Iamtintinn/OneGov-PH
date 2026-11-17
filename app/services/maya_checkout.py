@@ -178,7 +178,8 @@ def build_redirect_urls(*, application_id: int, payment_reference: str) -> dict[
             "to your public HTTPS origin (for example an ngrok URL), or open the app from a browser request."
         )
     token = build_return_token(application_id=application_id, payment_reference=payment_reference)
-    path = f"/citizen/applications/{int(application_id)}/payment/maya/result"
+    portal = "/admin/portal" if has_request_context() and request.path.startswith("/admin") else "/citizen"
+    path = f"{portal}/applications/{int(application_id)}/payment/maya/result"
     urls = {}
     for outcome in ("success", "failure", "cancel"):
         query = urlencode({"outcome": outcome, "token": token})

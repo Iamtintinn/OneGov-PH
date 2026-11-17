@@ -1,6 +1,6 @@
 """Citizen Apply Now steps. These views are registered on the citizen blueprint."""
 
-from flask import abort, flash, redirect, render_template, request, send_file, url_for
+from flask import abort, flash, redirect, render_template, request, send_file
 from flask_login import current_user
 from sqlalchemy.orm import joinedload
 
@@ -76,6 +76,7 @@ from app.services.application_service import (
     write_details,
 )
 from app.utils.decorators import citizen_portal_required
+from app.utils.portal import portal_url_for as url_for
 from app.routes.citizen import STATUS_LABELS
 
 
@@ -1921,7 +1922,7 @@ def application_continue(application_id):
     return redirect(url_for("citizen.application_detail", application_id=application.application_id))
 
 
-def register(blueprint):
+def register(blueprint, base="/citizen", wrap=None):
     rules = (
         ("/citizen/services/<int:service_id>/apply", apply_details, ["GET", "POST"], "apply_details"),
         ("/citizen/services/<int:service_id>/apply/type", apply_type, ["GET", "POST"], "apply_type"),
@@ -2057,4 +2058,6 @@ def register(blueprint):
         ),
     )
     for path, view, methods, endpoint in rules:
-        blueprint.add_url_rule(path, endpoint=endpoint, view_func=view, methods=methods)
+        portal_path = f"{base}{path[len('/citizen'):]}"
+        view_func = wrap(view) if wrap else view
+        blueprint.add_url_rule(portal_path, endpoint=endpoint, view_func=view_func, methods=methods)

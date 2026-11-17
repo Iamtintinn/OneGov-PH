@@ -1,3 +1,6 @@
+{% if request.path.startswith('/admin') %}
+{% include "admin/_header.html" %}
+{% else %}
 {% set page = request.endpoint %}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap">
 <aside id="citizen-sidebar" class="dash-sidebar" aria-label="{% if current_user.role == 'system_admin' %}Admin and citizen navigation{% else %}Citizen navigation{% endif %}">
@@ -93,3 +96,4 @@
     </div>
 </div>
 <script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
+{% endif %}

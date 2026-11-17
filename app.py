@@ -54,6 +54,12 @@ def create_app():
     def inject_csrf():
         return {"csrf_token": generate_csrf_token}
 
+    @application.context_processor
+    def inject_portal_url():
+        from app.utils.portal import portal_url_for
+
+        return {"url_for": portal_url_for}
+
     @application.errorhandler(413)
     def request_too_large(_error):
         return render_template(

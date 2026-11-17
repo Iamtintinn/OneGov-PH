@@ -1,77 +1,301 @@
 {% extends "base.html" %}
 {% block title %}Review {{ application.tracking_number }} · OneGov PH{% endblock %}
-{% block body_class %}admin-dashboard{% endblock %}
+{% block body_class %}citizen-dashboard admin-dashboard admin-review-page{% endblock %}
+{% block head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin_review.css') }}">
+{% if tracking.map %}<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">{% endif %}
+{% endblock %}
 {% block site_header %}{% include "admin/_header.html" %}{% endblock %}
 {% block content %}
-<div class="admin-main">
+{% set application_type = fields.get("application_type") or "—" %}
+{% set applicant_name = applicant.full_name if applicant else "Citizen account unavailable" %}
+{% set history_count = events|length + tracking.delivery.history|length %}
+<div class="admin-main review-main">
     <p class="admin-breadcrumb"><a href="{{ url_for('admin.applications') }}">Applications</a><span>/</span>{{ application.tracking_number }}</p>
-    <header class="admin-page-heading">
-        <div><p class="admin-eyebrow">{{ application.service.service_name }} / {{ application.tracking_number }}</p><h1>Application review</h1><p>Submitted {{ application.submission_date.strftime("%d %B %Y at %H:%M") }} · {{ applicant.full_name if applicant else "Citizen account unavailable" }}</p></div>
-        <span class="admin-status-pill admin-status-pill--{{ application.application_status }}">{{ status_labels[application.application_status] }}</span>
-    </header>
-    <div class="admin-detail-grid">
-        <div class="admin-detail-main">
-            <section class="admin-panel">
-                <div class="admin-panel-heading"><div><p class="admin-eyebrow">SUBMITTED FORM</p><h2>Application information</h2></div></div>
-                {% if fields %}
-                <dl class="admin-definition-list">
-                    {% for key, value in fields.items() %}
-                    {% if value is not none and value|string|trim %}
-                    <div><dt>{{ key|replace("_", " ")|title }}</dt><dd>{{ value }}</dd></div>
-                    {% endif %}
-                    {% endfor %}
-                </dl>
-                {% else %}<p class="admin-empty">No application details were saved.</p>{% endif %}
-                <div class="admin-applicant-strip"><span class="admin-avatar">{{ applicant.first_name[:1]|upper if applicant else "?" }}</span><div><strong>{{ applicant.full_name if applicant else "Unknown citizen" }}</strong><small>{{ applicant.email if applicant else "" }}{% if applicant and applicant.contact_number %} · {{ applicant.contact_number }}{% endif %}</small></div><a href="{{ url_for('admin.account_detail', user_id=applicant.user_id) if current_user.role == 'system_admin' and applicant else '#' }}">Account profile →</a></div>
-            </section>
 
-            <section class="admin-panel">
-                <div class="admin-panel-heading"><div><p class="admin-eyebrow">DOCUMENT CHECKLIST</p><h2>Submitted documents</h2></div><span class="admin-count-chip">{{ application.requirements|length }} files</span></div>
-                {% if application.requirements %}
-                <div class="admin-document-list">
-                    {% for requirement in application.requirements %}
-                    <article class="admin-document-row">
-                        <span class="admin-document-icon">▤</span>
-                        <div class="admin-document-copy"><strong>{{ requirement.requirement_name|replace("_", " ")|title }}</strong><small>{{ requirement.remarks or "No file name provided" }}</small><span class="admin-status-pill admin-status-pill--{{ requirement.verification_status }}">{{ requirement.verification_status|title }}</span></div>
-                        {% if requirement.uploaded_file %}<a class="admin-button admin-button--quiet" href="{{ url_for('admin.application_document', application_id=application.application_id, requirement_id=requirement.requirement_id) }}" target="_blank" rel="noopener">View file</a>{% else %}<span class="admin-muted">No upload</span>{% endif %}
-                        <form class="admin-document-review" method="post" action="{{ url_for('admin.update_requirement', application_id=application.application_id, requirement_id=requirement.requirement_id) }}">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <select name="verification_status" aria-label="Review status for {{ requirement.requirement_name }}">
-                                {% for value in ['pending', 'verified', 'rejected'] %}<option value="{{ value }}" {% if requirement.verification_status == value %}selected{% endif %}>{{ value|title }}</option>{% endfor %}
-                            </select>
-                            <input type="text" name="remarks" maxlength="500" value="{{ requirement.remarks or '' }}" placeholder="Review note or correction reason" aria-label="Document review note">
-                            <button class="admin-button admin-button--quiet" type="submit">Save review</button>
-                        </form>
-                    </article>
-                    {% endfor %}
-                </div>
-                {% else %}<p class="admin-empty">No document uploads are associated with this request.</p>{% endif %}
-            </section>
-
-            <section class="admin-panel">
-                <div class="admin-panel-heading"><div><p class="admin-eyebrow">AUDIT TRAIL</p><h2>Status history</h2></div></div>
-                {% if events %}
-                <div class="admin-history-list">{% for event in events %}<article class="admin-history-row"><span class="admin-history-marker"></span><div><strong>{{ status_labels[event.new_status] }}</strong><p>{{ event.update_description }}</p><small>{{ event.recorded_at.strftime("%d %b %Y, %H:%M") }} · {{ actors.get(event.updated_by, "System") if event.updated_by else "System" }}</small></div></article>{% endfor %}</div>
-                {% else %}<p class="admin-empty">No status updates have been recorded.</p>{% endif %}
-            </section>
+    <header class="review-header">
+        <div class="review-header-main">
+            <p class="review-reference">{{ application.tracking_number }}</p>
+            <h1>{{ application.service.service_name }}</h1>
+            <p class="review-subtitle">{{ application_type }}<span>·</span>{{ applicant_name }}</p>
         </div>
-        <aside class="admin-detail-side">
-            <section class="admin-panel">
-                <div class="admin-panel-heading"><div><p class="admin-eyebrow">ADMIN ACTION</p><h2>Update request</h2></div></div>
-                <form class="admin-form-stack" method="post" action="{{ url_for('admin.update_application', application_id=application.application_id) }}">
+        <dl class="review-header-meta">
+            <div><dt>Submitted</dt><dd>{{ application.submission_date.strftime("%d %b %Y, %I:%M %p") }}</dd></div>
+            <div><dt>Current status</dt><dd><span class="admin-status-pill admin-status-pill--{{ application.application_status }}">{{ tracking.processing_label }}</span></dd></div>
+        </dl>
+    </header>
+
+    <section class="review-card review-map-card admin-track-map-panel">
+        <div class="review-card-heading review-map-heading">
+            <div><p class="review-kicker">DELIVERY MONITOR</p><h2>Dispatch route</h2></div>
+            <div class="review-map-status">
+                <span class="admin-status-pill admin-status-pill--{{ tracking.delivery.status or 'pending' }}">{{ tracking.delivery.label }}</span>
+                <strong>{{ tracking.delivery_progress_percent }}%</strong>
+            </div>
+        </div>
+        {% if tracking.map %}
+        <div class="review-map-frame">
+            <div id="{{ tracking.map.map_id }}" class="admin-track-map review-map" role="application" aria-label="Delivery route map for {{ application.tracking_number }}"></div>
+        </div>
+        <div class="review-map-footer">
+            <div class="review-map-progress">
+                <div class="admin-track-progress" aria-hidden="true"><span style="width: {{ tracking.delivery_progress_percent }}%"></span></div>
+                <p data-delivery-progress>Vehicle position reflects the current simulated delivery progress.</p>
+            </div>
+            <div class="review-map-legend">
+                <span><i class="review-legend-dot review-legend-dot--start"></i>{{ tracking.map.start.label }}</span>
+                <span><i class="review-legend-dot review-legend-dot--end"></i>{{ tracking.map.destination.label }}</span>
+            </div>
+        </div>
+        {% else %}
+        <p class="admin-empty">Map details are unavailable for this application.</p>
+        {% endif %}
+    </section>
+
+    <section class="review-info-actions" aria-label="Application information">
+        <button class="review-info-button" type="button" data-review-modal="application-info-modal" aria-haspopup="dialog" aria-controls="application-info-modal">
+            <span class="review-info-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"></path><path d="M5 20a7 7 0 0 1 14 0"></path></svg>
+            </span>
+            <span class="review-info-copy"><strong>View Application Information</strong><small>Personal details, address, and submitted answers</small></span>
+            <span class="review-info-arrow" aria-hidden="true">→</span>
+        </button>
+        <button class="review-info-button" type="button" data-review-modal="documents-modal" aria-haspopup="dialog" aria-controls="documents-modal">
+            <span class="review-info-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z"></path><path d="M14 3v5h5"></path><path d="M9 13h6"></path><path d="M9 17h6"></path></svg>
+            </span>
+            <span class="review-info-copy"><strong>View Submitted Documents</strong><small>{{ application.requirements|length }} file{{ "" if application.requirements|length == 1 else "s" }} and review actions</small></span>
+            <span class="review-info-arrow" aria-hidden="true">→</span>
+        </button>
+        <button class="review-info-button" type="button" data-review-modal="delivery-info-modal" aria-haspopup="dialog" aria-controls="delivery-info-modal">
+            <span class="review-info-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M3 7h10v8H3z"></path><path d="M13 10h4l3 3v2h-7z"></path><circle cx="7" cy="17" r="2"></circle><circle cx="17" cy="17" r="2"></circle></svg>
+            </span>
+            <span class="review-info-copy"><strong>View Delivery Information</strong><small>Recipient, courier, coordinates, and delivery notes</small></span>
+            <span class="review-info-arrow" aria-hidden="true">→</span>
+        </button>
+    </section>
+
+    <section class="review-control-grid" aria-label="Admin status management">
+        <div class="review-card review-processing-card" id="processing-status">
+            <div class="review-card-heading">
+                <div><p class="review-kicker">APPLICATION PROCESSING</p><h2>Application status</h2></div>
+                <span class="admin-status-pill admin-status-pill--{{ application.application_status }}">{{ tracking.processing_label }}</span>
+            </div>
+            {% if tracking.can_update_status %}
+            <form class="review-form" method="post" action="{{ url_for('admin_portal.tracking') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="update_status">
+                <input type="hidden" name="return_to" value="detail">
+                <input type="hidden" name="application_id" value="{{ application.application_id }}">
+                <label class="review-field">Status selection
+                    <select name="processing_status" required>
+                        <option value="" disabled {% if not tracking.processing_selected %}selected{% endif %}>Select processing status</option>
+                        {% for key, label, legacy in processing_statuses %}<option value="{{ key }}" {% if tracking.processing_selected == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select>
+                </label>
+                <label class="review-field">Remarks or update notes<textarea name="remarks" maxlength="500" rows="3" placeholder="Optional notes for this status update"></textarea></label>
+                <div class="review-form-actions"><button class="admin-button admin-button--primary" type="submit">Save Processing Status</button></div>
+            </form>
+            {% else %}<p class="admin-empty">This application is closed and cannot be updated here.</p>{% endif %}
+            <details class="review-secondary-form">
+                <summary>Request correction or other status update</summary>
+                <form class="review-form" method="post" action="{{ url_for('admin.update_application', application_id=application.application_id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <label>Application status<select name="application_status" required>{% for status in statuses if status != 'draft' %}<option value="{{ status }}" {% if application.application_status == status %}selected{% endif %}>{{ status_labels[status] }}</option>{% endfor %}</select></label>
-                    <label>Remarks / correction request<textarea name="remarks" maxlength="500" rows="5" placeholder="Explain the status update or tell the citizen what to correct."></textarea><small>Required for rejection or correction requests. Up to 500 characters.</small></label>
-                    <button class="admin-button admin-button--primary admin-button--full" type="submit" onclick="return confirm('Save this application status and notify the citizen?');">Save update</button>
+                    <label class="review-field">Application status
+                        <select name="application_status" required>{% for status in statuses if status != 'draft' %}<option value="{{ status }}" {% if application.application_status == status %}selected{% endif %}>{{ status_labels[status] }}</option>{% endfor %}</select>
+                    </label>
+                    <label class="review-field">Remarks or correction request<textarea name="remarks" maxlength="500" rows="3" placeholder="Explain the update or tell the citizen what to correct."></textarea><small>Required for rejection or correction requests.</small></label>
+                    <div class="review-form-actions"><button class="admin-button admin-button--quiet" type="submit" onclick="return confirm('Save this application status and notify the citizen?');">Save Update</button></div>
                 </form>
-            </section>
-            <section class="admin-panel admin-payment-summary">
-                <p class="admin-eyebrow">PAYMENT RECORDS</p><h2>{{ application.payments|length }} payment(s)</h2>
-                {% for payment in application.payments %}
-                <div class="admin-payment-row"><span>{{ payment.payment_method|replace("_", " ")|title }}<small>{{ payment.payment_reference }}</small></span><strong>₱{{ "{:,.2f}".format(payment.amount) }}<small>{{ payment.payment_status|title }}</small></strong></div>
-                {% else %}<p class="admin-muted">No payment has been recorded.</p>{% endfor %}
-            </section>
-        </aside>
-    </div>
+            </details>
+        </div>
+
+        <div class="review-card review-delivery-card" id="delivery-management">
+            <div class="review-card-heading">
+                <div><p class="review-kicker">DELIVERY MANAGEMENT</p><h2>Dispatch status</h2></div>
+                <span class="admin-status-pill admin-status-pill--{{ tracking.delivery.status or 'pending' }}">{{ tracking.delivery.label }}</span>
+            </div>
+            {% if current_user.role == 'system_admin' %}
+            <fieldset class="review-delivery-fieldset" {% if not tracking.can_manage_delivery %}disabled{% endif %}>
+            <div class="review-delivery-forms">
+                <form class="review-subform review-form" method="post" action="{{ url_for('admin_portal.tracking') }}">
+                    <h3>Courier assignment</h3>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="assign_courier">
+                    <input type="hidden" name="return_to" value="detail">
+                    <input type="hidden" name="application_id" value="{{ application.application_id }}">
+                    <label class="review-field">Courier name<input type="text" name="courier_name" maxlength="120" value="{{ tracking.delivery.courier_name }}" required></label>
+                    <label class="review-field">Courier contact<input type="text" name="courier_contact" maxlength="30" value="{{ tracking.delivery.courier_contact }}" placeholder="Mobile or telephone number"></label>
+                    <div class="review-form-actions"><button class="admin-button admin-button--quiet" type="submit">Save Courier</button></div>
+                </form>
+                <form class="review-subform review-form" method="post" action="{{ url_for('admin_portal.tracking') }}">
+                    <h3>Delivery status</h3>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="update_delivery">
+                    <input type="hidden" name="return_to" value="detail">
+                    <input type="hidden" name="application_id" value="{{ application.application_id }}">
+                    <label class="review-field">Status selection
+                        <select name="delivery_status" required>
+                            <option value="" disabled {% if not tracking.delivery.status %}selected{% endif %}>Select delivery status</option>
+                            {% for key, label, progress in delivery_statuses %}<option value="{{ key }}" {% if tracking.delivery.status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                        </select>
+                    </label>
+                    <label class="review-field">Delivery notes<textarea name="delivery_note" maxlength="500" rows="2" placeholder="Courier or delivery notes">{{ tracking.delivery.note }}</textarea></label>
+                    <div class="review-form-actions"><button class="admin-button admin-button--primary" type="submit">Update Delivery Status</button></div>
+                </form>
+            </div>
+            </fieldset>
+            {% if not tracking.can_manage_delivery %}<p class="review-hint">Set the application to Ready for Dispatch to enable courier and delivery updates.</p>{% elif tracking.delivery.status == "courier_assigned" %}<p class="review-hint">The animated route progresses once the courier marks the document Picked Up.</p>{% elif not tracking.delivery.status %}<p class="review-hint">Assign a courier, then set Picked Up to begin the animated delivery route.</p>{% endif %}
+            {% else %}<p class="admin-muted">Delivery controls are reserved for system administrators.</p>{% endif %}
+        </div>
+    </section>
+
+    <section class="review-card review-payment-section">
+        <div class="review-card-heading">
+            <div><p class="review-kicker">PAYMENT INFORMATION</p><h2>Payment summary</h2></div>
+            <span class="review-count">{{ application.payments|length }} payment{{ "" if application.payments|length == 1 else "s" }}</span>
+        </div>
+        {% if application.payments %}
+        <div class="review-payment-list">
+            {% for payment in application.payments %}
+            <article class="review-payment-item">
+                <div><span>Payment method</span><strong>{{ payment.payment_method|replace("_", " ")|title }}</strong></div>
+                <div><span>Transaction reference</span><strong class="review-mono">{{ payment.payment_reference }}</strong></div>
+                <div><span>Amount paid</span><strong>₱{{ "{:,.2f}".format(payment.amount) }}</strong></div>
+                <div><span>Payment status</span><span class="admin-status-pill admin-status-pill--{{ payment.payment_status }}">{{ payment.payment_status|title }}</span></div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}<p class="admin-empty">No payment has been recorded for this application.</p>{% endif %}
+    </section>
+
+    <details class="review-card review-history">
+        <summary>
+            <span><span class="review-kicker">AUDIT TRAIL</span><strong>View Status History</strong></span>
+            <span class="review-count">{{ history_count }} update{{ "" if history_count == 1 else "s" }}</span>
+        </summary>
+        <div class="review-history-body">
+            <div class="admin-track-history-grid{% if not tracking.delivery.history %} admin-track-history-grid--single{% endif %}">
+                <div class="admin-track-history-column">
+                    <h3>Application updates</h3>
+                    {% if events %}
+                    <div class="admin-history-list">{% for event in events %}<article class="admin-history-row"><span class="admin-history-marker"></span><div><strong>{{ status_labels[event.new_status] }}</strong><p>{{ event.update_description }}</p><small>{{ event.recorded_at.strftime("%d %b %Y, %I:%M %p") }} · {{ actors.get(event.updated_by, "System") if event.updated_by else "System" }}</small></div></article>{% endfor %}</div>
+                    {% else %}<p class="admin-empty">No application status updates have been recorded.</p>{% endif %}
+                </div>
+                {% if tracking.delivery.history %}
+                <div class="admin-track-history-column">
+                    <h3>Delivery updates</h3>
+                    <div class="admin-history-list">
+                        {% for event in tracking.delivery.history|reverse %}
+                        <article class="admin-history-row"><span class="admin-history-marker admin-history-marker--delivery"></span><div><strong>{{ event.status_label }}</strong><p>{{ event.description }}</p><small>{{ event.recorded_at_label }} · {{ event.updated_by_name }}</small></div></article>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </details>
 </div>
+
+<dialog class="review-modal" id="application-info-modal" aria-labelledby="application-info-title">
+    <div class="review-modal-header">
+        <div><p class="review-kicker">APPLICATION INFORMATION</p><h2 id="application-info-title">Submitted details</h2></div>
+        <button class="review-modal-close" type="button" data-review-modal-close aria-label="Close application information">×</button>
+    </div>
+    <div class="review-modal-body">
+        <section class="review-modal-section">
+            <h3>Citizen information</h3>
+            <dl class="review-detail-grid">
+                <div><dt>Full name</dt><dd>{{ applicant_name }}</dd></div>
+                <div><dt>Email address</dt><dd>{{ applicant.email if applicant else "—" }}</dd></div>
+                <div><dt>Contact number</dt><dd>{{ applicant.contact_number if applicant and applicant.contact_number else "—" }}</dd></div>
+                <div class="review-detail-wide"><dt>Account address</dt><dd>{{ applicant.address if applicant and applicant.address else "—" }}</dd></div>
+            </dl>
+            {% if current_user.role == 'system_admin' and applicant %}<a class="review-account-link" href="{{ url_for('admin.account_detail', user_id=applicant.user_id) }}">View account profile →</a>{% endif %}
+        </section>
+        <section class="review-modal-section">
+            <h3>Submitted application information</h3>
+            {% if fields %}
+            <dl class="review-detail-grid">
+                {% for key, value in fields.items() %}
+                {% if value is not none and value|string|trim %}<div{% if key in ("address", "delivery_address", "remarks") %} class="review-detail-wide"{% endif %}><dt>{{ key|replace("_", " ")|title }}</dt><dd>{{ value }}</dd></div>{% endif %}
+                {% endfor %}
+            </dl>
+            {% else %}<p class="admin-empty">No application details were saved.</p>{% endif %}
+        </section>
+    </div>
+</dialog>
+
+<dialog class="review-modal review-modal--wide" id="documents-modal" aria-labelledby="documents-title">
+    <div class="review-modal-header">
+        <div><p class="review-kicker">SUBMITTED DOCUMENTS</p><h2 id="documents-title">Document checklist</h2></div>
+        <button class="review-modal-close" type="button" data-review-modal-close aria-label="Close submitted documents">×</button>
+    </div>
+    <div class="review-modal-body">
+        {% if application.requirements %}
+        <div class="review-doc-list">
+            {% for requirement in application.requirements %}
+            <article class="review-doc-card">
+                <div class="review-doc-head">
+                    <div><strong>{{ requirement.requirement_name|replace("_", " ")|title }}</strong><small>{{ requirement.remarks or "No file name or review note provided" }}</small></div>
+                    <span class="admin-status-pill admin-status-pill--{{ requirement.verification_status }}">{{ requirement.verification_status|title }}</span>
+                </div>
+                <div class="review-doc-file">
+                    {% if requirement.uploaded_file %}<a class="admin-button admin-button--quiet" href="{{ url_for('admin.application_document', application_id=application.application_id, requirement_id=requirement.requirement_id) }}" target="_blank" rel="noopener">View / download file</a>{% else %}<span class="admin-muted">No upload attached</span>{% endif %}
+                </div>
+                <form class="review-doc-form" method="post" action="{{ url_for('admin.update_requirement', application_id=application.application_id, requirement_id=requirement.requirement_id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <label class="review-field">Verification status<select name="verification_status">{% for value in ['pending', 'verified', 'rejected'] %}<option value="{{ value }}" {% if requirement.verification_status == value %}selected{% endif %}>{{ value|title }}</option>{% endfor %}</select></label>
+                    <label class="review-field">Review remarks<input type="text" name="remarks" maxlength="500" value="{{ requirement.remarks or '' }}" placeholder="Review note or correction reason"></label>
+                    <div class="review-form-actions"><button class="admin-button admin-button--quiet" type="submit">Save Review</button></div>
+                </form>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}<p class="admin-empty">No document uploads are associated with this request.</p>{% endif %}
+    </div>
+</dialog>
+
+<dialog class="review-modal" id="delivery-info-modal" aria-labelledby="delivery-info-title">
+    <div class="review-modal-header">
+        <div><p class="review-kicker">DELIVERY INFORMATION</p><h2 id="delivery-info-title">Recipient and courier</h2></div>
+        <button class="review-modal-close" type="button" data-review-modal-close aria-label="Close delivery information">×</button>
+    </div>
+    <div class="review-modal-body">
+        <section class="review-modal-section">
+            <h3>Recipient and address</h3>
+            {% if tracking.citizen_delivery %}
+            <dl class="review-detail-grid">
+                <div><dt>Recipient name</dt><dd>{{ tracking.citizen_delivery.get("recipient_name") or "—" }}</dd></div>
+                <div><dt>Contact number</dt><dd>{{ tracking.citizen_delivery.get("contact_number") or "—" }}</dd></div>
+                <div><dt>Barangay</dt><dd>{{ tracking.citizen_delivery.get("barangay") or "—" }}</dd></div>
+                <div><dt>Coordinates</dt><dd>{% if tracking.citizen_delivery.get("latitude") and tracking.citizen_delivery.get("longitude") %}{{ tracking.citizen_delivery.get("latitude") }}, {{ tracking.citizen_delivery.get("longitude") }}{% else %}Not pinned{% endif %}</dd></div>
+                <div class="review-detail-wide"><dt>Complete delivery address</dt><dd>{{ tracking.citizen_delivery.get("address") or "—" }}</dd></div>
+            </dl>
+            {% else %}<p class="admin-empty">No home-delivery details were saved for this application. A simulated destination is used for the map.</p>{% endif %}
+        </section>
+        <section class="review-modal-section">
+            <h3>Courier and delivery notes</h3>
+            <dl class="review-detail-grid">
+                <div><dt>Assigned courier</dt><dd>{{ tracking.delivery.courier_name or "Not assigned" }}</dd></div>
+                <div><dt>Courier contact</dt><dd>{{ tracking.delivery.courier_contact or "—" }}</dd></div>
+                <div><dt>Delivery status</dt><dd><span class="admin-status-pill admin-status-pill--{{ tracking.delivery.status or 'pending' }}">{{ tracking.delivery.label }}</span></dd></div>
+                <div><dt>Delivery progress</dt><dd>{{ tracking.delivery_progress_percent }}%</dd></div>
+                <div class="review-detail-wide"><dt>Delivery notes</dt><dd>{{ tracking.delivery.note or "No delivery notes recorded." }}</dd></div>
+            </dl>
+        </section>
+    </div>
+</dialog>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin_review.js') }}"></script>
+{% if tracking.map %}
+<script>window.ONE_GOV_ADMIN_DELIVERY_MAPS = {{ [tracking.map]|tojson }};</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='js/admin_delivery_map.js') }}"></script>
+{% endif %}
 {% endblock %}

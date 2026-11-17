@@ -1,6 +1,6 @@
 import re
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request
 from flask_login import current_user
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
@@ -13,6 +13,7 @@ from app.models.payment import Payment
 from app.models.service import Service
 from app.models.user import User
 from app.utils.decorators import citizen_portal_required
+from app.utils.portal import portal_url_for as url_for
 from app.utils.validators import clean_text, validate_name, normalize_contact_number
 
 PENDING_STATUSES = frozenset({
@@ -202,8 +203,7 @@ def _citizen_notifications(user_id):
     return notices, unread or 0
 
 
-@citizen_bp.context_processor
-def citizen_navigation():
+def portal_navigation_context():
     if not current_user.is_authenticated or current_user.role not in {
         User.ROLE_CITIZEN,
         User.ROLE_SYSTEM_ADMIN,
@@ -248,6 +248,11 @@ def citizen_navigation():
         "beneficiary_rows": beneficiary_rows,
         "show_saved_answer": show_saved_answer,
     }
+
+
+@citizen_bp.context_processor
+def citizen_navigation():
+    return portal_navigation_context()
 
 
 @citizen_bp.route("/citizen/dashboard")

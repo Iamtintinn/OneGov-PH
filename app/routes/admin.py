@@ -27,6 +27,13 @@ from app.utils.validators import clean_text, normalize_email, normalize_contact_
 
 admin_bp = Blueprint("admin", __name__)
 
+
+@admin_bp.context_processor
+def admin_navigation():
+    from app.routes.citizen import portal_navigation_context
+
+    return portal_navigation_context()
+
 PENDING_STATUSES = ("submitted", "under_review", "pending_documents", "for_payment")
 ACCOUNT_STATUSES = ("active", "inactive", "suspended")
 PERMISSION_OPTIONS = (
@@ -386,6 +393,12 @@ def application_detail(application_id):
             )
         ).all()
     } if events else {}
+    from app.routes.admin_portal import (
+        ADMIN_PROCESSING_STATUSES,
+        DELIVERY_STATUSES,
+        tracking_detail_data,
+    )
+
     return render_template(
         "admin/application_detail.html",
         application=application,
@@ -395,6 +408,9 @@ def application_detail(application_id):
         actors=actors,
         statuses=APPLICATION_STATUSES,
         status_labels=STATUS_LABELS,
+        tracking=tracking_detail_data(application, applicant),
+        processing_statuses=ADMIN_PROCESSING_STATUSES,
+        delivery_statuses=DELIVERY_STATUSES,
     )
 
 
