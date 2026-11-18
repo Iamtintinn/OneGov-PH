@@ -36,7 +36,9 @@
                 <strong>{{ tracking.delivery_progress_percent }}%</strong>
             </div>
         </div>
-        {% if tracking.map %}
+        {% if tracking.passport_fulfillment and tracking.passport_fulfillment.fulfillment_method == 'pickup' %}
+        <p class="admin-empty">This passport application is set for pickup. Pickup details are shown below; no dispatch route is used.</p>
+        {% elif tracking.map %}
         <div class="review-map-frame">
             <div id="{{ tracking.map.map_id }}" class="admin-track-map review-map" role="application" aria-label="Delivery route map for {{ application.tracking_number }}"></div>
         </div>
@@ -83,13 +85,48 @@
         </button>
     </section>
 
+    {% set passport = tracking.passport_fulfillment %}
+    {% if passport %}
+    <section class="review-card review-passport-confirmation-card" id="physical-requirements">
+        <div class="review-card-heading">
+            <div><p class="review-kicker">PASSPORT REQUIREMENTS</p><h2>Documents and physical requirements</h2></div>
+            <span class="admin-status-pill admin-status-pill--{{ 'approved' if passport.confirmed else 'pending' }}">{{ 'Confirmed' if passport.confirmed else 'Pending confirmation' }}</span>
+        </div>
+        <dl class="review-detail-grid">
+            <div><dt>Fulfillment</dt><dd>{{ passport.fulfillment_label }}</dd></div>
+            {% if passport.pickup_location %}<div class="review-detail-wide"><dt>Pickup office</dt><dd>{{ passport.pickup_location }}</dd></div>{% endif %}
+            {% if passport.confirmed %}
+            <div><dt>Confirmed by</dt><dd>{{ passport.confirmed_by_name or "Administrator" }}</dd></div>
+            <div><dt>Confirmed at</dt><dd>{{ passport.confirmed_at_label or "—" }}</dd></div>
+            {% if passport.pickup_id %}<div><dt>Pickup ID</dt><dd class="review-mono">{{ passport.pickup_id }}</dd></div>{% endif %}
+            {% if passport.pickup_date_label %}<div><dt>Pickup date</dt><dd>{{ passport.pickup_date_label }}</dd></div>{% endif %}
+            {% endif %}
+        </dl>
+        {% if not passport.confirmed and (is_system_admin or is_department_admin) %}
+        <form class="review-form" method="post" action="{{ url_for('admin.confirm_physical_requirements', application_id=application.application_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p class="review-hint">{{ passport.help }}</p>
+            <div class="review-form-actions"><button class="admin-button admin-button--primary" type="submit">Confirm documents and physical requirements</button></div>
+        </form>
+        {% elif not passport.confirmed %}
+        <p class="review-hint">Only administrators can confirm physical requirements.</p>
+        {% elif passport.fulfillment_method == 'pickup' %}
+        <p class="review-hint">Pickup details are ready. No courier assignment is needed for this application.</p>
+        {% else %}
+        <p class="review-hint">Confirmation complete. You can now update the application status and delivery details.</p>
+        {% endif %}
+    </section>
+    {% endif %}
+
     <section class="review-control-grid" aria-label="Admin status management">
         <div class="review-card review-processing-card" id="processing-status">
             <div class="review-card-heading">
                 <div><p class="review-kicker">APPLICATION PROCESSING</p><h2>Application status</h2></div>
                 <span class="admin-status-pill admin-status-pill--{{ application.application_status }}">{{ tracking.processing_label }}</span>
             </div>
-            {% if tracking.can_update_status %}
+            {% if passport and not passport.confirmed %}
+            <p class="review-hint">{{ passport.gate_message }}</p>
+            {% elif tracking.can_update_status %}
             <form class="review-form" method="post" action="{{ url_for('admin_portal.tracking') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="action" value="update_status">
@@ -105,17 +142,25 @@
                 <div class="review-form-actions"><button class="admin-button admin-button--primary" type="submit">Save Processing Status</button></div>
             </form>
             {% else %}<p class="admin-empty">This application is closed and cannot be updated here.</p>{% endif %}
+            {% if not passport %}
             <details class="review-secondary-form">
                 <summary>Request correction or other status update</summary>
                 <form class="review-form" method="post" action="{{ url_for('admin.update_application', application_id=application.application_id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <label class="review-field">Application status
+                        {% if passport_status_options %}
+                        <select name="application_status" required>
+                            {% for option in passport_status_options %}<option value="{{ option['key'] }}" {% if passport_status_key == option['key'] %}selected{% endif %}>{{ option['label'] }}</option>{% endfor %}
+                        </select>
+                        {% else %}
                         <select name="application_status" required>{% for status in statuses if status != 'draft' %}<option value="{{ status }}" {% if application.application_status == status %}selected{% endif %}>{{ status_labels[status] }}</option>{% endfor %}</select>
+                        {% endif %}
                     </label>
                     <label class="review-field">Remarks or correction request<textarea name="remarks" maxlength="500" rows="3" placeholder="Explain the update or tell the citizen what to correct."></textarea><small>Required for rejection or correction requests.</small></label>
                     <div class="review-form-actions"><button class="admin-button admin-button--quiet" type="submit" onclick="return confirm('Save this application status and notify the citizen?');">Save Update</button></div>
                 </form>
             </details>
+            {% endif %}
         </div>
 
         <div class="review-card review-delivery-card" id="delivery-management">
@@ -123,7 +168,16 @@
                 <div><p class="review-kicker">DELIVERY MANAGEMENT</p><h2>Dispatch status</h2></div>
                 <span class="admin-status-pill admin-status-pill--{{ tracking.delivery.status or 'pending' }}">{{ tracking.delivery.label }}</span>
             </div>
-            {% if is_system_admin or is_department_admin %}
+            {% if passport and passport.fulfillment_method == 'pickup' %}
+            <dl class="review-detail-grid">
+                <div><dt>Fulfillment</dt><dd>Pickup at DFA office</dd></div>
+                {% if passport.pickup_location %}<div class="review-detail-wide"><dt>Pickup office</dt><dd>{{ passport.pickup_location }}</dd></div>{% endif %}
+                {% if passport.confirmed %}
+                <div><dt>Pickup ID</dt><dd class="review-mono">{{ passport.pickup_id }}</dd></div>
+                <div><dt>Pickup date</dt><dd>{{ passport.pickup_date_label }}</dd></div>
+                {% else %}<div class="review-detail-wide"><dt>Pickup details</dt><dd>Available after confirming physical requirements.</dd></div>{% endif %}
+            </dl>
+            {% elif is_system_admin or is_department_admin %}
             <fieldset class="review-delivery-fieldset" {% if not tracking.can_manage_delivery %}disabled{% endif %}>
             <div class="review-delivery-forms">
                 <form class="review-subform review-form" method="post" action="{{ url_for('admin_portal.tracking') }}">
@@ -153,7 +207,7 @@
                 </form>
             </div>
             </fieldset>
-            {% if not tracking.can_manage_delivery %}<p class="review-hint">Set the application to Ready for Dispatch to enable courier and delivery updates.</p>{% elif tracking.delivery.status == "courier_assigned" %}<p class="review-hint">The animated route progresses once the courier marks the document Picked Up.</p>{% elif not tracking.delivery.status %}<p class="review-hint">Assign a courier, then set Picked Up to begin the animated delivery route.</p>{% endif %}
+            {% if passport and passport.gate_message %}<p class="review-hint">{{ passport.gate_message }}</p>{% elif not tracking.can_manage_delivery %}<p class="review-hint">Set the application to Ready for Dispatch to enable courier and delivery updates.</p>{% elif tracking.delivery.status == "courier_assigned" %}<p class="review-hint">The animated route progresses once the courier marks the document Picked Up.</p>{% elif not tracking.delivery.status %}<p class="review-hint">Assign a courier, then set Picked Up to begin the animated delivery route.</p>{% endif %}
             {% else %}<p class="admin-muted">Delivery controls are reserved for administrators.</p>{% endif %}
         </div>
     </section>

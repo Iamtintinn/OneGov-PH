@@ -13,9 +13,9 @@
         <header class="pay-hero confirm-hero delivery-page-hero">
             <div class="pay-hero-copy">
                 <p class="pay-kicker">Home delivery</p>
-                <h1 id="delivery-heading">{% if spec.kind in ['residency', 'birth', 'cenomar'] %}Where should we deliver your certificate?{% else %}Where should we deliver your clearance?{% endif %}</h1>
+                <h1 id="delivery-heading">{% if spec.kind == 'passport' %}Where should we deliver your passport?{% elif spec.kind in ['residency', 'birth', 'cenomar'] %}Where should we deliver your certificate?{% else %}Where should we deliver your clearance?{% endif %}</h1>
                 <p class="welcome-text">
-                    Pin the exact delivery location on the map first, then complete the recipient and address details below. {% if spec.kind == 'residency' %}Certificate of Residency{% elif spec.kind == 'birth' %}Birth Certificate{% elif spec.kind == 'cenomar' %}CENOMAR{% else %}Barangay Clearance{% endif %} is delivered to this address only.
+                    Pin the exact delivery location on the map first, then complete the recipient and address details below. {% if spec.kind == 'passport' %}Your passport{% elif spec.kind == 'residency' %}Certificate of Residency{% elif spec.kind == 'birth' %}Birth Certificate{% elif spec.kind == 'cenomar' %}CENOMAR{% else %}Barangay Clearance{% endif %} is delivered to this address only.
                 </p>
             </div>
             <div class="confirm-success-chip" aria-hidden="true">
@@ -26,6 +26,7 @@
 
         <form class="apply-form delivery-page-form" method="post" action="{{ url_for('citizen.apply_delivery', application_id=application.application_id) }}" id="delivery-form" novalidate>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% if fulfillment_method %}<input type="hidden" name="fulfillment_method" value="{{ fulfillment_method }}">{% endif %}
             <input type="hidden" name="latitude" id="delivery-latitude" value="{{ values.latitude }}">
             <input type="hidden" name="longitude" id="delivery-longitude" value="{{ values.longitude }}">
             <input type="hidden" name="delivery_location_confirmed" id="delivery-location-confirmed" value="{{ 'yes' if values.location_confirmed else '' }}">
@@ -46,7 +47,7 @@
                         </span>
                         <div>
                             <h2 id="delivery-map-heading">{% if show_origin_map %}Pin the delivery route{% else %}Pin the delivery location{% endif %}</h2>
-                            <p class="field-help">{% if fixed_origin_map %}The route starts at PSA Central Office / CRS. Click the map to pin where the document will be delivered.{% elif show_origin_map %}First pin where the document is coming from, then pin where it will be delivered. The route line appears once both pins are set.{% else %}Select a demonstration barangay, then click the map or drag the pin to the exact delivery point.{% endif %}</p>
+                            <p class="field-help">{% if fixed_origin_map %}The route starts at {{ values.origin_barangay }}. Click the map to pin where the document will be delivered.{% elif show_origin_map %}First pin where the document is coming from, then pin where it will be delivered. The route line appears once both pins are set.{% else %}Select a demonstration barangay, then click the map or drag the pin to the exact delivery point.{% endif %}</p>
                         </div>
                     </div>
                     <button class="dash-button apply-cancel pay-btn-ghost delivery-map-detect" type="button" id="detect-location">
@@ -129,7 +130,7 @@
                     {% if show_origin_map %}
                     <p class="delivery-map-status{% if values.origin_location_confirmed %} is-confirmed{% endif %}" id="origin-location-status" role="status">
                         {% if fixed_origin_map %}
-                        PSA Central Office / CRS start pin fixed.
+                        {{ values.origin_barangay }} start pin fixed.
                         {% elif spec.kind in ['barangay', 'residency'] %}
                             {% if values.origin_location_confirmed %}Starting pin placed.{% else %}No starting pin yet.{% endif %}
                         {% elif values.origin_location_confirmed %}
@@ -199,7 +200,7 @@
                     <div class="passport-details-fields delivery-fields">
                         <div class="apply-field{% if errors.get('recipient_name') %} has-error{% endif %}">
                             <label for="recipient_name">Recipient full name</label>
-                            <p class="field-help" id="recipient_name-help">Enter the name of the person who will receive the {% if spec.kind in ['residency', 'birth', 'cenomar'] %}certificate{% else %}clearance{% endif %}.</p>
+                            <p class="field-help" id="recipient_name-help">Enter the name of the person who will receive the {% if spec.kind == 'passport' %}passport{% elif spec.kind in ['residency', 'birth', 'cenomar'] %}certificate{% else %}clearance{% endif %}.</p>
                             <div class="text-input">
                                 <input id="recipient_name" name="recipient_name" type="text" maxlength="200" autocomplete="off" value="{{ values.recipient_name }}" required aria-describedby="recipient_name-help{% if errors.get('recipient_name') %} recipient_name-error{% endif %}">
                             </div>
@@ -319,6 +320,23 @@
                             <div>
                                 <dt>Total at payment</dt>
                                 <dd>{{ payment_summary.amount_display }}</dd>
+                            </div>
+                            {% elif spec.kind == 'passport' %}
+                            <div>
+                                <dt>Passport application fee</dt>
+                                <dd>{{ passport_payment_summary.application_fee_display }}</dd>
+                            </div>
+                            <div>
+                                <dt>Home delivery fee</dt>
+                                <dd>₱{{ "%.2f"|format(delivery_fee) }}</dd>
+                            </div>
+                            <div>
+                                <dt>Total at payment</dt>
+                                <dd>₱{{ "{:,.2f}".format(passport_payment_summary.application_fee + delivery_fee) }}</dd>
+                            </div>
+                            <div>
+                                <dt>Delivery coverage</dt>
+                                <dd>Quezon City demonstration barangays only</dd>
                             </div>
                             {% else %}
                             <div>
@@ -496,7 +514,7 @@ window.ONE_GOV_DELIVERY = {
         }
         if (fixedOriginFlow) {
             activePinKind = "delivery";
-            setStatus("origin", "PSA Central Office / CRS start pin fixed.");
+            setStatus("origin", {{ values.origin_barangay|tojson }} + " start pin fixed.");
             setStatus(
                 "delivery",
                 getPoint("delivery")

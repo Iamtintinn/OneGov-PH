@@ -47,6 +47,23 @@
         </dl>
         {% include "applications/_office.html" %}
         {% if spec and spec.fee_note %}<p class="empty-note">{{ spec.fee_note }}</p>{% endif %}
+        {% if spec and spec.kind == 'passport' and passport_physical and passport_physical.confirmed %}
+        <h2>Physical requirements</h2>
+        <p class="notice notice-warning">Demonstration confirmation — not an official DFA record.</p>
+        <dl class="detail-list">
+            <div><dt>Fulfillment</dt><dd>{{ passport_physical.fulfillment_label }}</dd></div>
+            <div><dt>Confirmed on</dt><dd>{{ passport_physical.confirmed_at_label or "—" }}</dd></div>
+            {% if passport_physical.pickup_location %}
+            <div><dt>Pickup office</dt><dd>{{ passport_physical.pickup_location }}</dd></div>
+            {% endif %}
+            {% if passport_physical.pickup_id %}
+            <div><dt>Pickup ID</dt><dd class="pay-mono">{{ passport_physical.pickup_id }}</dd></div>
+            {% endif %}
+            {% if passport_physical.pickup_date_label %}
+            <div><dt>Pickup date</dt><dd>{{ passport_physical.pickup_date_label }}</dd></div>
+            {% endif %}
+        </dl>
+        {% endif %}
         {% if spec and spec.kind == 'passport' and passport_appointment %}
         <h2>Demonstration appointment</h2>
         <p class="notice notice-warning">Demonstration Appointment – Not an Official DFA Appointment</p>

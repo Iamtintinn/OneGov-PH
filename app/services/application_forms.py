@@ -430,8 +430,9 @@ SERVICE_FORMS = {
             "3. Application details",
             "4. Review",
             "5. Scheduling",
-            "6. Payment",
-            "7. Confirmation",
+            "6. Delivery",
+            "7. Payment",
+            "8. Confirmation",
         ),
         "type_first": True,
         "documents_first": True,
@@ -443,11 +444,54 @@ SERVICE_FORMS = {
             "I understand that OneGov PH is not affiliated with or authorized by the Department of Foreign Affairs (DFA), "
             "and that appointment schedules, payments, and confirmations here are simulated."
         ),
-        "fee_note": "Demonstration passport fee: ₱1,150.00. You choose Maya sandbox or onsite payment after scheduling.",
-        "confirmation_step": 7,
+        "fee_note": (
+            "Demonstration passport fee: ₱1,150.00. Choose pickup or home delivery after scheduling; "
+            "home delivery adds ₱50.00. Payment is completed through Maya sandbox or onsite demonstration options."
+        ),
+        "confirmation_step": 8,
+        "physical_requirements_confirmation": {
+            "label": "Confirm physical requirements",
+            "help": (
+                "Confirm that the applicant submitted the required documents and completed "
+                "the physical passport requirements before changing the application status."
+            ),
+            "gate_message": (
+                "Confirm the applicant's documents and physical requirements before updating the application status."
+            ),
+            "pickup_id_prefix": "PU",
+            "pickup_lead_business_days": 7,
+        },
+        "admin_status_options": (
+            {"key": "submitted", "label": "Submitted", "legacy_status": "submitted"},
+            {"key": "under_review", "label": "Under Review", "legacy_status": "under_review"},
+            {"key": "corrections_requested", "label": "Corrections Requested", "legacy_status": "pending_documents"},
+            {"key": "for_payment", "label": "For Payment", "legacy_status": "for_payment"},
+            {"key": "paid", "label": "Paid", "legacy_status": "paid"},
+            {"key": "appointment_scheduled", "label": "Appointment Scheduled", "legacy_status": "scheduled"},
+            {"key": "for_personal_appearance", "label": "For Personal Appearance", "legacy_status": "for_biometrics"},
+            {"key": "personal_appearance_completed", "label": "Personal Appearance Completed", "legacy_status": "approved"},
+            {"key": "for_processing", "label": "For Processing", "legacy_status": "processing"},
+            {"key": "for_printing", "label": "For Printing", "legacy_status": "approved"},
+            {"key": "ready_for_pickup", "label": "Ready for Pickup", "legacy_status": "ready_for_release"},
+            {"key": "released_claimed", "label": "Released / Claimed", "legacy_status": "completed"},
+            {"key": "completed", "label": "Completed", "legacy_status": "completed"},
+            {"key": "rejected", "label": "Rejected", "legacy_status": "rejected"},
+            {"key": "cancelled", "label": "Cancelled", "legacy_status": "cancelled"},
+        ),
         "status_labels": {
+            "submitted": "Submitted",
+            "under_review": "Under Review",
+            "pending_documents": "Corrections Requested",
+            "for_payment": "For Payment",
             "paid": "Paid",
-            "scheduled": "Scheduled",
+            "scheduled": "Appointment Scheduled",
+            "for_biometrics": "For Personal Appearance",
+            "approved": "Personal Appearance Completed",
+            "processing": "For Processing",
+            "ready_for_release": "Ready for Pickup",
+            "completed": "Completed",
+            "rejected": "Rejected",
+            "cancelled": "Cancelled",
         },
         "submit_event": (
             "Passport appointment and payment were saved in OneGov PH."
@@ -458,6 +502,7 @@ SERVICE_FORMS = {
         "next_steps": (
             "Keep your confirmation ID and reference number.",
             "Bring the physical documents listed for your application type to your appointment.",
+            "If you chose home delivery, keep the pinned delivery address ready for tracking updates.",
             "Open Application tracking to see status changes on your account.",
             "Download the PDF confirmation for your records.",
         ),
@@ -2570,6 +2615,8 @@ def specification_for(service, values=None):
         "step_labels",
         "confirmation_step",
         "status_labels",
+        "physical_requirements_confirmation",
+        "admin_status_options",
         "submit_event",
         "submit_notice",
         "next_steps",

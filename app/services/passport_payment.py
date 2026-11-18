@@ -2,6 +2,7 @@
 
 import secrets
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import update
 
@@ -20,6 +21,7 @@ from app.services.maya_checkout import (
     retrieve_payment_by_id,
     retrieve_payment_by_rrn,
 )
+from app.services.passport_delivery import DELIVERY, delivery_fee_for, fulfillment_method
 from app.services.passport_scheduling import appointment_for, demo_fee
 from app.services.tracking_service import add_event
 
@@ -73,7 +75,10 @@ def latest_payment(application):
 def payment_summary(application):
     answers = field_map(application)
     appointment = appointment_for(application)
-    amount = demo_fee(answers.get("application_type"))
+    application_fee = demo_fee(answers.get("application_type"))
+    delivery_fee = delivery_fee_for(application)
+    amount = application_fee + delivery_fee
+    delivery_method = fulfillment_method(application)
     payment = latest_payment(application)
     status_label = None
     status_key = None
@@ -93,16 +98,27 @@ def payment_summary(application):
             status_label = "Cancelled"
         else:
             status_label = payment.payment_status.replace("_", " ").title()
-    processing_fee = 0
+    processing_fee = Decimal("0.00")
+    fee_lines = [
+        {"label": "Passport application fee", "amount_display": f"₱{application_fee:,.2f}"},
+    ]
+    if delivery_method == DELIVERY:
+        fee_lines.append({"label": "Home delivery fee", "amount_display": f"₱{delivery_fee:,.2f}"})
+    fee_lines.append({"label": "Processing fee", "amount_display": f"₱{processing_fee:,.2f}"})
     return {
         "application_type": answers.get("application_type") or "",
         "appointment": appointment,
+        "delivery_method": delivery_method,
         "amount": amount,
         "amount_display": f"₱{amount:,.2f}",
-        "application_fee": amount,
-        "application_fee_display": f"₱{amount:,.2f}",
+        "application_fee": application_fee,
+        "application_fee_display": f"₱{application_fee:,.2f}",
+        "application_fee_label": "Passport application fee",
+        "delivery_fee": delivery_fee,
+        "delivery_fee_display": f"₱{delivery_fee:,.2f}",
         "processing_fee": processing_fee,
         "processing_fee_display": f"₱{processing_fee:,.2f}",
+        "fee_lines": fee_lines,
         "payment": payment,
         "method_label": METHOD_LABELS.get(payment.payment_method) if payment else None,
         "status_label": status_label,
@@ -187,7 +203,7 @@ def record_demo_payment(application, user, choice, online_method=None):
     if application.application_status != "draft" and existing is not None:
         return None
 
-    amount = demo_fee(field_map(application).get("application_type"))
+    amount = payment_summary(application)["amount"]
     now = _now()
     if choice == "online":
         method = str(online_method or "").strip()
@@ -262,7 +278,7 @@ def start_maya_checkout(application, user):
     if existing is not None and existing.payment_status == "paid":
         return None, "This application is already paid."
 
-    amount = demo_fee(field_map(application).get("application_type"))
+    amount = payment_summary(application)["amount"]
     now = _now()
     if existing is not None and existing.payment_method == "maya" and existing.payment_status == "pending":
         payment = existing

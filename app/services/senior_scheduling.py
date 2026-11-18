@@ -6,21 +6,37 @@ from app.models.notification import Notification
 from app.services.application_service import read_details, write_details
 
 LOCATIONS = (
-    {
-        "code": "osca_main",
-        "label": "OSCA Main Office (Demonstration)",
-        "address": "Demonstration site · City / municipal OSCA main window",
-    },
-    {
-        "code": "osca_satellite",
-        "label": "OSCA Satellite Desk (Demonstration)",
-        "address": "Demonstration site · OSCA satellite service desk",
-    },
-    {
-        "code": "osca_community",
-        "label": "OSCA Community Center Window (Demonstration)",
-        "address": "Demonstration site · Community center senior services window",
-    },
+    {"code": "osca_caloocan", "region": "NCR", "city": "Caloocan City", "label": "Caloocan OSCA", "address": "Caloocan City · NCR · Demonstration OSCA appointment office"},
+    {"code": "osca_quezon_city", "region": "NCR", "city": "Quezon City", "label": "Quezon City OSCA", "address": "Quezon City · NCR · Demonstration OSCA appointment office"},
+    {"code": "osca_manila", "region": "NCR", "city": "Manila", "label": "Manila OSCA", "address": "Manila · NCR · Demonstration OSCA appointment office"},
+    {"code": "osca_pasig", "region": "NCR", "city": "Pasig City", "label": "Pasig OSCA", "address": "Pasig City · NCR · Demonstration OSCA appointment office"},
+    {"code": "osca_makati", "region": "NCR", "city": "Makati City", "label": "Makati OSCA", "address": "Makati City · NCR · Demonstration OSCA appointment office"},
+    {"code": "osca_malabon", "region": "NCR", "city": "Malabon City", "label": "Malabon OSCA", "address": "Malabon City · NCR · Demonstration OSCA appointment office"},
+    {"code": "osca_valenzuela", "region": "NCR", "city": "Valenzuela City", "label": "Valenzuela OSCA", "address": "Valenzuela City · NCR · Demonstration OSCA appointment office"},
+    {"code": "osca_pasay", "region": "NCR", "city": "Pasay City", "label": "Pasay OSCA", "address": "Pasay City · NCR · Demonstration OSCA appointment office"},
+    {"code": "osca_angeles", "region": "Region III", "city": "Angeles City, Pampanga", "label": "Angeles OSCA", "address": "Angeles City, Pampanga · Region III · Demonstration OSCA appointment office"},
+    {"code": "osca_san_fernando_pampanga", "region": "Region III", "city": "San Fernando, Pampanga", "label": "San Fernando OSCA", "address": "San Fernando, Pampanga · Region III · Demonstration OSCA appointment office"},
+    {"code": "osca_olongapo", "region": "Region III", "city": "Olongapo City, Zambales", "label": "Olongapo OSCA", "address": "Olongapo City, Zambales · Region III · Demonstration OSCA appointment office"},
+    {"code": "osca_malolos", "region": "Region III", "city": "Malolos City, Bulacan", "label": "Malolos OSCA", "address": "Malolos City, Bulacan · Region III · Demonstration OSCA appointment office"},
+    {"code": "osca_meycauayan", "region": "Region III", "city": "Meycauayan, Bulacan", "label": "Meycauayan OSCA", "address": "Meycauayan, Bulacan · Region III · Demonstration OSCA appointment office"},
+    {"code": "osca_balanga", "region": "Region III", "city": "Balanga City, Bataan", "label": "Balanga OSCA", "address": "Balanga City, Bataan · Region III · Demonstration OSCA appointment office"},
+    {"code": "osca_antipolo", "region": "Region IV-A", "city": "Antipolo City, Rizal", "label": "Antipolo OSCA", "address": "Antipolo City, Rizal · Region IV-A · Demonstration OSCA appointment office"},
+    {"code": "osca_bacoor", "region": "Region IV-A", "city": "Bacoor City, Cavite", "label": "Bacoor OSCA", "address": "Bacoor City, Cavite · Region IV-A · Demonstration OSCA appointment office"},
+    {"code": "osca_dasmarinas", "region": "Region IV-A", "city": "Dasmariñas City, Cavite", "label": "Dasmariñas OSCA", "address": "Dasmariñas City, Cavite · Region IV-A · Demonstration OSCA appointment office"},
+    {"code": "osca_imus", "region": "Region IV-A", "city": "Imus City, Cavite", "label": "Imus OSCA", "address": "Imus City, Cavite · Region IV-A · Demonstration OSCA appointment office"},
+    {"code": "osca_calamba", "region": "Region IV-A", "city": "Calamba City, Laguna", "label": "Calamba OSCA", "address": "Calamba City, Laguna · Region IV-A · Demonstration OSCA appointment office"},
+    {"code": "osca_santa_rosa", "region": "Region IV-A", "city": "Santa Rosa City, Laguna", "label": "Santa Rosa OSCA", "address": "Santa Rosa City, Laguna · Region IV-A · Demonstration OSCA appointment office"},
+    {"code": "osca_batangas", "region": "Region IV-A", "city": "Batangas City", "label": "Batangas OSCA", "address": "Batangas City · Region IV-A · Demonstration OSCA appointment office"},
+    {"code": "osca_lucena", "region": "Region IV-A", "city": "Lucena City, Quezon", "label": "Lucena OSCA", "address": "Lucena City, Quezon · Region IV-A · Demonstration OSCA appointment office"},
+    {"code": "osca_san_fernando_la_union", "region": "Region I", "city": "San Fernando City, La Union", "label": "San Fernando OSCA", "address": "San Fernando City, La Union · Region I · Demonstration OSCA appointment office"},
+    {"code": "osca_laoag", "region": "Region I", "city": "Laoag City, Ilocos Norte", "label": "Laoag OSCA", "address": "Laoag City, Ilocos Norte · Region I · Demonstration OSCA appointment office"},
+    {"code": "osca_dagupan", "region": "Region I", "city": "Dagupan City, Pangasinan", "label": "Dagupan OSCA", "address": "Dagupan City, Pangasinan · Region I · Demonstration OSCA appointment office"},
+    {"code": "osca_tuguegarao", "region": "Region II", "city": "Tuguegarao City, Cagayan", "label": "Tuguegarao OSCA", "address": "Tuguegarao City, Cagayan · Region II · Demonstration OSCA appointment office"},
+    {"code": "osca_legazpi", "region": "Region V", "city": "Legazpi City, Albay", "label": "Legazpi OSCA", "address": "Legazpi City, Albay · Region V · Demonstration OSCA appointment office"},
+    {"code": "osca_baguio", "region": "CAR", "city": "Baguio City", "label": "Baguio OSCA", "address": "Baguio City · CAR · Demonstration OSCA appointment office"},
+    {"code": "osca_main", "region": "Demonstration", "city": "Demonstration site", "label": "OSCA Main Office (Demonstration)", "address": "Demonstration site · City / municipal OSCA main window", "legacy": True},
+    {"code": "osca_satellite", "region": "Demonstration", "city": "Demonstration site", "label": "OSCA Satellite Desk (Demonstration)", "address": "Demonstration site · OSCA satellite service desk", "legacy": True},
+    {"code": "osca_community", "region": "Demonstration", "city": "Demonstration site", "label": "OSCA Community Center Window (Demonstration)", "address": "Demonstration site · Community center senior services window", "legacy": True},
 )
 
 TIME_SLOTS = ("08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00")

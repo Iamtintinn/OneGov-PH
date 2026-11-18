@@ -66,6 +66,12 @@ def read_details(application):
         details["appointment"] = raw["appointment"]
     if raw.get("delivery"):
         details["delivery"] = raw["delivery"]
+    if isinstance(raw.get("physical_requirements"), dict):
+        details["physical_requirements"] = raw["physical_requirements"]
+    if raw.get("passport_status_key"):
+        details["passport_status_key"] = raw["passport_status_key"]
+    if raw.get("admin_tracking"):
+        details["admin_tracking"] = raw["admin_tracking"]
     if raw.get("confirmation"):
         details["confirmation"] = raw["confirmation"]
     if raw.get("payment"):
@@ -102,6 +108,12 @@ def write_details(application, details, commit=True):
         payload["appointment"] = details["appointment"]
     if details.get("delivery"):
         payload["delivery"] = details["delivery"]
+    if isinstance(details.get("physical_requirements"), dict):
+        payload["physical_requirements"] = details["physical_requirements"]
+    if details.get("passport_status_key"):
+        payload["passport_status_key"] = details["passport_status_key"]
+    if details.get("admin_tracking"):
+        payload["admin_tracking"] = details["admin_tracking"]
     if details.get("confirmation"):
         payload["confirmation"] = details["confirmation"]
     if details.get("payment"):
@@ -1630,6 +1642,10 @@ def continue_target(application):
 
         if appointment_for(application) is None:
             return "schedule"
+        from app.services.passport_delivery import delivery_ready
+
+        if not delivery_ready(application):
+            return "delivery"
         return "payment"
     if spec.get("kind") == "philsys":
         if missing_documents(application, spec):

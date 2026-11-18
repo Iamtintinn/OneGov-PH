@@ -238,6 +238,17 @@ def portal_navigation_context():
         spec = specification_for(service, values) if service is not None else None
         if spec and spec.get("status_labels"):
             labels.update(spec["status_labels"])
+        if application is not None:
+            from app.services.passport_admin import (
+                current_status_key,
+                is_passport_application,
+                status_label,
+            )
+
+            if is_passport_application(application) and current_status_key(application):
+                label = status_label(application)
+                if label:
+                    labels[application.application_status] = label
         return labels
 
     def beneficiary_rows(value):
@@ -313,16 +324,19 @@ def application_detail(application_id):
     documents = [] if spec is None or spec.get("checklist") else document_rules(spec, answers)
     passport_appointment = None
     passport_summary = None
+    passport_physical = None
     passport_confirmation_id = None
     barangay_summary = None
     barangay_confirmation_id = None
     if spec and spec.get("kind") == "passport":
+        from app.services.passport_admin import summary as physical_summary
         from app.services.passport_confirmation_pdf import confirmation_id_for
         from app.services.passport_payment import payment_summary
         from app.services.passport_scheduling import appointment_for
 
         passport_appointment = appointment_for(application)
         passport_summary = payment_summary(application)
+        passport_physical = physical_summary(application)
         if application.application_status != "draft":
             passport_confirmation_id = confirmation_id_for(application)
     elif spec and spec.get("kind") in {"barangay", "residency"}:
@@ -386,6 +400,7 @@ def application_detail(application_id):
         requirements={item.requirement_name: item for item in application.requirements},
         passport_appointment=passport_appointment,
         passport_summary=passport_summary,
+        passport_physical=passport_physical,
         passport_confirmation_id=passport_confirmation_id,
         barangay_summary=barangay_summary,
         barangay_confirmation_id=barangay_confirmation_id,

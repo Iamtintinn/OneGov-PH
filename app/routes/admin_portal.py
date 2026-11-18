@@ -34,6 +34,13 @@ from app.utils.validators import clean_text, normalize_contact_number
 
 admin_portal_bp = Blueprint("admin_portal", __name__)
 
+
+def _passport_confirmation_gate(application):
+    from app.services.passport_admin import gate_message
+
+    return gate_message(application)
+
+
 LEGACY_STATUS_LABELS = {
     "draft": "Draft",
     "submitted": "Submitted",
@@ -61,9 +68,14 @@ ADMIN_PROCESSING_STATUSES = (
     ("document_approved", "Document Approved", "approved"),
     ("ready_for_dispatch", "Ready for Dispatch", "ready_for_release"),
 )
+PASSPORT_PROCESSING_STATUSES = (
+    ("cancelled", "Cancelled", "cancelled"),
+    ("rejected", "Rejected", "rejected"),
+    ("released_claimed", "Released / Claimed", "completed"),
+)
 ADMIN_PROCESSING_BY_KEY = {
     key: {"key": key, "label": label, "legacy_status": legacy}
-    for key, label, legacy in ADMIN_PROCESSING_STATUSES
+    for key, label, legacy in ADMIN_PROCESSING_STATUSES + PASSPORT_PROCESSING_STATUSES
 }
 ADMIN_PROCESSING_KEY_BY_LEGACY = {}
 for _key, _label, _legacy in ADMIN_PROCESSING_STATUSES:
@@ -298,15 +310,33 @@ def _delivery_map_data(application, delivery, applicant):
 
 def tracking_detail_data(application, applicant=None, include_map=True):
     """Build the tracking controls shared by the list and full review page."""
+    from app.services.passport_admin import (
+        current_status_key,
+        status_label,
+        summary as passport_summary,
+    )
+    from app.services.passport_delivery import PICKUP
+
+    passport = passport_summary(application)
     state = _admin_tracking_state(application)
     service_labels = _service_status_labels(application)
     processing_key, processing_label = _current_processing(
         application, state, service_labels
     )
+    if passport and current_status_key(application):
+        processing_label = status_label(application) or processing_label
+    elif passport and passport["fulfillment_method"] == PICKUP and processing_key == "ready_for_dispatch":
+        processing_label = "Ready for Pickup"
     delivery = _delivery_state(state)
     map_payload = None
-    if include_map:
+    if include_map and not (passport and passport["fulfillment_method"] == PICKUP):
         map_payload = _delivery_map_data(application, delivery, applicant)
+    gated = bool(passport and passport["gate_message"])
+    can_manage_delivery = application.application_status == "ready_for_release" or bool(
+        delivery["status"]
+    )
+    if gated or (passport and passport["fulfillment_method"] == PICKUP):
+        can_manage_delivery = False
     return {
         "processing_key": processing_key,
         "processing_label": processing_label,
@@ -316,9 +346,10 @@ def tracking_detail_data(application, applicant=None, include_map=True):
         "delivery": delivery,
         "delivery_progress_percent": int(round(delivery["progress"] * 100)),
         "citizen_delivery": _delivery_info(application),
-        "can_update_status": application.application_status not in {"draft", "cancelled"},
-        "can_manage_delivery": application.application_status == "ready_for_release"
-        or bool(delivery["status"]),
+        "passport_fulfillment": passport,
+        "can_update_status": application.application_status not in {"draft", "cancelled"}
+        and not gated,
+        "can_manage_delivery": can_manage_delivery,
         "show_map": map_payload is not None,
         "map": map_payload,
     }
@@ -381,17 +412,36 @@ def _update_processing_status(application):
     if application.application_status in {"draft", "cancelled"}:
         flash("Only applications at the Confirmation stage or later can be updated.", "warning")
         return _tracking_redirect(application.application_id)
+    confirmation_gate = _passport_confirmation_gate(application)
+    if confirmation_gate:
+        flash(confirmation_gate, "warning")
+        return _tracking_redirect(application.application_id)
     if len(remarks) > 500:
         flash("Remarks must be 500 characters or fewer.", "warning")
         return _tracking_redirect(application.application_id)
 
+    from app.services.application_service import read_details, write_details
+    from app.services.passport_admin import admin_status_options, status_key_for_legacy
+
+    passport_options = admin_status_options(application)
+    option_keys = {item.get("key") for item in passport_options}
+    passport_key = (
+        target["key"]
+        if target["key"] in option_keys
+        else status_key_for_legacy(application, target["legacy_status"])
+    )
+    passport_label = next(
+        (item.get("label") for item in passport_options if item.get("key") == passport_key),
+        None,
+    )
+    target_label = passport_label or target["label"]
     state = _admin_tracking_state(application)
     processing = state["processing"]
     now = datetime.now().replace(microsecond=0)
     processing.update(
         {
             "key": target["key"],
-            "label": target["label"],
+            "label": target_label,
             "legacy_status": target["legacy_status"],
             "note": remarks,
             "updated_by": current_user.user_id,
@@ -403,7 +453,7 @@ def _update_processing_status(application):
     processing["history"].append(
         {
             "key": target["key"],
-            "label": target["label"],
+            "label": target_label,
             "legacy_status": target["legacy_status"],
             "note": remarks,
             "updated_by": current_user.user_id,
@@ -414,18 +464,27 @@ def _update_processing_status(application):
     )
     _save_admin_tracking(application, state)
 
+    if passport_key:
+        details = read_details(application)
+        details["passport_status_key"] = passport_key
+        write_details(application, details, commit=False)
+
     previous_status = application.application_status
     application.application_status = target["legacy_status"]
-    description = f"Administrator set processing status to {target['label']}."
+    description = f"Administrator set processing status to {target_label}."
     if remarks:
         description += f" Remarks: {remarks}"
     _log_admin_status_event(application, previous_status, description)
     db.session.commit()
-    flash(f"{application.tracking_number} is now marked {target['label']}.", "success")
+    flash(f"{application.tracking_number} is now marked {target_label}.", "success")
     return _tracking_redirect(application.application_id)
 
 
 def _assign_courier(application):
+    confirmation_gate = _passport_confirmation_gate(application)
+    if confirmation_gate:
+        flash(confirmation_gate, "warning")
+        return _tracking_redirect(application.application_id)
     state = _admin_tracking_state(application)
     delivery = _delivery_state(state)
     if application.application_status != "ready_for_release" and not delivery["status"]:
@@ -482,6 +541,10 @@ def _assign_courier(application):
 
 
 def _update_delivery_status(application):
+    confirmation_gate = _passport_confirmation_gate(application)
+    if confirmation_gate:
+        flash(confirmation_gate, "warning")
+        return _tracking_redirect(application.application_id)
     target_key = clean_text(request.form.get("delivery_status"))
     note = clean_text(request.form.get("delivery_note"))
     target = DELIVERY_BY_KEY.get(target_key)

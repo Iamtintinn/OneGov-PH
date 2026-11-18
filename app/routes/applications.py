@@ -78,6 +78,7 @@ from app.services.application_service import (
 )
 from app.utils.decorators import citizen_portal_required
 from app.utils.portal import portal_url_for as url_for
+from app.utils.validators import clean_text
 from app.routes.citizen import STATUS_LABELS
 
 
@@ -757,6 +758,8 @@ def apply_schedule(application_id):
         )
         if error:
             flash(error, "warning")
+        elif kind == "passport":
+            return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
         else:
             return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
 
@@ -779,6 +782,7 @@ def apply_delivery(application_id):
         return redirect(url_for("citizen.apply_confirmation", application_id=application.application_id))
     spec = specification_for(application.service, field_map(application))
     kind = spec.get("kind")
+    fulfillment_choice = ""
     if kind == "barangay":
         if not barangay_review_ready(application):
             flash("Review your application before setting the delivery details.", "warning")
@@ -859,13 +863,94 @@ def apply_delivery(application_id):
             validate_delivery_form,
         )
         from app.services.cenomar_payment import payment_summary as cenomar_payment_summary
+    elif kind == "passport":
+        if not passport_review_ready(application):
+            flash("Review your application before setting the delivery details.", "warning")
+            return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+        from app.services.passport_delivery import (
+            CITY,
+            DEFAULT_LAT,
+            DEFAULT_LNG,
+            DELIVERY,
+            DELIVERY_FEE,
+            DEMO_BARANGAYS,
+            PICKUP,
+            PROVINCE,
+            REGION,
+            delivery_address,
+            delivery_ready,
+            delivery_values,
+            fulfillment_method,
+            passport_center,
+            save_delivery,
+            save_pickup,
+            validate_delivery_form,
+        )
+        from app.services.passport_scheduling import appointment_for
+
+        appointment = appointment_for(application)
+        if appointment is None:
+            flash("Select a demonstration appointment before choosing delivery.", "warning")
+            return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
+
+        if request.method == "POST":
+            choice = clean_text(request.form.get("fulfillment_method")).lower()
+            if choice == PICKUP:
+                error = save_pickup(application, current_user)
+                if error:
+                    flash(error, "warning")
+                else:
+                    flash("Passport pickup selected.", "success")
+                    return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+            elif choice == DELIVERY:
+                fulfillment_choice = DELIVERY
+            else:
+                flash("Choose pickup or home delivery.", "warning")
+                return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
+
+        if request.method != "POST":
+            fulfillment_choice = (
+                clean_text(request.values.get("method")).lower()
+                or fulfillment_method(application)
+            )
+        if fulfillment_choice == PICKUP:
+            return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+        if fulfillment_choice not in {PICKUP, DELIVERY}:
+            context = _common(application, 6)
+            context.update(
+                {
+                    "appointment": appointment,
+                    "fulfillment_options": (
+                        {
+                            "key": PICKUP,
+                            "title": "Pick up at the DFA office",
+                            "help": (
+                                "Collect your passport at the appointment office you selected. "
+                                "No delivery fee is added."
+                            ),
+                        },
+                        {
+                            "key": DELIVERY,
+                            "title": "Request home delivery",
+                            "help": (
+                                "Pin your delivery address on the map and add ₱50.00 to the "
+                                "demonstration payment."
+                            ),
+                        },
+                    ),
+                }
+            )
+            return render_template("applications/apply_passport_fulfillment.html", **context)
     else:
         return redirect(url_for("citizen.application_continue", application_id=application.application_id))
 
     values = delivery_values(application)
     errors = {}
     if request.method == "POST":
-        values, errors = validate_delivery_form(request.form)
+        if kind == "passport":
+            values, errors = validate_delivery_form(request.form, application)
+        else:
+            values, errors = validate_delivery_form(request.form)
         if not errors:
             error = save_delivery(application, current_user, values)
             if error:
@@ -895,6 +980,12 @@ def apply_delivery(application_id):
                 initial_lat, initial_lng = center
             else:
                 initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
+        elif kind == "passport":
+            center = passport_center(values.get("barangay") or field_map(application).get("barangay"))
+            if center:
+                initial_lat, initial_lng = center["latitude"], center["longitude"]
+            else:
+                initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
         else:
             center = barangay_center(values.get("barangay") or field_map(application).get("barangay"))
             if center:
@@ -903,9 +994,9 @@ def apply_delivery(application_id):
                 initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
 
     delivery_region_val = REGION
-    context = _common(application, 5)
+    context = _common(application, 6 if kind == "passport" else 5)
     delivery_address_preview = ""
-    if kind in {"birth", "cenomar"}:
+    if kind in {"birth", "cenomar", "passport"}:
         delivery_address_preview = delivery_address(
             {
                 "house_number": values.get("house_number"),
@@ -925,6 +1016,11 @@ def apply_delivery(application_id):
     elif kind == "cenomar":
         cenomar_summary = cenomar_payment_summary(application)
         context["cenomar_payment_summary"] = cenomar_summary
+    elif kind == "passport":
+        from app.services.passport_payment import payment_summary as passport_payment_summary
+
+        passport_summary = passport_payment_summary(application)
+        context["passport_payment_summary"] = passport_summary
     context.update(
         {
             "values": values,
@@ -938,9 +1034,10 @@ def apply_delivery(application_id):
             "delivery_saved": delivery_ready(application),
             "initial_lat": initial_lat,
             "initial_lng": initial_lng,
-            "show_origin_map": kind in {"barangay", "residency", "birth", "cenomar"},
-            "fixed_origin_map": kind in {"birth", "cenomar"},
-            "auto_pin_map": kind in {"barangay", "residency", "birth", "cenomar"},
+            "show_origin_map": kind in {"barangay", "residency", "birth", "cenomar", "passport"},
+            "fixed_origin_map": kind in {"birth", "cenomar", "passport"},
+            "auto_pin_map": kind in {"barangay", "residency", "birth", "cenomar", "passport"},
+            "fulfillment_method": DELIVERY if kind == "passport" else "",
             "saved_origin_lat": values.get("origin_latitude"),
             "saved_origin_lng": values.get("origin_longitude"),
             "origin_confirmed": values.get("origin_location_confirmed"),
@@ -998,8 +1095,13 @@ def apply_payment(application_id):
         if appointment_for(application) is None:
             flash("Select a demonstration appointment before payment.", "warning")
             return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
-        payment_step = 6 if spec.get("type_first") else 5
-        back_endpoint = "citizen.apply_schedule"
+        from app.services.passport_delivery import delivery_ready
+
+        if not delivery_ready(application):
+            flash("Choose pickup or home delivery before payment.", "warning")
+            return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
+        payment_step = 7
+        back_endpoint = "citizen.apply_delivery"
         free_payment = False
     elif kind == "senior":
         from app.services.senior_payment import confirm_free_application, payment_summary

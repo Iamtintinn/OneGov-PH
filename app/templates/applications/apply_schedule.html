@@ -20,6 +20,7 @@
         </p>
 
         {% set current_location = locations|selectattr('code', 'equalto', selected_location)|list|first %}
+        {% set current_location_label = (current_location.city ~ ' — ' ~ current_location.label) if current_location and current_location.city else (current_location.label if current_location else '') %}
         <form class="schedule-location-form" method="get" action="{{ url_for('citizen.apply_schedule', application_id=application.application_id) }}">
             <label for="location_code">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
@@ -36,7 +37,7 @@
                 </optgroup>
                 {% set ns.region = None %}
                 {% endif %}
-                <option value="{{ location.code }}" {% if location.code == selected_location %}selected{% endif %}>{{ location.label }}</option>
+                <option value="{{ location.code }}" {% if location.code == selected_location %}selected{% endif %}>{% if location.city %}{{ location.city }} — {% endif %}{{ location.label }}</option>
                 {% endfor %}
                 {% if ns.region is not none %}</optgroup>{% endif %}
             </select>
@@ -190,7 +191,7 @@
     var popoverClose = document.getElementById("schedule-popover-close");
     var popoverConfirm = document.getElementById("schedule-popover-confirm");
     var monthBox = document.getElementById("schedule-month");
-    var locationLabel = {{ (locations|selectattr('code', 'equalto', selected_location)|list|first).label|tojson }};
+    var locationLabel = {{ current_location_label|tojson }};
     var days = document.querySelectorAll(".schedule-day[data-date]");
     var panels = Array.prototype.slice.call(document.querySelectorAll("[data-month-panel]"));
     var title = document.getElementById("calendar-month-title");

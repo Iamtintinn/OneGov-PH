@@ -571,8 +571,27 @@ def application_detail(application_id):
     from app.routes.admin_portal import (
         ADMIN_PROCESSING_STATUSES,
         DELIVERY_STATUSES,
+        PASSPORT_PROCESSING_STATUSES,
         tracking_detail_data,
     )
+    from app.services.passport_admin import admin_status_options, current_status_key
+    from app.services.passport_delivery import PICKUP
+
+    tracking = tracking_detail_data(application, applicant)
+    passport = tracking["passport_fulfillment"]
+    processing_statuses = ADMIN_PROCESSING_STATUSES
+    if passport:
+        is_pickup = passport["fulfillment_method"] == PICKUP
+        processing_statuses = tuple(
+            (
+                key,
+                "Ready for Pickup"
+                if is_pickup and key == "ready_for_dispatch"
+                else label,
+                legacy,
+            )
+            for key, label, legacy in ADMIN_PROCESSING_STATUSES
+        ) + PASSPORT_PROCESSING_STATUSES
 
     return render_template(
         "admin/application_detail.html",
@@ -583,18 +602,62 @@ def application_detail(application_id):
         actors=actors,
         statuses=APPLICATION_STATUSES,
         status_labels=STATUS_LABELS,
-        tracking=tracking_detail_data(application, applicant),
-        processing_statuses=ADMIN_PROCESSING_STATUSES,
+        tracking=tracking,
+        processing_statuses=processing_statuses,
         delivery_statuses=DELIVERY_STATUSES,
+        passport_status_options=admin_status_options(application),
+        passport_status_key=current_status_key(application),
     )
+
+
+@admin_bp.route("/admin/applications/<int:application_id>/physical-requirements", methods=["POST"])
+@admin_console_required
+def confirm_physical_requirements(application_id):
+    application = _application_or_404(application_id)
+    from app.services.passport_admin import confirm, is_confirmed, is_passport_application
+
+    if not is_passport_application(application):
+        abort(400, description="Physical requirements are only confirmed for passport applications.")
+    if is_confirmed(application):
+        flash("Physical requirements are already confirmed for this application.", "info")
+        return redirect(url_for("admin.application_detail", application_id=application_id))
+
+    record = confirm(application, current_user)
+    if record is None:
+        flash("The applicant must choose pickup or home delivery before confirmation.", "warning")
+        return redirect(url_for("admin.application_detail", application_id=application_id))
+
+    description = "Confirmed submitted documents and completed physical requirements."
+    if record.get("pickup_id"):
+        description += f" Pickup ID {record['pickup_id']} is scheduled for {record['pickup_date_label']}."
+    _log_application_event(application, application.application_status, description)
+    db.session.commit()
+    flash("Documents and physical requirements confirmed.", "success")
+    return redirect(url_for("admin.application_detail", application_id=application_id))
 
 
 @admin_bp.route("/admin/applications/<int:application_id>/update", methods=["POST"])
 @role_required(User.ROLE_SYSTEM_ADMIN, User.ROLE_DEPARTMENT_STAFF, User.ROLE_DEPARTMENT_SUPERVISOR)
 def update_application(application_id):
     application = _application_or_404(application_id)
-    target_status = clean_text(request.form.get("application_status"))
+    target_key = clean_text(request.form.get("application_status"))
     remarks = clean_text(request.form.get("remarks"))
+    from app.services.application_service import read_details, write_details
+    from app.services.passport_admin import (
+        gate_message,
+        is_passport_application,
+        resolve_status_update,
+    )
+
+    passport_application = is_passport_application(application)
+    target_status = target_key
+    display_label = STATUS_LABELS.get(target_status, target_status)
+    if passport_application:
+        passport_status, passport_label = resolve_status_update(application, target_key)
+        if not passport_status:
+            abort(400, description="Choose a valid passport application status.")
+        target_status = passport_status
+        display_label = passport_label
     if target_status not in APPLICATION_STATUSES or target_status == "draft":
         abort(400, description="Choose a valid application status.")
     if len(remarks) > 500:
@@ -604,9 +667,18 @@ def update_application(application_id):
         flash("Add a reason when rejecting an application or requesting corrections.", "warning")
         return redirect(url_for("admin.application_detail", application_id=application_id))
 
+    confirmation_gate = gate_message(application)
+    if confirmation_gate:
+        flash(confirmation_gate, "warning")
+        return redirect(url_for("admin.application_detail", application_id=application_id))
+
     previous_status = application.application_status
     application.application_status = target_status
-    description = f"Status changed to {STATUS_LABELS[target_status]}."
+    if passport_application:
+        details = read_details(application)
+        details["passport_status_key"] = target_key
+        write_details(application, details, commit=False)
+    description = f"Status changed to {display_label}."
     if remarks:
         description += f" Remarks: {remarks}"
     _log_application_event(application, previous_status, description)
