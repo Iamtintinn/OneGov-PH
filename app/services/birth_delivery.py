@@ -117,8 +117,10 @@ def validate_delivery_form(form):
         errors["contact_number"] = "Enter a valid contact number."
 
     barangay = clean_text(form.get("barangay"))
-    if birth_by_name(barangay) is None:
-        errors["barangay"] = "Select a supported demonstration barangay."
+    if not barangay:
+        errors["barangay"] = "Enter the barangay."
+    elif len(barangay) > 200:
+        errors["barangay"] = "Use 200 characters or fewer for the barangay."
 
     house_number = clean_text(form.get("house_number"))
     if not house_number:

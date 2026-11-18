@@ -158,7 +158,7 @@ def ensure_confirmation_pdf(application):
             )
             + appointment_rows,
             "delivery_rows": delivery_rows,
-            "fee_lines": (
+            "fee_lines": summary.get("fee_lines") or (
                 {
                     "label": "Processing fee",
                     "amount_display": summary.get("amount_display") or "₱50.00",

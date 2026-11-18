@@ -37,3 +37,6 @@ class Config:
     # Public origin used for Maya success/failure/cancel redirects (QRPh-friendly).
     # Prefer an HTTPS tunnel (ngrok) over localhost so wallet/QR returns keep working.
     MAYA_PUBLIC_BASE_URL = os.getenv("MAYA_PUBLIC_BASE_URL", "").strip().rstrip("/")
+
+    OSRM_API = os.getenv("OSRM_API", "").strip().rstrip("/")
+    NOMINATIM_API = os.getenv("NOMINATIM_API", "").strip().rstrip("/")

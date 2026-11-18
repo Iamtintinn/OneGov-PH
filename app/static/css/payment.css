@@ -2061,6 +2061,147 @@
     min-width: 0;
 }
 
+.delivery-origin-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 1rem;
+}
+
+.delivery-pin-mode {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    margin: 0.25rem 0 0.9rem;
+}
+
+.delivery-pin-mode .dash-button.is-active {
+    background: #005ea2;
+    color: #ffffff;
+    border-color: #005ea2;
+    box-shadow: 0 6px 16px rgba(0, 94, 162, 0.2);
+}
+
+.delivery-address-search {
+    position: relative;
+    margin: 0 0 1rem;
+}
+
+.delivery-address-search > label {
+    display: block;
+    margin-bottom: 0.2rem;
+    color: #0c2e52;
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.delivery-address-search .field-help {
+    margin: 0 0 0.5rem;
+}
+
+.delivery-address-search-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+}
+
+.delivery-address-search-row .text-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.delivery-address-search-row input[type="search"] {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.delivery-address-search-status {
+    min-height: 1.1rem;
+    margin: 0.45rem 0 0;
+    color: #5a6b7d;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.delivery-address-search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    max-height: 15rem;
+    overflow: auto;
+    border: 1px solid #d7e5f0;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 16px 36px rgba(12, 46, 82, 0.16);
+}
+
+.delivery-address-search-results[hidden] {
+    display: none;
+}
+
+.delivery-address-result {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+    width: 100%;
+    padding: 0.7rem 0.85rem;
+    border: 0;
+    border-bottom: 1px solid #edf2f7;
+    background: #ffffff;
+    color: #0c2e52;
+    text-align: left;
+    cursor: pointer;
+}
+
+.delivery-address-result:last-child {
+    border-bottom: 0;
+}
+
+.delivery-address-result:hover,
+.delivery-address-result:focus {
+    background: #eaf4fd;
+    outline: none;
+}
+
+.delivery-address-result strong {
+    font-size: 0.86rem;
+}
+
+.delivery-address-result span {
+    color: #5a6b7d;
+    font-size: 0.76rem;
+    line-height: 1.35;
+}
+
+.delivery-pin-marker {
+    background: transparent;
+    border: 0;
+}
+
+.delivery-pin-marker span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 3px solid #ffffff;
+    border-radius: 50%;
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 800;
+    box-shadow: 0 5px 14px rgba(12, 46, 82, 0.28);
+}
+
+.delivery-pin-marker--origin span {
+    background: #1565c0;
+}
+
+.delivery-pin-marker--delivery span {
+    background: #c62828;
+}
+
 .delivery-summary-panel {
     width: 100%;
     flex: 1 1 auto;

@@ -902,6 +902,8 @@ def apply_delivery(application_id):
 
     delivery_region_val = REGION
     context = _common(application, 5)
+    initial_origin_lat = values.get("origin_latitude") or initial_lat
+    initial_origin_lng = values.get("origin_longitude") or initial_lng
     if kind == "birth":
         birth_summary = birth_payment_summary(application)
         context["birth_payment_summary"] = birth_summary
@@ -920,6 +922,12 @@ def apply_delivery(application_id):
             "delivery_saved": delivery_ready(application),
             "initial_lat": initial_lat,
             "initial_lng": initial_lng,
+            "show_origin_map": kind in {"barangay", "residency"},
+            "saved_origin_lat": values.get("origin_latitude"),
+            "saved_origin_lng": values.get("origin_longitude"),
+            "origin_confirmed": values.get("origin_location_confirmed"),
+            "initial_origin_lat": initial_origin_lat,
+            "initial_origin_lng": initial_origin_lng,
         }
     )
     if kind == "birth":

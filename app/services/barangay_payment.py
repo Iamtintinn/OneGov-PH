@@ -1,4 +1,7 @@
-"""Local government payment (barangay clearance / certificate of residency). Fee is ₱50.00."""
+"""Local government payment (barangay clearance / certificate of residency).
+
+The clearance fee is ₱50.00. Barangay clearance home delivery adds ₱50.00.
+"""
 
 import secrets
 from datetime import datetime
@@ -17,6 +20,7 @@ from app.services.passport_payment import METHOD_LABELS, ONLINE_METHODS, latest_
 from app.services.tracking_service import add_event
 
 LOCAL_FEE = Decimal("50.00")
+DELIVERY_FEE = Decimal("50.00")
 BARANGAY_FEE = LOCAL_FEE
 
 
@@ -51,14 +55,19 @@ def _is_reviewed(application, kind=None):
     return bool(details.get(_review_flag(kind)))
 
 
-def demo_fee():
-    return LOCAL_FEE
+def demo_fee(kind=None):
+    kind = kind or "barangay"
+    delivery_fee = DELIVERY_FEE if kind == "barangay" else Decimal("0.00")
+    return LOCAL_FEE + delivery_fee
 
 
 def payment_summary(application):
     answers = field_map(application)
     kind = _service_kind(application)
-    amount = demo_fee()
+    application_fee = LOCAL_FEE
+    delivery_fee = DELIVERY_FEE if kind == "barangay" else Decimal("0.00")
+    processing_fee = Decimal("0.00")
+    amount = application_fee + delivery_fee + processing_fee
     payment = latest_payment(application)
     status_label = None
     status_key = None
@@ -78,6 +87,21 @@ def payment_summary(application):
             status_label = "Cancelled"
         else:
             status_label = payment.payment_status.replace("_", " ").title()
+    fee_lines = [
+        {
+            "label": "Certificate of residency fee" if kind == "residency" else "Barangay clearance fee",
+            "amount_display": f"₱{application_fee:,.2f}",
+        },
+        {
+            "label": "Processing fee",
+            "amount_display": f"₱{processing_fee:,.2f}",
+        },
+    ]
+    if delivery_fee:
+        fee_lines.insert(1, {
+            "label": "Home delivery fee",
+            "amount_display": f"₱{delivery_fee:,.2f}",
+        })
     return {
         "service_kind": kind,
         "barangay": answers.get("barangay") or "",
@@ -86,10 +110,17 @@ def payment_summary(application):
         "application_type": answers.get("application_type") or "",
         "amount": amount,
         "amount_display": f"₱{amount:,.2f}",
-        "application_fee": amount,
-        "application_fee_display": f"₱{amount:,.2f}",
-        "processing_fee": Decimal("0.00"),
-        "processing_fee_display": "₱0.00",
+        "application_fee": application_fee,
+        "application_fee_display": f"₱{application_fee:,.2f}",
+        "application_fee_label": "Certificate of residency fee" if kind == "residency" else "Barangay clearance fee",
+        "delivery_fee": delivery_fee,
+        "delivery_fee_display": f"₱{delivery_fee:,.2f}",
+        "delivery_fee_label": "Home delivery fee",
+        "processing_fee": processing_fee,
+        "processing_fee_display": f"₱{processing_fee:,.2f}",
+        "processing_fee_label": "Processing fee",
+        "total_label": "TOTAL",
+        "fee_lines": fee_lines,
         "payment": payment,
         "method_label": METHOD_LABELS.get(payment.payment_method) if payment else None,
         "status_label": status_label,
@@ -191,7 +222,7 @@ def record_demo_payment(application, user, choice, online_method=None):
     if application.application_status != "draft" and existing is not None:
         return None
 
-    amount = demo_fee()
+    amount = demo_fee(kind)
     now = _now()
     if choice == "online":
         method = str(online_method or "").strip()
@@ -264,7 +295,7 @@ def start_maya_checkout(application, user):
     if existing is not None and existing.payment_status == "paid":
         return None, "This application is already paid."
 
-    amount = demo_fee()
+    amount = demo_fee(kind)
     now = _now()
     if existing is not None and existing.payment_method == "maya" and existing.payment_status == "pending":
         payment = existing
@@ -318,7 +349,7 @@ def start_maya_checkout(application, user):
     item_name = (
         "OneGov PH certificate of residency fee (sandbox)"
         if kind == "residency"
-        else "OneGov PH barangay clearance fee (sandbox)"
+        else "OneGov PH barangay clearance and home delivery fee (sandbox)"
     )
     try:
         checkout = create_checkout(

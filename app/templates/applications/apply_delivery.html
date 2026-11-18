@@ -29,26 +29,73 @@
             <input type="hidden" name="latitude" id="delivery-latitude" value="{{ values.latitude }}">
             <input type="hidden" name="longitude" id="delivery-longitude" value="{{ values.longitude }}">
             <input type="hidden" name="delivery_location_confirmed" id="delivery-location-confirmed" value="{{ 'yes' if values.location_confirmed else '' }}">
+            {% if show_origin_map %}
+            <input type="hidden" name="origin_latitude" id="origin-latitude" value="{{ values.origin_latitude }}">
+            <input type="hidden" name="origin_longitude" id="origin-longitude" value="{{ values.origin_longitude }}">
+            <input type="hidden" name="origin_location_confirmed" id="origin-location-confirmed" value="{{ 'yes' if values.origin_location_confirmed else '' }}">
+            {% endif %}
 
-            <section class="delivery-map-panel{% if values.location_confirmed %} is-confirmed{% endif %}" aria-labelledby="delivery-map-heading">
+            <section class="delivery-map-panel{% if values.location_confirmed and (not show_origin_map or values.origin_location_confirmed) %} is-confirmed{% endif %}" aria-labelledby="delivery-map-heading">
                 <div class="delivery-map-panel-head">
                     <div class="delivery-map-panel-title">
                         <span class="delivery-map-panel-icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/></svg>
-                            </span>
+                        </span>
                         <div>
-                            <h2 id="delivery-map-heading">Pin the delivery location</h2>
-                            <p class="field-help">Select a demonstration barangay, then click the map or drag the pin to the exact delivery point.</p>
+                            <h2 id="delivery-map-heading">{% if show_origin_map %}Pin the delivery route{% else %}Pin the delivery location{% endif %}</h2>
+                            <p class="field-help">{% if show_origin_map %}First pin where the document is coming from, then pin where it will be delivered. The route line appears once both pins are set.{% else %}Select a demonstration barangay, then click the map or drag the pin to the exact delivery point.{% endif %}</p>
                         </div>
                     </div>
                     <button class="dash-button apply-cancel pay-btn-ghost delivery-map-detect" type="button" id="detect-location">
-                        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8 3h-2.07A6 6 0 0 0 13 6.07V4h-2v2.07A6 6 0 0 0 6.07 11H4v2h2.07A6 6 0 0 0 11 17.93V20h2v-2.07A6 6 0 0 0 17.93 13H20v-2z"/></svg>
+                        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8 3h-2.07A6 6 0 0 0 13 6.07V4h-2v2.07A6 6 0 0 0 6.07 11H4v2h2.07A6 6 0 0 0 11 17.93V20h2v-2.07A6 6 0 0 0 17.93 13H20v-2z"/></svg>
                         <span>Use my current location</span>
                     </button>
                 </div>
 
+                {% if show_origin_map %}
+                <div class="passport-details-fields delivery-fields delivery-origin-fields">
+                    <div class="apply-field{% if errors.get('origin_barangay') %} has-error{% endif %}">
+                        <label for="origin_barangay">Requesting barangay</label>
+                        <p class="field-help" id="origin_barangay-help">Enter the barangay where the document is being requested.</p>
+                        <div class="text-input">
+                            <input id="origin_barangay" name="origin_barangay" type="text" maxlength="200" autocomplete="off" value="{{ values.origin_barangay }}" required aria-describedby="origin_barangay-help{% if errors.get('origin_barangay') %} origin_barangay-error{% endif %}">
+                        </div>
+                        {% if errors.get('origin_barangay') %}<p class="field-error" id="origin_barangay-error">{{ errors.origin_barangay }}</p>{% endif %}
+                    </div>
+
+                    <div class="apply-field{% if errors.get('origin_address') %} has-error{% endif %}">
+                        <label for="origin_address">Starting address</label>
+                        <p class="field-help" id="origin_address-help">Enter the office or pickup address where the document starts.</p>
+                        <div class="text-input">
+                            <input id="origin_address" name="origin_address" type="text" maxlength="300" autocomplete="off" value="{{ values.origin_address }}" required aria-describedby="origin_address-help{% if errors.get('origin_address') %} origin_address-error{% endif %}">
+                        </div>
+                        {% if errors.get('origin_address') %}<p class="field-error" id="origin_address-error">{{ errors.origin_address }}</p>{% endif %}
+                    </div>
+                </div>
+
+                {% if spec.kind not in ['barangay', 'residency'] %}
+                <div class="delivery-pin-mode" role="group" aria-label="Choose which point to pin">
+                    <button class="dash-button pay-btn-primary" type="button" id="pin-origin-mode" aria-pressed="true">1. Pin start</button>
+                    <button class="dash-button pay-btn-ghost" type="button" id="pin-delivery-mode" aria-pressed="false">2. Pin destination</button>
+                </div>
+                {% endif %}
+                {% endif %}
+
+                <div class="delivery-address-search" id="delivery-address-search">
+                    <label for="delivery-address-search-input">Search an address</label>
+                    <p class="field-help" id="delivery-address-search-help">Find an address, then select a result to pin {% if spec.kind in ['barangay', 'residency'] %}the next point{% elif show_origin_map %}the active point{% else %}the delivery point{% endif %} on the map.</p>
+                    <div class="delivery-address-search-row">
+                        <div class="text-input">
+                            <input id="delivery-address-search-input" type="search" maxlength="200" autocomplete="off" placeholder="Start typing an address in Quezon City" aria-describedby="delivery-address-search-help">
+                        </div>
+                        <button class="dash-button pay-btn-ghost" type="button" id="delivery-address-search-button">Search</button>
+                    </div>
+                    <p class="delivery-address-search-status" id="delivery-address-search-status" role="status"></p>
+                    <div class="delivery-address-search-results" id="delivery-address-search-results" hidden></div>
+                </div>
+
                 <div class="delivery-map-frame">
-                    <div id="map" class="delivery-map" role="application" aria-label="Delivery location map"></div>
+                    <div id="map" class="delivery-map" role="application" aria-label="{% if show_origin_map %}Delivery route map{% else %}Delivery location map{% endif %}"></div>
                     <span class="delivery-map-chip" aria-hidden="true">
                         <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/></svg>
                         <span>Quezon City · demo area</span>
@@ -56,24 +103,56 @@
                 </div>
 
                 <div class="delivery-map-panel-foot">
+                    {% if show_origin_map %}
+                    <p class="delivery-map-status{% if values.origin_location_confirmed %} is-confirmed{% endif %}" id="origin-location-status" role="status">
+                        {% if spec.kind in ['barangay', 'residency'] %}
+                            {% if values.origin_location_confirmed %}Starting pin placed.{% else %}No starting pin yet.{% endif %}
+                        {% elif values.origin_location_confirmed %}
+                        Starting location confirmed.
+                        {% else %}
+                        No starting location confirmed yet.
+                        {% endif %}
+                    </p>
+                    {% endif %}
                     <p class="delivery-map-status{% if values.location_confirmed %} is-confirmed{% endif %}" id="location-status" role="status">
-                        {% if values.location_confirmed %}
+                        {% if spec.kind in ['barangay', 'residency'] %}
+                            {% if values.location_confirmed %}Delivery pin placed.{% else %}No delivery pin yet.{% endif %}
+                        {% elif values.location_confirmed %}
                         Delivery location confirmed.
                         {% else %}
                         No delivery location confirmed yet.
                         {% endif %}
                     </p>
-                    <button class="dash-button pay-btn-primary delivery-map-confirm" type="button" id="confirm-location">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg>
-                        <span>Confirm pinned location</span>
+                    {% if spec.kind in ['barangay', 'residency'] %}
+                    <button class="dash-button pay-btn-ghost delivery-map-confirm" type="button" id="clear-pins">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                        <span>Cancel pinning</span>
                     </button>
+                    {% else %}
+                        {% if show_origin_map %}
+                        <button class="dash-button pay-btn-primary delivery-map-confirm" type="button" id="confirm-origin-location">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg>
+                            <span>Confirm start</span>
+                        </button>
+                        {% endif %}
+                        <button class="dash-button pay-btn-primary delivery-map-confirm" type="button" id="confirm-location">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg>
+                            <span>{% if show_origin_map %}Confirm destination{% else %}Confirm pinned location{% endif %}</span>
+                        </button>
+                    {% endif %}
                 </div>
 
+                {% if show_origin_map %}
+                {% if errors.get('origin_latitude') %}<p class="field-error">{{ errors.origin_latitude }}</p>{% endif %}
+                {% if errors.get('origin_longitude') %}<p class="field-error">{{ errors.origin_longitude }}</p>{% endif %}
+                {% if errors.get('origin_location_confirmed') %}<p class="field-error">{{ errors.origin_location_confirmed }}</p>{% endif %}
+                {% endif %}
                 {% if errors.get('latitude') %}<p class="field-error">{{ errors.latitude }}</p>{% endif %}
                 {% if errors.get('longitude') %}<p class="field-error">{{ errors.longitude }}</p>{% endif %}
                 {% if errors.get('location_confirmed') %}<p class="field-error">{{ errors.location_confirmed }}</p>{% endif %}
-                <p class="delivery-map-note">Map data uses OpenStreetMap. The saved pin is the delivery coordinate used for this prototype.</p>
+                <p class="delivery-map-note">{% if show_origin_map %}The blue pin is the starting location and the red pin is the delivery destination.{% else %}Map data uses OpenStreetMap. The saved pin is the delivery coordinate used for this prototype.{% endif %}</p>
             </section>
+
 
             <div class="delivery-content-wrapper">
                 <section class="delivery-form-panel">
@@ -132,14 +211,8 @@
 
                         <div class="apply-field{% if errors.get('barangay') %} has-error{% endif %}">
                             <label for="delivery_barangay">Barangay</label>
-                            <p class="field-help" id="delivery_barangay-help">Selecting a barangay centers the map on that demonstration area.</p>
-                            <div class="select-input">
-                                <select id="delivery_barangay" name="barangay" required aria-describedby="delivery_barangay-help{% if errors.get('barangay') %} delivery_barangay-error{% endif %}">
-                                    <option value="">Select barangay</option>
-                                    {% for item in barangay_options %}
-                                    <option value="{{ item.name }}" data-lat="{{ item.latitude }}" data-lng="{{ item.longitude }}" {% if values.barangay == item.name %}selected{% endif %}>{{ item.name }}</option>
-                                    {% endfor %}
-                                </select>
+                            <div class="text-input">
+                                <input id="delivery_barangay" name="barangay" type="text" maxlength="200" autocomplete="off" value="{{ values.barangay or '' }}" required{% if errors.get('barangay') %} aria-describedby="delivery_barangay-error"{% endif %}>
                             </div>
                             {% if errors.get('barangay') %}<p class="field-error" id="delivery_barangay-error">{{ errors.barangay }}</p>{% endif %}
                         </div>
@@ -259,7 +332,17 @@ window.ONE_GOV_DELIVERY = {
     initialLng: {{ initial_lng|tojson }},
     savedLat: {{ values.latitude|tojson }},
     savedLng: {{ values.longitude|tojson }},
-    confirmed: {{ 'true' if values.location_confirmed else 'false' }}
+    confirmed: {{ 'true' if values.location_confirmed else 'false' }},
+    showOrigin: {{ 'true' if show_origin_map else 'false' }},
+    autoPinFlow: {{ 'true' if spec.kind in ['barangay', 'residency'] else 'false' }},
+    initialOriginLat: {{ initial_origin_lat|tojson }},
+    initialOriginLng: {{ initial_origin_lng|tojson }},
+    savedOriginLat: {{ saved_origin_lat|tojson }},
+    savedOriginLng: {{ saved_origin_lng|tojson }},
+    originConfirmed: {{ 'true' if origin_confirmed else 'false' }},
+    routeUrl: {{ url_for('routing.delivery_route')|tojson }},
+    addressSearchUrl: {{ url_for('routing.address_search')|tojson }},
+    barangayCenters: {{ barangay_options|tojson }}
 };
 </script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -267,134 +350,634 @@ window.ONE_GOV_DELIVERY = {
 (function () {
     var config = window.ONE_GOV_DELIVERY || {};
     var mapElement = document.getElementById("map");
-    var latInput = document.getElementById("delivery-latitude");
-    var lngInput = document.getElementById("delivery-longitude");
-    var latDisplay = document.getElementById("delivery_latitude_display");
-    var lngDisplay = document.getElementById("delivery_longitude_display");
-    var confirmedInput = document.getElementById("delivery-location-confirmed");
-    var statusText = document.getElementById("location-status");
-    var confirmButton = document.getElementById("confirm-location");
-    var detectButton = document.getElementById("detect-location");
     var barangaySelect = document.getElementById("delivery_barangay");
+    var detectButton = document.getElementById("detect-location");
+    var originModeButton = document.getElementById("pin-origin-mode");
+    var deliveryModeButton = document.getElementById("pin-delivery-mode");
+    var addressSearchContainer = document.getElementById("delivery-address-search");
+    var addressSearchInput = document.getElementById("delivery-address-search-input");
+    var addressSearchButton = document.getElementById("delivery-address-search-button");
+    var addressSearchResults = document.getElementById("delivery-address-search-results");
+    var addressSearchStatus = document.getElementById("delivery-address-search-status");
     if (!mapElement || !window.L) {
         return;
     }
 
+    var activePinKind = config.showOrigin ? "origin" : "delivery";
+    var autoPinFlow = Boolean(config.autoPinFlow);
+    var markers = {};
+    var routeLine = null;
+    var routeRequestId = 0;
+    var addressSearchCache = {};
+    var addressSearchTimer = null;
+    var addressSearchRequestId = 0;
     var map = L.map(mapElement).setView(
-        [Number(config.initialLat) || 14.5995, Number(config.initialLng) || 120.9842],
+        [
+            Number(config.showOrigin && config.savedOriginLat ? config.savedOriginLat : config.initialOriginLat) ||
+                Number(config.initialLat) || 14.5995,
+            Number(config.showOrigin && config.savedOriginLng ? config.savedOriginLng : config.initialOriginLng) ||
+                Number(config.initialLng) || 120.9842
+        ],
         15
     );
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap contributors"
     }).addTo(map);
-    var marker = null;
-
     setTimeout(function () {
         map.invalidateSize();
     }, 200);
 
-    function setStatus(message) {
-        if (statusText) {
-            statusText.textContent = message;
+    function fieldsFor(kind) {
+        if (kind === "origin") {
+            return {
+                lat: document.getElementById("origin-latitude"),
+                lng: document.getElementById("origin-longitude"),
+                latDisplay: null,
+                lngDisplay: null,
+                confirmed: document.getElementById("origin-location-confirmed"),
+                status: document.getElementById("origin-location-status")
+            };
+        }
+        return {
+            lat: document.getElementById("delivery-latitude"),
+            lng: document.getElementById("delivery-longitude"),
+            latDisplay: document.getElementById("delivery_latitude_display"),
+            lngDisplay: document.getElementById("delivery_longitude_display"),
+            confirmed: document.getElementById("delivery-location-confirmed"),
+            status: document.getElementById("location-status")
+        };
+    }
+
+    function setStatus(kind, message) {
+        var fields = fieldsFor(kind);
+        if (fields.status) {
+            fields.status.textContent = message;
         }
     }
 
-    function placeMarker(lat, lng, confirmed) {
-        latInput.value = Number(lat).toFixed(7);
-        lngInput.value = Number(lng).toFixed(7);
-        if (latDisplay) {
-            latDisplay.value = latInput.value;
+    function getPoint(kind) {
+        var fields = fieldsFor(kind);
+        if (!fields.lat || !fields.lat.value || !fields.lng || !fields.lng.value) {
+            return null;
         }
-        if (lngDisplay) {
-            lngDisplay.value = lngInput.value;
+        var lat = Number(fields.lat.value);
+        var lng = Number(fields.lng.value);
+        if (!isFinite(lat) || !isFinite(lng)) {
+            return null;
         }
-        confirmedInput.value = confirmed ? "yes" : "";
-        if (marker) {
-            marker.setLatLng([lat, lng]);
+        return { lat: lat, lng: lng };
+    }
+
+    function createPinIcon(kind) {
+        return L.divIcon({
+            className: "delivery-pin-marker delivery-pin-marker--" + kind,
+            html: "<span>" + (kind === "origin" ? "S" : "D") + "</span>",
+            iconSize: [30, 30],
+            iconAnchor: [15, 30],
+            tooltipAnchor: [0, -22]
+        });
+    }
+
+    function setActivePin(kind) {
+        activePinKind = kind;
+        if (autoPinFlow) {
+            return;
+        }
+        if (originModeButton) {
+            originModeButton.classList.toggle("is-active", kind === "origin");
+            originModeButton.setAttribute("aria-pressed", kind === "origin" ? "true" : "false");
+        }
+        if (deliveryModeButton) {
+            deliveryModeButton.classList.toggle("is-active", kind === "delivery");
+            deliveryModeButton.setAttribute("aria-pressed", kind === "delivery" ? "true" : "false");
+        }
+    }
+
+    function nextAutoPinKind() {
+        return getPoint("origin") ? "delivery" : "origin";
+    }
+
+    function syncAutoPinState() {
+        if (!autoPinFlow) {
+            return;
+        }
+        activePinKind = nextAutoPinKind();
+        if (!getPoint("origin")) {
+            setStatus("origin", "No starting pin yet. Click the map to place it.");
+            setStatus("delivery", "The delivery pin is placed second.");
+        } else if (!getPoint("delivery")) {
+            setStatus("origin", "Starting pin placed.");
+            setStatus("delivery", "No delivery pin yet. Click the map to place it.");
         } else {
-            marker = L.marker([lat, lng], { draggable: true }).addTo(map);
-            marker.on("dragend", function () {
-                var point = marker.getLatLng();
-                placeMarker(point.lat, point.lng, false);
-                setStatus("Pin moved. Press Confirm pinned location to save it.");
+            setStatus("origin", "Starting pin placed.");
+            setStatus("delivery", "Delivery pin placed. Click the map to move it, or cancel to clear both pins.");
+        }
+    }
+
+    function setAddressSearchStatus(message) {
+        if (addressSearchStatus) {
+            addressSearchStatus.textContent = message || "";
+        }
+    }
+
+    function hideAddressResults() {
+        if (addressSearchResults) {
+            addressSearchResults.hidden = true;
+            addressSearchResults.textContent = "";
+        }
+    }
+
+    function applyAddressResult(result) {
+        if (!result) {
+            return;
+        }
+        var lat = Number(result.lat);
+        var lng = Number(result.lng);
+        if (!isFinite(lat) || !isFinite(lng)) {
+            return;
+        }
+        map.setView([lat, lng], 17);
+        var pinKind = autoPinFlow ? nextAutoPinKind() : activePinKind;
+        placePin(pinKind, lat, lng, false);
+        if (addressSearchInput) {
+            addressSearchInput.value = result.label || "";
+        }
+        hideAddressResults();
+        if (config.showOrigin && pinKind === "origin") {
+            var originBarangay = document.getElementById("origin_barangay");
+            var originAddress = document.getElementById("origin_address");
+            var address = result.address || {};
+            var derivedBarangay = address.suburb || address.quarter || address.neighbourhood || address.village || address.barangay;
+            if (originBarangay && derivedBarangay && !originBarangay.value.trim()) {
+                originBarangay.value = String(derivedBarangay).slice(0, 200);
+            }
+            if (originAddress && result.label) {
+                originAddress.value = String(result.label).slice(0, 300);
+            }
+            if (autoPinFlow) {
+                syncAutoPinState();
+                setAddressSearchStatus("Pinned as the starting location.");
+                return;
+            }
+            setStatus("origin", "Address found. Starting pin placed. Press Confirm start.");
+            setActivePin("delivery");
+            setAddressSearchStatus("Pinned as the starting location.");
+            return;
+        }
+        var autoLandmark = document.getElementById("landmark");
+        if (autoPinFlow) {
+            if (autoLandmark && !autoLandmark.value.trim() && result.name) {
+                autoLandmark.value = String(result.name).slice(0, 200);
+            }
+            syncAutoPinState();
+            setAddressSearchStatus("Pinned as the delivery destination.");
+            return;
+        }
+        var landmark = document.getElementById("landmark");
+        if (landmark && !landmark.value.trim() && result.name) {
+            landmark.value = String(result.name).slice(0, 200);
+        }
+        setStatus(
+            "delivery",
+            config.showOrigin
+                ? "Address found. Destination pin placed. Press Confirm destination."
+                : "Address found. Pin placed. Press Confirm pinned location."
+        );
+        setAddressSearchStatus("Pinned as the delivery destination.");
+    }
+
+    function renderAddressResults(results) {
+        if (!addressSearchResults) {
+            return;
+        }
+        addressSearchResults.textContent = "";
+        if (!results.length) {
+            addressSearchResults.hidden = false;
+            setAddressSearchStatus("No addresses found. Try a more specific address.");
+            return;
+        }
+        results.forEach(function (result) {
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = "delivery-address-result";
+            var title = document.createElement("strong");
+            title.textContent = result.name || result.label;
+            var detail = document.createElement("span");
+            detail.textContent = result.label;
+            button.appendChild(title);
+            button.appendChild(detail);
+            button.addEventListener("click", function () {
+                applyAddressResult(result);
+            });
+            addressSearchResults.appendChild(button);
+        });
+        addressSearchResults.hidden = false;
+    }
+
+    function performAddressSearch() {
+        if (!addressSearchInput) {
+            return;
+        }
+        var query = addressSearchInput.value.trim();
+        if (query.length < 3) {
+            hideAddressResults();
+            setAddressSearchStatus("Enter at least 3 characters to search.");
+            return;
+        }
+        if (!config.addressSearchUrl || !window.fetch) {
+            setAddressSearchStatus("Address search is unavailable.");
+            return;
+        }
+        var requestId = ++addressSearchRequestId;
+        var cacheKey = query.toLowerCase();
+        if (Object.prototype.hasOwnProperty.call(addressSearchCache, cacheKey)) {
+            renderAddressResults(addressSearchCache[cacheKey]);
+            setAddressSearchStatus("Select an address to pin it.");
+            return;
+        }
+        setAddressSearchStatus("Searching for addresses...");
+        var params = new URLSearchParams({ q: query });
+        fetch(config.addressSearchUrl + "?" + params.toString(), { credentials: "same-origin" })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("address search unavailable");
+                }
+                return response.json();
+            })
+            .then(function (data) {
+                if (requestId !== addressSearchRequestId) {
+                    return;
+                }
+                var results = Array.isArray(data.results) ? data.results : [];
+                addressSearchCache[cacheKey] = results;
+                renderAddressResults(results);
+                setAddressSearchStatus("Select an address to pin it.");
+            })
+            .catch(function () {
+                if (requestId === addressSearchRequestId) {
+                    hideAddressResults();
+                    setAddressSearchStatus("Address search is unavailable. Pin the location manually.");
+                }
+            });
+    }
+
+    function drawRoute(coordinates) {
+        if (routeLine) {
+            map.removeLayer(routeLine);
+            routeLine = null;
+        }
+        if (!coordinates || coordinates.length < 2) {
+            return;
+        }
+        routeLine = L.polyline(coordinates, { color: "#005ea2", weight: 4, opacity: 0.85 }).addTo(map);
+        routeLine.bringToBack();
+    }
+
+    function refreshRoute() {
+        routeRequestId += 1;
+        var requestId = routeRequestId;
+        drawRoute(null);
+        if (!config.showOrigin) {
+            return;
+        }
+        var originPoint = getPoint("origin");
+        var destinationPoint = getPoint("delivery");
+        if (!originPoint || !destinationPoint) {
+            return;
+        }
+        var straightRoute = [
+            [originPoint.lat, originPoint.lng],
+            [destinationPoint.lat, destinationPoint.lng]
+        ];
+        drawRoute(straightRoute);
+        if (!config.routeUrl || !window.fetch) {
+            return;
+        }
+        var query = new URLSearchParams({
+            start_lat: String(originPoint.lat),
+            start_lng: String(originPoint.lng),
+            end_lat: String(destinationPoint.lat),
+            end_lng: String(destinationPoint.lng)
+        });
+        fetch(config.routeUrl + "?" + query.toString(), { credentials: "same-origin" })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("route unavailable");
+                }
+                return response.json();
+            })
+            .then(function (data) {
+                if (requestId !== routeRequestId) {
+                    return;
+                }
+                var coordinates = Array.isArray(data.coordinates) ? data.coordinates : [];
+                if (coordinates.length >= 2) {
+                    drawRoute(coordinates);
+                }
+            })
+            .catch(function () {
+                if (requestId === routeRequestId) {
+                    drawRoute(straightRoute);
+                }
+            });
+    }
+
+    function placePin(kind, lat, lng, confirmed) {
+        var fields = fieldsFor(kind);
+        if (!fields.lat || !fields.lng) {
+            return;
+        }
+        fields.lat.value = Number(lat).toFixed(7);
+        fields.lng.value = Number(lng).toFixed(7);
+        if (fields.latDisplay) {
+            fields.latDisplay.value = fields.lat.value;
+        }
+        if (fields.lngDisplay) {
+            fields.lngDisplay.value = fields.lng.value;
+        }
+        fields.confirmed.value = autoPinFlow || confirmed ? "yes" : "";
+        if (markers[kind]) {
+            markers[kind].setLatLng([lat, lng]);
+        } else {
+            markers[kind] = L.marker([lat, lng], {
+                draggable: true,
+                icon: createPinIcon(kind),
+                zIndexOffset: kind === "origin" ? 500 : 600
+            }).addTo(map);
+            markers[kind].bindTooltip(kind === "origin" ? "Starting location" : "Delivery destination");
+            markers[kind].on("dragend", function () {
+                var point = markers[kind].getLatLng();
+                placePin(kind, point.lat, point.lng, false);
+                if (autoPinFlow) {
+                    syncAutoPinState();
+                    return;
+                }
+                setStatus(
+                    kind,
+                    kind === "origin"
+                        ? "Starting pin moved. Press Confirm start to save it."
+                        : "Destination pin moved. Press Confirm destination to save it."
+                );
             });
         }
-        if (confirmed) {
-            setStatus("Delivery location confirmed.");
+        refreshRoute();
+    }
+
+    function clearPin(kind) {
+        var fields = fieldsFor(kind);
+        if (fields.lat) {
+            fields.lat.value = "";
+        }
+        if (fields.lng) {
+            fields.lng.value = "";
+        }
+        if (fields.latDisplay) {
+            fields.latDisplay.value = "";
+        }
+        if (fields.lngDisplay) {
+            fields.lngDisplay.value = "";
+        }
+        if (fields.confirmed) {
+            fields.confirmed.value = "";
+        }
+        if (markers[kind]) {
+            map.removeLayer(markers[kind]);
+            markers[kind] = null;
+        }
+        refreshRoute();
+    }
+
+    function confirmPin(kind) {
+        var point = getPoint(kind);
+        if (!point) {
+            setStatus(kind, kind === "origin" ? "Place the starting pin on the map first." : "Place the pin on the map first.");
+            return;
+        }
+        placePin(kind, point.lat, point.lng, true);
+        if (kind === "origin") {
+            setStatus("origin", "Starting location confirmed.");
+            setActivePin("delivery");
+        } else {
+            setStatus("delivery", config.showOrigin ? "Delivery destination confirmed." : "Delivery location confirmed.");
         }
     }
 
-    if (config.savedLat && config.savedLng) {
-        placeMarker(Number(config.savedLat), Number(config.savedLng), Boolean(config.confirmed));
+    if (autoPinFlow) {
+        if (config.savedOriginLat && config.savedOriginLng) {
+            placePin("origin", Number(config.savedOriginLat), Number(config.savedOriginLng), true);
+        }
+        if (config.savedLat && config.savedLng) {
+            placePin("delivery", Number(config.savedLat), Number(config.savedLng), true);
+        }
+        syncAutoPinState();
+    } else if (config.showOrigin) {
+        if (config.savedOriginLat && config.savedOriginLng) {
+            placePin("origin", Number(config.savedOriginLat), Number(config.savedOriginLng), Boolean(config.originConfirmed));
+        }
+        if (config.savedLat && config.savedLng) {
+            placePin("delivery", Number(config.savedLat), Number(config.savedLng), Boolean(config.confirmed));
+        }
+        setActivePin(getPoint("origin") ? "delivery" : "origin");
+        if (!getPoint("origin")) {
+            setStatus("origin", "Click the map to pin where the document is coming from.");
+        } else if (!getPoint("delivery")) {
+            setStatus("delivery", "Now click the map to pin where it will be delivered.");
+        } else if (!config.originConfirmed || !config.confirmed) {
+            setStatus("delivery", "Drag the pins or click the map to adjust, then confirm both points.");
+        }
     } else {
-        placeMarker(
-            Number(config.initialLat) || 14.5995,
-            Number(config.initialLng) || 120.9842,
-            false
+        if (config.savedLat && config.savedLng) {
+            placePin("delivery", Number(config.savedLat), Number(config.savedLng), Boolean(config.confirmed));
+        } else {
+            placePin("delivery", Number(config.initialLat) || 14.5995, Number(config.initialLng) || 120.9842, false);
+        }
+        setActivePin("delivery");
+        if (!config.confirmed) {
+            setStatus("delivery", "Drag the pin or click the map to set your delivery point, then confirm.");
+        }
+    }
+
+    if (config.showOrigin && getPoint("origin") && getPoint("delivery")) {
+        var originPoint = getPoint("origin");
+        var destinationPoint = getPoint("delivery");
+        map.fitBounds(
+            [[originPoint.lat, originPoint.lng], [destinationPoint.lat, destinationPoint.lng]],
+            { padding: [45, 45], maxZoom: 15 }
         );
-        setStatus("Drag the pin or click the map to set your delivery point, then confirm.");
     }
 
     map.on("click", function (event) {
-        placeMarker(event.latlng.lat, event.latlng.lng, false);
-        setStatus("Pin placed. Press Confirm pinned location to save it.");
-    });
-
-    barangaySelect.addEventListener("change", function () {
-        var option = barangaySelect.options[barangaySelect.selectedIndex];
-        var lat = Number(option.getAttribute("data-lat"));
-        var lng = Number(option.getAttribute("data-lng"));
-        if (!lat || !lng) {
+        if (autoPinFlow) {
+            placePin(nextAutoPinKind(), event.latlng.lat, event.latlng.lng, true);
+            syncAutoPinState();
             return;
         }
-        map.setView([lat, lng], 14);
-        if (marker) {
-            map.removeLayer(marker);
-            marker = null;
+        placePin(activePinKind, event.latlng.lat, event.latlng.lng, false);
+        if (config.showOrigin && activePinKind === "origin") {
+            setStatus("origin", "Starting pin placed. Press Confirm start, then pin the destination.");
+            setActivePin("delivery");
+        } else {
+            setStatus(
+                "delivery",
+                config.showOrigin
+                    ? "Destination pin placed. Press Confirm destination to save it."
+                    : "Pin placed. Press Confirm pinned location to save it."
+            );
         }
-        latInput.value = "";
-        lngInput.value = "";
-        if (latDisplay) {
-            latDisplay.value = "";
-        }
-        if (lngDisplay) {
-            lngDisplay.value = "";
-        }
-        confirmedInput.value = "";
-        setStatus("Barangay selected. Click the map or drag the pin to the delivery point.");
     });
 
-    confirmButton.addEventListener("click", function () {
-        if (!latInput.value || !lngInput.value) {
-            setStatus("Place the pin on the map first.");
-            return;
+    if (originModeButton) {
+        originModeButton.addEventListener("click", function () {
+            setActivePin("origin");
+            setStatus("origin", "Click the map to pin where the document is coming from.");
+        });
+    }
+    if (deliveryModeButton) {
+        deliveryModeButton.addEventListener("click", function () {
+            setActivePin("delivery");
+            setStatus("delivery", "Click the map to pin where it will be delivered.");
+        });
+    }
+
+    if (addressSearchButton) {
+        addressSearchButton.addEventListener("click", function () {
+            if (addressSearchTimer) {
+                clearTimeout(addressSearchTimer);
+            }
+            performAddressSearch();
+        });
+    }
+    if (addressSearchInput) {
+        addressSearchInput.addEventListener("input", function () {
+            if (addressSearchTimer) {
+                clearTimeout(addressSearchTimer);
+            }
+            addressSearchTimer = setTimeout(performAddressSearch, 600);
+        });
+        addressSearchInput.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                if (addressSearchTimer) {
+                    clearTimeout(addressSearchTimer);
+                }
+                performAddressSearch();
+            }
+        });
+    }
+    document.addEventListener("click", function (event) {
+        if (addressSearchContainer && !addressSearchContainer.contains(event.target)) {
+            hideAddressResults();
         }
-        confirmedInput.value = "yes";
-        setStatus("Delivery location confirmed.");
     });
 
-    detectButton.addEventListener("click", function () {
-        if (!navigator.geolocation) {
-            setStatus("Location detection is not available in this browser.");
-            return;
-        }
-        setStatus("Detecting your current location...");
-        navigator.geolocation.getCurrentPosition(function (position) {
-            var lat = position.coords.latitude;
-            var lng = position.coords.longitude;
-            map.setView([lat, lng], 16);
-            placeMarker(lat, lng, false);
-            setStatus("Current location pinned. Press Confirm pinned location to save it.");
-        }, function () {
-            setStatus("Current location could not be detected. Pin the address manually.");
-        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-    });
+    if (barangaySelect) {
+        barangaySelect.addEventListener("change", function () {
+            var lat = 0;
+            var lng = 0;
+            if (barangaySelect.tagName === "SELECT") {
+                var option = barangaySelect.options[barangaySelect.selectedIndex];
+                lat = Number(option.getAttribute("data-lat"));
+                lng = Number(option.getAttribute("data-lng"));
+            } else {
+                var query = (barangaySelect.value || "").trim().toLowerCase();
+                var match = (config.barangayCenters || []).find(function (item) {
+                    return item.name.toLowerCase() === query;
+                });
+                if (match) {
+                    lat = Number(match.latitude);
+                    lng = Number(match.longitude);
+                }
+            }
+            if (!lat || !lng) {
+                return;
+            }
+            map.setView([lat, lng], 14);
+            clearPin("delivery");
+            if (autoPinFlow) {
+                syncAutoPinState();
+                return;
+            }
+            setActivePin("delivery");
+            setStatus("delivery", "Barangay selected. Click the map to pin the delivery point.");
+        });
+    }
+
+    var confirmOriginButton = document.getElementById("confirm-origin-location");
+    if (confirmOriginButton) {
+        confirmOriginButton.addEventListener("click", function () {
+            confirmPin("origin");
+        });
+    }
+    var confirmLocationButton = document.getElementById("confirm-location");
+    if (confirmLocationButton) {
+        confirmLocationButton.addEventListener("click", function () {
+            confirmPin("delivery");
+        });
+    }
+    var clearPinsButton = document.getElementById("clear-pins");
+    if (clearPinsButton) {
+        clearPinsButton.addEventListener("click", function () {
+            clearPin("origin");
+            clearPin("delivery");
+            syncAutoPinState();
+        });
+    }
+
+    if (detectButton) {
+        detectButton.addEventListener("click", function () {
+            var kind = config.showOrigin ? activePinKind : "delivery";
+            if (!navigator.geolocation) {
+                setStatus(kind, "Location detection is not available in this browser.");
+                return;
+            }
+            setStatus(kind, "Detecting your current location...");
+            navigator.geolocation.getCurrentPosition(function (position) {
+                var lat = position.coords.latitude;
+                var lng = position.coords.longitude;
+                map.setView([lat, lng], 16);
+                if (autoPinFlow) {
+                    placePin(nextAutoPinKind(), lat, lng, true);
+                    syncAutoPinState();
+                    return;
+                }
+                placePin(kind, lat, lng, false);
+                if (config.showOrigin && kind === "origin") {
+                    setStatus("origin", "Starting location pinned from your device. Press Confirm start.");
+                    setActivePin("delivery");
+                } else {
+                    setStatus("delivery", "Current location pinned. Press Confirm destination to save it.");
+                }
+            }, function () {
+                setStatus(kind, "Current location could not be detected. Pin the address manually.");
+            }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+        });
+    }
 
     document.getElementById("delivery-form").addEventListener("submit", function (event) {
-        if (!confirmedInput.value) {
+        if (autoPinFlow) {
+            if (!getPoint("origin") || !getPoint("delivery")) {
+                event.preventDefault();
+                if (!getPoint("origin")) {
+                    setStatus("origin", "Click the map to place the starting pin.");
+                } else {
+                    setStatus("delivery", "Click the map to place the delivery pin.");
+                }
+                mapElement.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+            return;
+        }
+        if (config.showOrigin && !fieldsFor("origin").confirmed.value) {
             event.preventDefault();
-            setStatus("Confirm the pinned delivery location before continuing.");
+            setActivePin("origin");
+            setStatus("origin", "Confirm the pinned starting location before continuing.");
+            mapElement.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+        }
+        if (!fieldsFor("delivery").confirmed.value) {
+            event.preventDefault();
+            setActivePin("delivery");
+            setStatus("delivery", "Confirm the pinned delivery location before continuing.");
             mapElement.scrollIntoView({ behavior: "smooth", block: "center" });
         }
     });

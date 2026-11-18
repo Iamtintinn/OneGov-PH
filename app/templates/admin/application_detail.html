@@ -40,10 +40,14 @@
         <div class="review-map-frame">
             <div id="{{ tracking.map.map_id }}" class="admin-track-map review-map" role="application" aria-label="Delivery route map for {{ application.tracking_number }}"></div>
         </div>
+        <div class="review-map-dates">
+            <span><strong>Dispatch start</strong>{{ tracking.map.started_at_label or 'Not dispatched yet' }}</span>
+            <span><strong>Delivery end</strong>{{ tracking.map.ends_at_label or 'Pending' }}</span>
+        </div>
         <div class="review-map-footer">
             <div class="review-map-progress">
                 <div class="admin-track-progress" aria-hidden="true"><span style="width: {{ tracking.delivery_progress_percent }}%"></span></div>
-                <p data-delivery-progress>Vehicle position reflects the current simulated delivery progress.</p>
+                <p data-delivery-progress>Vehicle position reflects the current tracked delivery progress.</p>
             </div>
             <div class="review-map-legend">
                 <span><i class="review-legend-dot review-legend-dot--start"></i>{{ tracking.map.start.label }}</span>
@@ -272,8 +276,11 @@
             <dl class="review-detail-grid">
                 <div><dt>Recipient name</dt><dd>{{ tracking.citizen_delivery.get("recipient_name") or "—" }}</dd></div>
                 <div><dt>Contact number</dt><dd>{{ tracking.citizen_delivery.get("contact_number") or "—" }}</dd></div>
-                <div><dt>Barangay</dt><dd>{{ tracking.citizen_delivery.get("barangay") or "—" }}</dd></div>
-                <div><dt>Coordinates</dt><dd>{% if tracking.citizen_delivery.get("latitude") and tracking.citizen_delivery.get("longitude") %}{{ tracking.citizen_delivery.get("latitude") }}, {{ tracking.citizen_delivery.get("longitude") }}{% else %}Not pinned{% endif %}</dd></div>
+                <div><dt>Requesting barangay</dt><dd>{{ tracking.citizen_delivery.get("origin_barangay") or "—" }}</dd></div>
+                <div><dt>Delivery barangay</dt><dd>{{ tracking.citizen_delivery.get("barangay") or "—" }}</dd></div>
+                <div class="review-detail-wide"><dt>Starting address</dt><dd>{{ tracking.citizen_delivery.get("origin_address") or "—" }}</dd></div>
+                <div><dt>Start coordinates</dt><dd>{% if tracking.citizen_delivery.get("origin_latitude") and tracking.citizen_delivery.get("origin_longitude") %}{{ tracking.citizen_delivery.get("origin_latitude") }}, {{ tracking.citizen_delivery.get("origin_longitude") }}{% else %}Not pinned{% endif %}</dd></div>
+                <div><dt>Delivery coordinates</dt><dd>{% if tracking.citizen_delivery.get("latitude") and tracking.citizen_delivery.get("longitude") %}{{ tracking.citizen_delivery.get("latitude") }}, {{ tracking.citizen_delivery.get("longitude") }}{% else %}Not pinned{% endif %}</dd></div>
                 <div class="review-detail-wide"><dt>Complete delivery address</dt><dd>{{ tracking.citizen_delivery.get("address") or "—" }}</dd></div>
             </dl>
             {% else %}<p class="admin-empty">No home-delivery details were saved for this application. A simulated destination is used for the map.</p>{% endif %}
@@ -295,6 +302,7 @@
 <script src="{{ url_for('static', filename='js/admin_review.js') }}"></script>
 {% if tracking.map %}
 <script>window.ONE_GOV_ADMIN_DELIVERY_MAPS = {{ [tracking.map]|tojson }};</script>
+<script>window.ONE_GOV_ROUTE_URL = {{ url_for('routing.delivery_route')|tojson }};</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{{ url_for('static', filename='js/admin_delivery_map.js') }}"></script>
 {% endif %}

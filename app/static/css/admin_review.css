@@ -187,6 +187,28 @@ body.admin-review-page .review-map {
     z-index: 0;
 }
 
+.review-map-dates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1.5rem;
+    padding: .7rem .15rem 0;
+}
+
+.review-map-dates span {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+    color: #69788e;
+    font-size: .7rem;
+}
+
+.review-map-dates strong {
+    color: #0c2e52;
+    font-size: .62rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
 .review-map-footer {
     display: flex;
     align-items: flex-start;

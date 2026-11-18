@@ -21,6 +21,7 @@ from app.models.payment import Payment
 from app.models.user import User
 from app.routes import citizen
 from app.routes.applications import register as register_application_routes
+from app.routes.routing import fetch_route
 from app.services.application_forms import specification_for
 from app.services.application_service import field_map, read_details
 from app.utils.access import (
@@ -154,6 +155,12 @@ def _delivery_state(state):
         "courier_contact": delivery.get("courier_contact") or "",
         "note": delivery.get("note") or "",
         "history": history,
+        "dispatched_at": delivery.get("dispatched_at"),
+        "dispatched_at_label": delivery.get("dispatched_at_label") or "",
+        "delivered_at": delivery.get("delivered_at"),
+        "delivered_at_label": delivery.get("delivered_at_label") or "",
+        "updated_at": delivery.get("updated_at"),
+        "updated_at_label": delivery.get("updated_at_label") or "",
         "map": _json_dict(delivery.get("map")),
     }
 
@@ -172,24 +179,79 @@ def _coordinate(value):
 
 def _delivery_map_data(application, delivery, applicant):
     saved = _json_dict(delivery.get("map"))
-    if saved.get("start") and saved.get("destination") and saved.get("route"):
+    citizen_delivery = _delivery_info(application)
+    origin_lat = _coordinate(citizen_delivery.get("origin_latitude"))
+    origin_lng = _coordinate(citizen_delivery.get("origin_longitude"))
+    destination_lat = _coordinate(citizen_delivery.get("latitude"))
+    destination_lng = _coordinate(citizen_delivery.get("longitude"))
+    destination_label = (
+        clean_text(citizen_delivery.get("address"))
+        or (applicant.address if applicant and applicant.address else "")
+        or "Citizen delivery destination"
+    )
+    should_fetch_route = delivery.get("status") in MAP_DELIVERY_STATUSES
+
+    def route_for(start_lat, start_lng, end_lat, end_lng, fallback):
+        if should_fetch_route:
+            routed = fetch_route(start_lat, start_lng, end_lat, end_lng)
+            if routed and len(routed.get("coordinates") or []) > 1:
+                return routed["coordinates"], routed.get("distance"), routed.get("duration")
+        return fallback, None, None
+
+    if origin_lat is not None and origin_lng is not None:
+        origin_address = clean_text(citizen_delivery.get("origin_address"))
+        origin_barangay = clean_text(citizen_delivery.get("origin_barangay"))
+        start_label = origin_address or "Starting location"
+        if origin_barangay and origin_barangay.lower() not in start_label.lower():
+            start_label = f"{origin_barangay} · {start_label}"
+
+        if destination_lat is None or destination_lng is None:
+            destination_lat = origin_lat + 0.012
+            destination_lng = origin_lng + 0.009
+        if abs(destination_lat - origin_lat) < 0.0015 and abs(destination_lng - origin_lng) < 0.0015:
+            destination_lat += 0.012
+            destination_lng += 0.009
+        fallback_route = [
+            [origin_lat, origin_lng],
+            [destination_lat, destination_lng],
+        ]
+        route, distance, duration = route_for(
+            origin_lat, origin_lng, destination_lat, destination_lng, fallback_route
+        )
+        payload = {
+            "start": {"lat": origin_lat, "lng": origin_lng, "label": start_label},
+            "destination": {
+                "lat": destination_lat,
+                "lng": destination_lng,
+                "label": destination_label,
+            },
+            "route": route,
+        }
+    elif saved.get("start") and saved.get("destination") and saved.get("route"):
         payload = dict(saved)
+        saved_start = _json_dict(saved.get("start"))
+        saved_destination = _json_dict(saved.get("destination"))
+        route, distance, duration = route_for(
+            _coordinate(saved_start.get("lat")) or 0,
+            _coordinate(saved_start.get("lng")) or 0,
+            _coordinate(saved_destination.get("lat")) or 0,
+            _coordinate(saved_destination.get("lng")) or 0,
+            saved["route"],
+        )
+        payload["route"] = route
     else:
         from app.services.barangay_delivery import barangay_center
 
-        citizen_delivery = _delivery_info(application)
         barangay = clean_text(citizen_delivery.get("barangay"))
         office = barangay_center(barangay) or DEFAULT_BARANGAY_OFFICE
         office_lat, office_lng = office
-        destination_lat = _coordinate(citizen_delivery.get("latitude"))
-        destination_lng = _coordinate(citizen_delivery.get("longitude"))
         if destination_lat is None or destination_lng is None:
             destination_lat = office_lat + 0.012
             destination_lng = office_lng + 0.009
         if abs(destination_lat - office_lat) < 0.0015 and abs(destination_lng - office_lng) < 0.0015:
             destination_lat += 0.012
             destination_lng += 0.009
-        route = [
+        fallback_route = [
             [office_lat, office_lng],
             [
                 (office_lat + destination_lat) / 2 + 0.0025,
@@ -197,6 +259,9 @@ def _delivery_map_data(application, delivery, applicant):
             ],
             [destination_lat, destination_lng],
         ]
+        route, distance, duration = route_for(
+            office_lat, office_lng, destination_lat, destination_lng, fallback_route
+        )
         payload = {
             "start": {
                 "lat": office_lat,
@@ -206,16 +271,28 @@ def _delivery_map_data(application, delivery, applicant):
             "destination": {
                 "lat": destination_lat,
                 "lng": destination_lng,
-                "label": citizen_delivery.get("address")
-                or (applicant.address if applicant and applicant.address else "")
-                or "Citizen delivery destination",
+                "label": destination_label,
             },
             "route": route,
         }
+
     payload["map_id"] = f"admin-delivery-map-{application.application_id}"
     payload["progress"] = delivery.get("progress") or 0
+    payload["from_progress"] = delivery.get(
+        "from_progress", saved.get("from_progress", 0)
+    ) or 0
+    payload["started_at"] = delivery.get("dispatched_at") or delivery.get("updated_at")
+    payload["started_at_label"] = (
+        delivery.get("dispatched_at_label")
+        or delivery.get("updated_at_label")
+        or "Not dispatched yet"
+    )
+    payload["ends_at"] = delivery.get("delivered_at")
+    payload["ends_at_label"] = delivery.get("delivered_at_label") or "Pending"
+    payload["route_distance"] = distance
+    payload["route_duration"] = duration
     payload["status"] = delivery.get("status")
-    payload["status_label"] = delivery.get("label")
+    payload["status_label"] = delivery.get("label") or delivery.get("status_label")
     return payload
 
 
@@ -426,6 +503,7 @@ def _update_delivery_status(application):
     now = datetime.now().replace(microsecond=0)
     stored_delivery = state["delivery"]
     previous_label = delivery["label"]
+    previous_progress = float(delivery["progress"] or 0)
     stored_delivery.update(
         {
             "status": target["key"],
@@ -437,7 +515,7 @@ def _update_delivery_status(application):
             "updated_at_label": now.strftime("%d %b %Y, %I:%M %p"),
         }
     )
-    if target["key"] == "picked_up":
+    if target["key"] in MAP_DELIVERY_STATUSES and not stored_delivery.get("dispatched_at"):
         stored_delivery["dispatched_at"] = now.isoformat()
         stored_delivery["dispatched_at_label"] = now.strftime("%d %b %Y, %I:%M %p")
     if target["key"] == "delivered":
@@ -460,13 +538,19 @@ def _update_delivery_status(application):
         }
     )
     if target["key"] in MAP_DELIVERY_STATUSES:
-        stored_delivery["map"] = _delivery_map_data(
-            application,
+        map_context = dict(stored_delivery)
+        map_context.update(
             {
                 "status": target["key"],
                 "label": target["label"],
                 "progress": target["progress"],
-            },
+                "from_progress": previous_progress,
+                "map": stored_delivery.get("map"),
+            }
+        )
+        stored_delivery["map"] = _delivery_map_data(
+            application,
+            map_context,
             db.session.get(User, application.applicant_id),
         )
     _save_admin_tracking(application, state)

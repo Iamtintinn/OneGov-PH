@@ -59,23 +59,59 @@
         element._adminDelivery = {
             map: map,
             marker: marker,
+            line: line,
             route: route,
             progress: Number(config.progress || 0),
-            frame: null
+            fromProgress: Number(config.from_progress != null ? config.from_progress : 0),
+            frame: null,
+            routeRequestId: 0
         };
         return element._adminDelivery;
+    }
+
+    function loadRoute(state, config) {
+        var routeUrl = window.ONE_GOV_ROUTE_URL;
+        if (!routeUrl || !config.start || !config.destination || !window.fetch) { return; }
+        state.routeRequestId += 1;
+        var requestId = state.routeRequestId;
+        var query = new URLSearchParams({
+            start_lat: String(config.start.lat),
+            start_lng: String(config.start.lng),
+            end_lat: String(config.destination.lat),
+            end_lng: String(config.destination.lng)
+        });
+        fetch(routeUrl + "?" + query.toString(), { credentials: "same-origin" })
+            .then(function (response) {
+                if (!response.ok) { throw new Error("route unavailable"); }
+                return response.json();
+            })
+            .then(function (data) {
+                if (requestId !== state.routeRequestId) { return; }
+                var coordinates = Array.isArray(data.coordinates) ? data.coordinates : [];
+                if (coordinates.length < 2) { return; }
+                state.route = coordinates.map(function (point) {
+                    return [Number(point[0]), Number(point[1])];
+                });
+                state.line.setLatLngs(state.route);
+                state.map.fitBounds(state.line.getBounds(), { padding: [36, 36] });
+                state.marker.setLatLng(pointOnRoute(state.route, state.progress));
+            })
+            .catch(function () {});
     }
 
     function animateDelivery(element, state) {
         if (state.frame) { cancelAnimationFrame(state.frame); }
         var startedAt = performance.now();
         var duration = 1800;
+        var targetProgress = state.progress;
+        var startProgress = state.fromProgress;
+        if (startProgress > targetProgress) { startProgress = 0; }
         var panel = element.closest(".admin-track-map-panel");
         var progressBar = panel ? panel.querySelector(".admin-track-progress span") : null;
         var progressText = panel ? panel.querySelector("[data-delivery-progress]") : null;
         function frame(now) {
             var elapsed = Math.min((now - startedAt) / duration, 1);
-            var progress = state.progress * elapsed;
+            var progress = startProgress + (targetProgress - startProgress) * elapsed;
             state.marker.setLatLng(pointOnRoute(state.route, progress));
             if (progressBar) { progressBar.style.width = Math.round(progress * 100) + "%"; }
             if (progressText) { progressText.textContent = Math.round(progress * 100) + "% of the simulated delivery route completed."; }
@@ -88,6 +124,7 @@
         var config = configById[element.id];
         if (!config) { return; }
         var state = element._adminDelivery || buildMap(element, config);
+        loadRoute(state, config);
         requestAnimationFrame(function () {
             state.map.invalidateSize();
             animateDelivery(element, state);

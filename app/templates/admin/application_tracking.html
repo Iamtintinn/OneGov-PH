@@ -36,6 +36,7 @@
                         <th>Government service</th>
                         <th>Application type</th>
                         <th>Submission date</th>
+                        <th>Delivery window</th>
                         <th>Current status</th>
                         <th><span class="visually-hidden">Action</span></th>
                     </tr>
@@ -49,6 +50,10 @@
                         <td>{{ application.service.service_name }}</td>
                         <td>{{ row.application_type }}</td>
                         <td>{{ application.submission_date.strftime("%d %b %Y") }}</td>
+                        <td>
+                            {% if row.delivery.dispatched_at_label %}{{ row.delivery.dispatched_at_label }}{% else %}—{% endif %}
+                            <small>{% if row.delivery.delivered_at_label %}Ended {{ row.delivery.delivered_at_label }}{% else %}End pending{% endif %}</small>
+                        </td>
                         <td><span class="admin-status-pill admin-status-pill--{{ application.application_status }}">{{ row.processing_label }}</span></td>
                         <td class="admin-tracking-action"><a class="admin-button admin-button--quiet" href="{{ url_for('admin.application_detail', application_id=application.application_id) }}">Open full review <span aria-hidden="true">→</span></a></td>
                     </tr>

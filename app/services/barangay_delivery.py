@@ -16,8 +16,8 @@ REGION = "National Capital Region"
 PROVINCE = "Metro Manila"
 CITY = "Quezon City"
 
-# Home delivery is included in the demonstration; the clearance fee stays at ₱50.00.
-DELIVERY_FEE = Decimal("0.00")
+# Home delivery costs ₱50.00; the clearance fee stays at ₱50.00.
+DELIVERY_FEE = Decimal("50.00")
 
 DEMO_BARANGAYS = (
     {"name": "Commonwealth", "latitude": 14.6986, "longitude": 121.0850},
@@ -95,6 +95,13 @@ def delivery_values(application):
         "latitude": latitude,
         "longitude": longitude,
         "location_confirmed": bool(latitude and longitude),
+        "origin_barangay": delivery.get("origin_barangay") or "",
+        "origin_address": delivery.get("origin_address") or "",
+        "origin_latitude": delivery.get("origin_latitude") or "",
+        "origin_longitude": delivery.get("origin_longitude") or "",
+        "origin_location_confirmed": bool(
+            delivery.get("origin_latitude") and delivery.get("origin_longitude")
+        ),
     }
 
 
@@ -122,8 +129,10 @@ def validate_delivery_form(form):
         errors["contact_number"] = "Enter a valid contact number."
 
     barangay = clean_text(form.get("barangay"))
-    if barangay_by_name(barangay) is None:
-        errors["barangay"] = "Select a supported demonstration barangay."
+    if not barangay:
+        errors["barangay"] = "Enter the barangay."
+    elif len(barangay) > 200:
+        errors["barangay"] = "Use 200 characters or fewer for the barangay."
 
     house_number = clean_text(form.get("house_number"))
     if not house_number:
@@ -140,6 +149,25 @@ def validate_delivery_form(form):
     subdivision = clean_text(form.get("subdivision"))[:200]
     landmark = clean_text(form.get("landmark"))[:200]
 
+    origin_barangay = clean_text(form.get("origin_barangay"))[:200]
+    if not origin_barangay:
+        errors["origin_barangay"] = "Enter the barangay where the clearance is being requested."
+
+    origin_address = clean_text(form.get("origin_address"))[:300]
+    if not origin_address:
+        errors["origin_address"] = "Enter the starting address."
+
+    origin_latitude = _as_float(form.get("origin_latitude"))
+    origin_longitude = _as_float(form.get("origin_longitude"))
+    if origin_latitude is None or origin_longitude is None:
+        errors["origin_latitude"] = "Pin the starting location on the map."
+    elif not LAT_MIN <= origin_latitude <= LAT_MAX:
+        errors["origin_latitude"] = "The pinned latitude is outside the supported area."
+    elif not LNG_MIN <= origin_longitude <= LNG_MAX:
+        errors["origin_longitude"] = "The pinned longitude is outside the supported area."
+
+    origin_confirmed = origin_latitude is not None and origin_longitude is not None
+
     latitude = _as_float(form.get("latitude"))
     longitude = _as_float(form.get("longitude"))
     if latitude is None or longitude is None:
@@ -149,9 +177,7 @@ def validate_delivery_form(form):
     elif not LNG_MIN <= longitude <= LNG_MAX:
         errors["longitude"] = "The pinned longitude is outside the supported area."
 
-    confirmed = str(form.get("delivery_location_confirmed") or "").strip() == "yes"
-    if not confirmed:
-        errors["location_confirmed"] = "Confirm the pinned delivery location before continuing."
+    confirmed = latitude is not None and longitude is not None
 
     values = {
         "recipient_name": recipient,
@@ -167,6 +193,11 @@ def validate_delivery_form(form):
         "latitude": f"{latitude:.7f}" if latitude is not None else "",
         "longitude": f"{longitude:.7f}" if longitude is not None else "",
         "location_confirmed": confirmed,
+        "origin_barangay": origin_barangay,
+        "origin_address": origin_address,
+        "origin_latitude": f"{origin_latitude:.7f}" if origin_latitude is not None else "",
+        "origin_longitude": f"{origin_longitude:.7f}" if origin_longitude is not None else "",
+        "origin_location_confirmed": origin_confirmed,
     }
     return values, errors
 
@@ -174,6 +205,8 @@ def validate_delivery_form(form):
 def save_delivery(application, user, values):
     if not values.get("latitude") or not values.get("longitude"):
         return "Pin the delivery location on the map."
+    if not values.get("origin_latitude") or not values.get("origin_longitude"):
+        return "Pin the starting location on the map."
 
     payload = {
         "recipient_name": values.get("recipient_name") or "",
@@ -188,6 +221,10 @@ def save_delivery(application, user, values):
         "landmark": values.get("landmark") or "",
         "latitude": str(values.get("latitude") or ""),
         "longitude": str(values.get("longitude") or ""),
+        "origin_barangay": values.get("origin_barangay") or "",
+        "origin_address": values.get("origin_address") or "",
+        "origin_latitude": str(values.get("origin_latitude") or ""),
+        "origin_longitude": str(values.get("origin_longitude") or ""),
         "saved_at": _now().isoformat(),
     }
     payload["address"] = delivery_address(payload)
@@ -202,8 +239,8 @@ def save_delivery(application, user, values):
             user_id=user.user_id,
             notification_title="Delivery details saved",
             notification_message=(
-                "Your Barangay Clearance home-delivery location and recipient details "
-                f"were saved for {payload['address'] or 'the pinned location'}."
+                "Your Barangay Clearance home-delivery route, starting location, "
+                f"and recipient details were saved for {payload['address'] or 'the pinned location'}."
             ),
             notification_type="application",
             read_status="unread",
