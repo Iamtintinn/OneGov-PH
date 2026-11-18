@@ -810,6 +810,7 @@ def apply_delivery(application_id):
             PROVINCE,
             REGION,
             birth_center,
+            delivery_address,
             delivery_ready,
             delivery_values,
             save_delivery,
@@ -851,6 +852,7 @@ def apply_delivery(application_id):
             PROVINCE,
             REGION,
             cenomar_center,
+            delivery_address,
             delivery_ready,
             delivery_values,
             save_delivery,
@@ -902,6 +904,19 @@ def apply_delivery(application_id):
 
     delivery_region_val = REGION
     context = _common(application, 5)
+    delivery_address_preview = ""
+    if kind in {"birth", "cenomar"}:
+        delivery_address_preview = delivery_address(
+            {
+                "house_number": values.get("house_number"),
+                "street": values.get("street"),
+                "subdivision": values.get("subdivision"),
+                "barangay": values.get("barangay"),
+                "city": CITY,
+                "province": PROVINCE,
+                "region": REGION,
+            }
+        )
     initial_origin_lat = values.get("origin_latitude") or initial_lat
     initial_origin_lng = values.get("origin_longitude") or initial_lng
     if kind == "birth":
@@ -914,6 +929,7 @@ def apply_delivery(application_id):
         {
             "values": values,
             "errors": errors,
+            "delivery_address_preview": delivery_address_preview,
             "barangay_options": DEMO_BARANGAYS,
             "delivery_region": delivery_region_val,
             "delivery_province": PROVINCE,
@@ -922,7 +938,9 @@ def apply_delivery(application_id):
             "delivery_saved": delivery_ready(application),
             "initial_lat": initial_lat,
             "initial_lng": initial_lng,
-            "show_origin_map": kind in {"barangay", "residency"},
+            "show_origin_map": kind in {"barangay", "residency", "birth", "cenomar"},
+            "fixed_origin_map": kind in {"birth", "cenomar"},
+            "auto_pin_map": kind in {"barangay", "residency", "birth", "cenomar"},
             "saved_origin_lat": values.get("origin_latitude"),
             "saved_origin_lng": values.get("origin_longitude"),
             "origin_confirmed": values.get("origin_location_confirmed"),

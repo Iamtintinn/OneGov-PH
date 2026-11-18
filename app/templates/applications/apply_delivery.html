@@ -33,6 +33,9 @@
             <input type="hidden" name="origin_latitude" id="origin-latitude" value="{{ values.origin_latitude }}">
             <input type="hidden" name="origin_longitude" id="origin-longitude" value="{{ values.origin_longitude }}">
             <input type="hidden" name="origin_location_confirmed" id="origin-location-confirmed" value="{{ 'yes' if values.origin_location_confirmed else '' }}">
+            {% if fixed_origin_map %}
+            <input type="hidden" name="origin_address" id="origin-address" value="{{ values.origin_address }}">
+            {% endif %}
             {% endif %}
 
             <section class="delivery-map-panel{% if values.location_confirmed and (not show_origin_map or values.origin_location_confirmed) %} is-confirmed{% endif %}" aria-labelledby="delivery-map-heading">
@@ -43,7 +46,7 @@
                         </span>
                         <div>
                             <h2 id="delivery-map-heading">{% if show_origin_map %}Pin the delivery route{% else %}Pin the delivery location{% endif %}</h2>
-                            <p class="field-help">{% if show_origin_map %}First pin where the document is coming from, then pin where it will be delivered. The route line appears once both pins are set.{% else %}Select a demonstration barangay, then click the map or drag the pin to the exact delivery point.{% endif %}</p>
+                            <p class="field-help">{% if fixed_origin_map %}The route starts at PSA Central Office / CRS. Click the map to pin where the document will be delivered.{% elif show_origin_map %}First pin where the document is coming from, then pin where it will be delivered. The route line appears once both pins are set.{% else %}Select a demonstration barangay, then click the map or drag the pin to the exact delivery point.{% endif %}</p>
                         </div>
                     </div>
                     <button class="dash-button apply-cancel pay-btn-ghost delivery-map-detect" type="button" id="detect-location">
@@ -53,6 +56,25 @@
                 </div>
 
                 {% if show_origin_map %}
+                {% if fixed_origin_map %}
+                <div class="passport-details-fields delivery-fields delivery-origin-fields">
+                    <div class="apply-field">
+                        <label for="origin_barangay">Starting office</label>
+                        <p class="field-help" id="origin_barangay-help">Fixed pickup location for this document.</p>
+                        <div class="text-input">
+                            <input id="origin_barangay" name="origin_barangay" type="text" value="{{ values.origin_barangay }}" readonly aria-describedby="origin_barangay-help">
+                        </div>
+                    </div>
+
+                    <div class="apply-field">
+                        <label for="delivery_address_display">Delivery address</label>
+                        <p class="field-help" id="delivery_address_display-help">This is the destination where the document will be delivered.</p>
+                        <div class="text-input">
+                            <input id="delivery_address_display" type="text" value="{{ delivery_address_preview }}" readonly aria-describedby="delivery_address_display-help">
+                        </div>
+                    </div>
+                </div>
+                {% else %}
                 <div class="passport-details-fields delivery-fields delivery-origin-fields">
                     <div class="apply-field{% if errors.get('origin_barangay') %} has-error{% endif %}">
                         <label for="origin_barangay">Requesting barangay</label>
@@ -72,8 +94,9 @@
                         {% if errors.get('origin_address') %}<p class="field-error" id="origin_address-error">{{ errors.origin_address }}</p>{% endif %}
                     </div>
                 </div>
+                {% endif %}
 
-                {% if spec.kind not in ['barangay', 'residency'] %}
+                {% if not auto_pin_map %}
                 <div class="delivery-pin-mode" role="group" aria-label="Choose which point to pin">
                     <button class="dash-button pay-btn-primary" type="button" id="pin-origin-mode" aria-pressed="true">1. Pin start</button>
                     <button class="dash-button pay-btn-ghost" type="button" id="pin-delivery-mode" aria-pressed="false">2. Pin destination</button>
@@ -83,7 +106,7 @@
 
                 <div class="delivery-address-search" id="delivery-address-search">
                     <label for="delivery-address-search-input">Search an address</label>
-                    <p class="field-help" id="delivery-address-search-help">Find an address, then select a result to pin {% if spec.kind in ['barangay', 'residency'] %}the next point{% elif show_origin_map %}the active point{% else %}the delivery point{% endif %} on the map.</p>
+                    <p class="field-help" id="delivery-address-search-help">Find an address, then select a result to pin {% if fixed_origin_map %}the delivery point{% elif spec.kind in ['barangay', 'residency'] %}the next point{% elif show_origin_map %}the active point{% else %}the delivery point{% endif %} on the map.</p>
                     <div class="delivery-address-search-row">
                         <div class="text-input">
                             <input id="delivery-address-search-input" type="search" maxlength="200" autocomplete="off" placeholder="Start typing an address in Quezon City" aria-describedby="delivery-address-search-help">
@@ -105,7 +128,9 @@
                 <div class="delivery-map-panel-foot">
                     {% if show_origin_map %}
                     <p class="delivery-map-status{% if values.origin_location_confirmed %} is-confirmed{% endif %}" id="origin-location-status" role="status">
-                        {% if spec.kind in ['barangay', 'residency'] %}
+                        {% if fixed_origin_map %}
+                        PSA Central Office / CRS start pin fixed.
+                        {% elif spec.kind in ['barangay', 'residency'] %}
                             {% if values.origin_location_confirmed %}Starting pin placed.{% else %}No starting pin yet.{% endif %}
                         {% elif values.origin_location_confirmed %}
                         Starting location confirmed.
@@ -115,7 +140,7 @@
                     </p>
                     {% endif %}
                     <p class="delivery-map-status{% if values.location_confirmed %} is-confirmed{% endif %}" id="location-status" role="status">
-                        {% if spec.kind in ['barangay', 'residency'] %}
+                        {% if auto_pin_map %}
                             {% if values.location_confirmed %}Delivery pin placed.{% else %}No delivery pin yet.{% endif %}
                         {% elif values.location_confirmed %}
                         Delivery location confirmed.
@@ -123,7 +148,12 @@
                         No delivery location confirmed yet.
                         {% endif %}
                     </p>
-                    {% if spec.kind in ['barangay', 'residency'] %}
+                    {% if fixed_origin_map %}
+                    <button class="dash-button pay-btn-ghost delivery-map-confirm" type="button" id="clear-destination-pin">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                        <span>Clear delivery pin</span>
+                    </button>
+                    {% elif auto_pin_map %}
                     <button class="dash-button pay-btn-ghost delivery-map-confirm" type="button" id="clear-pins">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
                         <span>Cancel pinning</span>
@@ -334,7 +364,8 @@ window.ONE_GOV_DELIVERY = {
     savedLng: {{ values.longitude|tojson }},
     confirmed: {{ 'true' if values.location_confirmed else 'false' }},
     showOrigin: {{ 'true' if show_origin_map else 'false' }},
-    autoPinFlow: {{ 'true' if spec.kind in ['barangay', 'residency'] else 'false' }},
+    autoPinFlow: {{ 'true' if auto_pin_map else 'false' }},
+    fixedOriginFlow: {{ 'true' if fixed_origin_map else 'false' }},
     initialOriginLat: {{ initial_origin_lat|tojson }},
     initialOriginLng: {{ initial_origin_lng|tojson }},
     savedOriginLat: {{ saved_origin_lat|tojson }},
@@ -364,7 +395,8 @@ window.ONE_GOV_DELIVERY = {
     }
 
     var activePinKind = config.showOrigin ? "origin" : "delivery";
-    var autoPinFlow = Boolean(config.autoPinFlow);
+    var fixedOriginFlow = Boolean(config.fixedOriginFlow);
+    var autoPinFlow = Boolean(config.autoPinFlow) || fixedOriginFlow;
     var markers = {};
     var routeLine = null;
     var routeRequestId = 0;
@@ -462,6 +494,17 @@ window.ONE_GOV_DELIVERY = {
         if (!autoPinFlow) {
             return;
         }
+        if (fixedOriginFlow) {
+            activePinKind = "delivery";
+            setStatus("origin", "PSA Central Office / CRS start pin fixed.");
+            setStatus(
+                "delivery",
+                getPoint("delivery")
+                    ? "Delivery pin placed. Click the map to move it, or clear the pin to start over."
+                    : "Click the map to pin the delivery destination."
+            );
+            return;
+        }
         activePinKind = nextAutoPinKind();
         if (!getPoint("origin")) {
             setStatus("origin", "No starting pin yet. Click the map to place it.");
@@ -473,6 +516,22 @@ window.ONE_GOV_DELIVERY = {
             setStatus("origin", "Starting pin placed.");
             setStatus("delivery", "Delivery pin placed. Click the map to move it, or cancel to clear both pins.");
         }
+    }
+
+    function refreshDeliveryAddressPreview() {
+        var preview = document.getElementById("delivery_address_display");
+        if (!preview) {
+            return;
+        }
+        var parts = ["house_number", "street", "subdivision", "delivery_barangay", "delivery_city", "delivery_province", "delivery_region"]
+            .map(function (id) {
+                var element = document.getElementById(id);
+                return element ? String(element.value || "").trim() : "";
+            })
+            .filter(function (value) {
+                return Boolean(value);
+            });
+        preview.value = parts.join(", ");
     }
 
     function setAddressSearchStatus(message) {
@@ -517,11 +576,13 @@ window.ONE_GOV_DELIVERY = {
             }
             if (autoPinFlow) {
                 syncAutoPinState();
+                refreshDeliveryAddressPreview();
                 setAddressSearchStatus("Pinned as the starting location.");
                 return;
             }
             setStatus("origin", "Address found. Starting pin placed. Press Confirm start.");
             setActivePin("delivery");
+            refreshDeliveryAddressPreview();
             setAddressSearchStatus("Pinned as the starting location.");
             return;
         }
@@ -531,6 +592,7 @@ window.ONE_GOV_DELIVERY = {
                 autoLandmark.value = String(result.name).slice(0, 200);
             }
             syncAutoPinState();
+            refreshDeliveryAddressPreview();
             setAddressSearchStatus("Pinned as the delivery destination.");
             return;
         }
@@ -544,6 +606,7 @@ window.ONE_GOV_DELIVERY = {
                 ? "Address found. Destination pin placed. Press Confirm destination."
                 : "Address found. Pin placed. Press Confirm pinned location."
         );
+        refreshDeliveryAddressPreview();
         setAddressSearchStatus("Pinned as the delivery destination.");
     }
 
@@ -903,6 +966,15 @@ window.ONE_GOV_DELIVERY = {
         });
     }
 
+    ["house_number", "street", "subdivision", "delivery_barangay"].forEach(function (id) {
+        var element = document.getElementById(id);
+        if (element) {
+            element.addEventListener("input", refreshDeliveryAddressPreview);
+            element.addEventListener("change", refreshDeliveryAddressPreview);
+        }
+    });
+    refreshDeliveryAddressPreview();
+
     var confirmOriginButton = document.getElementById("confirm-origin-location");
     if (confirmOriginButton) {
         confirmOriginButton.addEventListener("click", function () {
@@ -919,6 +991,13 @@ window.ONE_GOV_DELIVERY = {
     if (clearPinsButton) {
         clearPinsButton.addEventListener("click", function () {
             clearPin("origin");
+            clearPin("delivery");
+            syncAutoPinState();
+        });
+    }
+    var clearDestinationButton = document.getElementById("clear-destination-pin");
+    if (clearDestinationButton) {
+        clearDestinationButton.addEventListener("click", function () {
             clearPin("delivery");
             syncAutoPinState();
         });

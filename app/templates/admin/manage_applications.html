@@ -25,12 +25,16 @@
                 <tbody>
                     {% for application in applications %}
                     {% set applicant = applicants.get(application.applicant_id) %}
+                    {% set row_status = row_statuses.get(application.application_id) %}
                     <tr>
                         <td><strong class="admin-mono">{{ application.tracking_number }}</strong></td>
                         <td>{{ applicant.full_name if applicant else "Unknown account" }}<small>{{ applicant.email if applicant else "" }}</small></td>
                         <td>{{ application.service.service_name }}</td>
                         <td>{{ application.submission_date.strftime("%d %b %Y") }}</td>
-                        <td><span class="admin-status-pill admin-status-pill--{{ application.application_status }}">{{ status_labels[application.application_status] }}</span></td>
+                        <td>
+                            <span class="admin-status-pill admin-status-pill--{{ row_status.status if row_status else application.application_status }}">{{ row_status.label if row_status else status_labels[application.application_status] }}</span>
+                            {% if row_status and row_status.courier_name %}<small>{{ row_status.courier_name }}</small>{% endif %}
+                        </td>
                         <td>{{ application.payment_status|replace("_", " ")|title if application.payment_status else "—" }}</td>
                         <td><a class="admin-row-action" href="{{ url_for('admin.application_detail', application_id=application.application_id) }}">Review <span aria-hidden="true">→</span></a></td>
                     </tr>

@@ -11,6 +11,10 @@ from app.services.birth_delivery import (
     DEFAULT_LNG,
     DELIVERY_FEE,
     DEMO_BARANGAYS,
+    ORIGIN_ADDRESS,
+    ORIGIN_LAT,
+    ORIGIN_LNG,
+    ORIGIN_NAME,
     PROVINCE,
     REGION,
     birth_center as cenomar_center,
@@ -43,6 +47,10 @@ def save_delivery(application, user, values):
         "landmark": values.get("landmark") or "",
         "latitude": str(values.get("latitude") or ""),
         "longitude": str(values.get("longitude") or ""),
+        "origin_barangay": ORIGIN_NAME,
+        "origin_address": ORIGIN_ADDRESS,
+        "origin_latitude": f"{ORIGIN_LAT:.7f}",
+        "origin_longitude": f"{ORIGIN_LNG:.7f}",
         "saved_at": _now().isoformat(),
     }
     payload["address"] = delivery_address(payload)

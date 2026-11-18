@@ -521,6 +521,19 @@ def applications():
             db.select(User).where(User.user_id.in_({item.applicant_id for item in rows}))
         ).all()
     } if rows else {}
+    from app.routes.admin_portal import tracking_detail_data
+
+    row_statuses = {}
+    for item in rows:
+        delivery = tracking_detail_data(
+            item, applicants.get(item.applicant_id), include_map=False
+        )["delivery"]
+        if delivery["status"]:
+            row_statuses[item.application_id] = {
+                "label": delivery["label"],
+                "status": delivery["status"],
+                "courier_name": delivery["courier_name"],
+            }
     return render_template(
         "admin/manage_applications.html",
         applications=rows,
@@ -530,6 +543,7 @@ def applications():
         ).all(),
         statuses=APPLICATION_STATUSES,
         status_labels=STATUS_LABELS,
+        row_statuses=row_statuses,
         selected_status=status,
         selected_service=service_raw,
         search=search,

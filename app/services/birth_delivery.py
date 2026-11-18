@@ -20,6 +20,11 @@ LNG_MIN, LNG_MAX = 116.0, 127.0
 DEFAULT_LAT = 14.5995
 DEFAULT_LNG = 120.9842
 
+ORIGIN_NAME = "PSA Central Office / CRS"
+ORIGIN_ADDRESS = "PSA Complex, East Avenue, Diliman, Quezon City, Metro Manila."
+ORIGIN_LAT = 14.6392
+ORIGIN_LNG = 121.0437
+
 DEMO_BARANGAYS = (
     {"name": "Commonwealth", "latitude": 14.6986, "longitude": 121.0850},
     {"name": "Batasan Hills", "latitude": 14.6786, "longitude": 121.0965},
@@ -90,6 +95,11 @@ def delivery_values(application):
         "latitude": latitude,
         "longitude": longitude,
         "location_confirmed": bool(latitude and longitude),
+        "origin_barangay": ORIGIN_NAME,
+        "origin_address": ORIGIN_ADDRESS,
+        "origin_latitude": f"{ORIGIN_LAT:.7f}",
+        "origin_longitude": f"{ORIGIN_LNG:.7f}",
+        "origin_location_confirmed": True,
     }
 
 
@@ -164,6 +174,11 @@ def validate_delivery_form(form):
         "latitude": f"{latitude:.7f}" if latitude is not None else "",
         "longitude": f"{longitude:.7f}" if longitude is not None else "",
         "location_confirmed": confirmed,
+        "origin_barangay": ORIGIN_NAME,
+        "origin_address": ORIGIN_ADDRESS,
+        "origin_latitude": f"{ORIGIN_LAT:.7f}",
+        "origin_longitude": f"{ORIGIN_LNG:.7f}",
+        "origin_location_confirmed": True,
     }
     return values, errors
 
@@ -185,6 +200,10 @@ def save_delivery(application, user, values):
         "landmark": values.get("landmark") or "",
         "latitude": str(values.get("latitude") or ""),
         "longitude": str(values.get("longitude") or ""),
+        "origin_barangay": ORIGIN_NAME,
+        "origin_address": ORIGIN_ADDRESS,
+        "origin_latitude": f"{ORIGIN_LAT:.7f}",
+        "origin_longitude": f"{ORIGIN_LNG:.7f}",
         "saved_at": _now().isoformat(),
     }
     payload["address"] = delivery_address(payload)

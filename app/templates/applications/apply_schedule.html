@@ -19,16 +19,28 @@
             {% endif %}
         </p>
 
+        {% set current_location = locations|selectattr('code', 'equalto', selected_location)|list|first %}
         <form class="schedule-location-form" method="get" action="{{ url_for('citizen.apply_schedule', application_id=application.application_id) }}">
             <label for="location_code">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
                 Appointment location
             </label>
-            <select id="location_code" name="location_code" onchange="this.form.submit()">
-                {% for location in locations %}
+            <select id="location_code" name="location_code" onchange="this.form.submit()" aria-describedby="location-address-help">
+                {% set ns = namespace(region=None) %}
+                {% for location in locations if not location.legacy or location.code == selected_location %}
+                {% if location.region and location.region != ns.region %}
+                {% if ns.region is not none %}</optgroup>{% endif %}
+                <optgroup label="{{ location.region }}">
+                {% set ns.region = location.region %}
+                {% elif not location.region and ns.region is not none %}
+                </optgroup>
+                {% set ns.region = None %}
+                {% endif %}
                 <option value="{{ location.code }}" {% if location.code == selected_location %}selected{% endif %}>{{ location.label }}</option>
                 {% endfor %}
+                {% if ns.region is not none %}</optgroup>{% endif %}
             </select>
+            <p class="field-help" id="location-address-help">{{ current_location.address if current_location else '' }}</p>
         </form>
 
         <form class="schedule-booking-form" method="post" action="{{ url_for('citizen.apply_schedule', application_id=application.application_id) }}" id="schedule-form">
