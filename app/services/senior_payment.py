@@ -10,6 +10,7 @@ from app.models.application import Application
 from app.models.notification import Notification
 from app.services.application_forms import specification_for
 from app.services.application_service import field_map, missing_documents, read_details, write_details
+from app.services.senior_delivery import delivery_fee_for, delivery_for, fulfillment_method
 from app.services.tracking_service import add_event
 
 
@@ -47,12 +48,24 @@ def payment_summary(application):
     answers = field_map(application)
     config = fee_configuration(application)
     amount = NEW_APPLICATION_FEE
+    delivery = delivery_for(application)
+    method = fulfillment_method(application)
+    delivery_fee = delivery_fee_for(application)
     application_type = answers.get("application_type") or "New application"
     return {
         "service_kind": "senior",
         "application_type": application_type,
         "barangay": answers.get("barangay") or "",
         "city": answers.get("city") or "",
+        "delivery": delivery,
+        "fulfillment_method": method,
+        "fulfillment_label": "Home delivery" if method == "delivery" else "Pickup at OSCA office" if method == "pickup" else "Not selected",
+        "delivery_fee": delivery_fee,
+        "delivery_fee_display": f"₱{delivery_fee:,.2f}",
+        "fee_lines": (
+            {"label": "Senior Citizen ID application fee", "amount_display": f"₱{amount:,.2f}"},
+            {"label": "Home delivery fee", "amount_display": f"₱{delivery_fee:,.2f}"},
+        ),
         "amount": amount,
         "amount_display": f"₱{amount:,.2f}",
         "application_fee": amount,

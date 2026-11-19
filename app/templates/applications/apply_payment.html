@@ -18,7 +18,7 @@
                     {% elif spec.kind == 'sss' %}
                     SS Number registration has no processing fee. Review the fee summary, then continue to confirmation. No payment is collected, and OneGov PH does not issue an SS Number.
                     {% else %}
-                    New Senior Citizen ID applications are free. Review the fee configuration, then continue to confirmation. No payment is collected for a first-time request.
+                    New Senior Citizen ID applications are free for pickup or home delivery. Review the fee configuration, then continue to confirmation. No payment is collected for a first-time request.
                     {% endif %}
                     {% elif spec.kind == 'barangay' %}
                     Pay the ₱50.00 barangay clearance processing fee, then continue to confirmation. Maya uses Checkout sandbox; other options are demonstration records only.
@@ -239,6 +239,14 @@
                         <div>
                             <dt>City / municipality</dt>
                             <dd>{{ summary.city or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Fulfillment</dt>
+                            <dd>{{ summary.fulfillment_label or "—" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Home delivery fee</dt>
+                            <dd>{{ summary.delivery_fee_display or "₱0.00" }}</dd>
                         </div>
                         <div>
                             <dt>Payment required</dt>

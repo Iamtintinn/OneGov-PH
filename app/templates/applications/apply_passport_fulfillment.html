@@ -10,11 +10,11 @@
 
         <header class="pay-hero confirm-hero">
             <div class="pay-hero-copy">
-                <p class="pay-kicker">Passport delivery</p>
-                <h1 id="fulfillment-heading" class="passport-details-title">How would you like to receive your passport?</h1>
+                <p class="pay-kicker">{% if spec.kind == 'passport' %}Passport delivery{% else %}Senior Citizen ID delivery{% endif %}</p>
+                <h1 id="fulfillment-heading" class="passport-details-title">How would you like to receive your {% if spec.kind == 'passport' %}passport{% else %}Senior Citizen ID{% endif %}?</h1>
                 <p class="welcome-text">
-                    Your demonstration appointment is at {{ appointment.location_label or 'your selected DFA office' }}.
-                    Choose pickup to continue straight to payment, or choose home delivery to pin where the passport should be delivered.
+                    Your demonstration appointment is at {{ appointment.location_label or ('your selected DFA office' if spec.kind == 'passport' else 'your selected OSCA office') }}.
+                    Choose pickup to continue straight to payment, or choose home delivery to pin where the {% if spec.kind == 'passport' %}passport{% else %}Senior Citizen ID{% endif %} should be delivered.
                 </p>
             </div>
             <div class="confirm-success-chip passport-step-chip" aria-hidden="true">
@@ -30,27 +30,32 @@
                 </span>
                 <div>
                     <h2 id="fulfillment-options-heading">Choose one option</h2>
-                    <p>Home delivery adds ₱50.00 to the demonstration payment.</p>
+                    <p>{% if spec.kind == 'passport' %}Home delivery adds ₱50.00 to the demonstration payment.{% else %}New Senior Citizen ID requests stay free for pickup or home delivery.{% endif %}</p>
                 </div>
             </div>
 
             <div class="passport-type-grid" role="group" aria-labelledby="fulfillment-options-heading">
+                {% for option in fulfillment_options %}
+                {% if option.key == 'pickup' %}
                 <form method="post" action="{{ url_for('citizen.apply_delivery', application_id=application.application_id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="fulfillment_method" value="pickup">
+                    <input type="hidden" name="fulfillment_method" value="{{ option.key }}">
                     <button class="passport-type-card" type="submit">
                         <span class="passport-type-card-body">
-                            <strong>Pick up at the DFA office</strong>
-                            <small>Collect your passport at the appointment office. No delivery fee is added.</small>
+                            <strong>{{ option.title }}</strong>
+                            <small>{{ option.help }}</small>
                         </span>
                     </button>
                 </form>
-                <a class="passport-type-card" href="{{ url_for('citizen.apply_delivery', application_id=application.application_id, method='delivery') }}">
+                {% else %}
+                <a class="passport-type-card" href="{{ option.href }}">
                     <span class="passport-type-card-body">
-                        <strong>Request home delivery</strong>
-                        <small>Pin your delivery address on the map and add ₱50.00 to the demonstration payment.</small>
+                        <strong>{{ option.title }}</strong>
+                        <small>{{ option.help }}</small>
                     </span>
                 </a>
+                {% endif %}
+                {% endfor %}
             </div>
         </section>
 

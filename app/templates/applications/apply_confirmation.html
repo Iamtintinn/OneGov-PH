@@ -764,6 +764,37 @@
                 </section>
                 {% endif %}
 
+                {% if spec.kind == 'senior' and delivery %}
+                <section class="pay-panel confirm-panel" aria-labelledby="senior-delivery-heading">
+                    <div class="pay-panel-head confirm-panel-head">
+                        <span class="confirm-panel-icon confirm-panel-icon--blue" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/></svg>
+                        </span>
+                        <div>
+                            <h2 id="senior-delivery-heading">Pickup or delivery</h2>
+                            <p>{% if delivery.method == 'delivery' %}Your Senior Citizen ID request will use the pinned home-delivery address.{% else %}Your Senior Citizen ID request will be picked up at the selected OSCA office.{% endif %}</p>
+                        </div>
+                    </div>
+                    <dl class="confirm-info-grid">
+                        <div class="confirm-info-card confirm-info-card--maroon">
+                            <span class="confirm-info-label">Fulfillment</span>
+                            <strong>{{ 'Home delivery' if delivery.method == 'delivery' else 'Pickup at OSCA office' }}</strong>
+                        </div>
+                        <div class="confirm-info-card confirm-info-card--gold">
+                            <span class="confirm-info-label">{% if delivery.method == 'delivery' %}Delivery address{% else %}Pickup office{% endif %}</span>
+                            <strong>{{ delivery_address or delivery.pickup_location or "—" }}</strong>
+                        </div>
+                        {% if delivery.recipient_name %}
+                        <div class="confirm-info-card confirm-info-card--blue">
+                            <span class="confirm-info-label">Recipient</span>
+                            <strong>{{ delivery.recipient_name }}{% if delivery.contact_number %} · {{ delivery.contact_number }}{% endif %}</strong>
+                        </div>
+                        {% endif %}
+                    </dl>
+                    <p class="field-help">This is a demonstration fulfillment record. OSCA verifies and issues the Senior Citizen ID.</p>
+                </section>
+                {% endif %}
+
                 {% if bring_requirements and bring_requirements['items'] %}
                 <section class="pay-panel confirm-panel" aria-labelledby="senior-bring-heading">
                     <div class="pay-panel-head confirm-panel-head">

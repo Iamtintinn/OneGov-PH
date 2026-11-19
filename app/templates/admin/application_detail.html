@@ -177,6 +177,11 @@
                 <div><dt>Pickup date</dt><dd>{{ passport.pickup_date_label }}</dd></div>
                 {% else %}<div class="review-detail-wide"><dt>Pickup details</dt><dd>Available after confirming physical requirements.</dd></div>{% endif %}
             </dl>
+            {% elif tracking.senior_fulfillment and tracking.senior_fulfillment.method == 'pickup' %}
+            <dl class="review-detail-grid">
+                <div><dt>Fulfillment</dt><dd>Pickup at OSCA office</dd></div>
+                <div class="review-detail-wide"><dt>Pickup office</dt><dd>{{ tracking.citizen_delivery.pickup_location or '—' }}</dd></div>
+            </dl>
             {% elif is_system_admin or is_department_admin %}
             <fieldset class="review-delivery-fieldset" {% if not tracking.can_manage_delivery %}disabled{% endif %}>
             <div class="review-delivery-forms">

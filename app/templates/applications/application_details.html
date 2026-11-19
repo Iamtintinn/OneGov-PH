@@ -64,6 +64,18 @@
             {% endif %}
         </dl>
         {% endif %}
+        {% if spec and spec.kind == 'senior' and senior_delivery %}
+        <h2>Pickup or delivery</h2>
+        <dl class="detail-list">
+            <div><dt>Fulfillment</dt><dd>{{ 'Home delivery' if senior_delivery.method == 'delivery' else 'Pickup at OSCA office' }}</dd></div>
+            {% if senior_delivery.method == 'delivery' %}
+            <div><dt>Delivery address</dt><dd>{{ senior_delivery_address or "—" }}</dd></div>
+            {% if senior_delivery.recipient_name %}<div><dt>Recipient</dt><dd>{{ senior_delivery.recipient_name }}{% if senior_delivery.contact_number %} · {{ senior_delivery.contact_number }}{% endif %}</dd></div>{% endif %}
+            {% else %}
+            <div><dt>Pickup office</dt><dd>{{ senior_delivery.pickup_location or "—" }}</dd></div>
+            {% endif %}
+        </dl>
+        {% endif %}
         {% if spec and spec.kind == 'passport' and passport_appointment %}
         <h2>Demonstration appointment</h2>
         <p class="notice notice-warning">Demonstration Appointment – Not an Official DFA Appointment</p>

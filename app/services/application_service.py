@@ -1718,6 +1718,10 @@ def continue_target(application):
 
             if appointment_for(application) is None:
                 return "schedule"
+        from app.services.senior_delivery import delivery_ready
+
+        if not delivery_ready(application):
+            return "delivery"
         return "payment"
     if spec.get("kind") == "birth":
         if spec.get("type_first") and not birth_type_ready(application):

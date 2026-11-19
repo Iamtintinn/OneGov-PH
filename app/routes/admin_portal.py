@@ -315,9 +315,17 @@ def tracking_detail_data(application, applicant=None, include_map=True):
         status_label,
         summary as passport_summary,
     )
+    from app.services.application_forms import specification_for
+    from app.services.application_service import field_map
     from app.services.passport_delivery import PICKUP
+    from app.services.senior_delivery import PICKUP as SENIOR_PICKUP
+    from app.services.senior_delivery import fulfillment_method as senior_fulfillment_method
 
     passport = passport_summary(application)
+    spec = specification_for(application.service, field_map(application))
+    is_senior = bool(spec and spec.get("kind") == "senior")
+    senior_method = senior_fulfillment_method(application) if is_senior else ""
+    senior_fulfillment = {"method": senior_method} if is_senior else None
     state = _admin_tracking_state(application)
     service_labels = _service_status_labels(application)
     processing_key, processing_label = _current_processing(
@@ -329,13 +337,17 @@ def tracking_detail_data(application, applicant=None, include_map=True):
         processing_label = "Ready for Pickup"
     delivery = _delivery_state(state)
     map_payload = None
-    if include_map and not (passport and passport["fulfillment_method"] == PICKUP):
+    if include_map and not (passport and passport["fulfillment_method"] == PICKUP) and not (
+        is_senior and senior_method == SENIOR_PICKUP
+    ):
         map_payload = _delivery_map_data(application, delivery, applicant)
     gated = bool(passport and passport["gate_message"])
     can_manage_delivery = application.application_status == "ready_for_release" or bool(
         delivery["status"]
     )
-    if gated or (passport and passport["fulfillment_method"] == PICKUP):
+    if gated or (passport and passport["fulfillment_method"] == PICKUP) or (
+        is_senior and senior_method == SENIOR_PICKUP
+    ):
         can_manage_delivery = False
     return {
         "processing_key": processing_key,
@@ -347,6 +359,7 @@ def tracking_detail_data(application, applicant=None, include_map=True):
         "delivery_progress_percent": int(round(delivery["progress"] * 100)),
         "citizen_delivery": _delivery_info(application),
         "passport_fulfillment": passport,
+        "senior_fulfillment": senior_fulfillment,
         "can_update_status": application.application_status not in {"draft", "cancelled"}
         and not gated,
         "can_manage_delivery": can_manage_delivery,
