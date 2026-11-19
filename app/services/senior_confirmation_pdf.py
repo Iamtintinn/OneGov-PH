@@ -9,7 +9,7 @@ from app.services.application_service import field_map, read_details, write_deta
 from app.services.receipt_pdf import write_receipt_pdf
 from app.services.senior_payment import payment_summary
 from app.services.senior_requirements import bring_requirements_for
-from app.services.senior_scheduling import appointment_for
+from app.services.senior_scheduling import appointment_for, location_by_code
 
 
 def _upload_root():
@@ -19,11 +19,7 @@ def _upload_root():
 
 
 def confirmation_id_for(application):
-    details = read_details(application)
-    confirmation = details.get("confirmation") or {}
-    if confirmation.get("confirmation_id"):
-        return confirmation["confirmation_id"]
-    return f"DEMO-OSCA-{application.tracking_number}"
+    return application.tracking_number
 
 
 def ensure_confirmation_pdf(application):
@@ -33,7 +29,7 @@ def ensure_confirmation_pdf(application):
 
     answers = field_map(application)
     summary = payment_summary(application)
-    conf_id = confirmation.get("confirmation_id") or f"DEMO-OSCA-{secrets.token_hex(4).upper()}"
+    conf_id = application.tracking_number
     full_name = " ".join(
         part
         for part in (
@@ -52,6 +48,14 @@ def ensure_confirmation_pdf(application):
     watermark = "DEMONSTRATION ONLY – NOT AN OFFICIAL SENIOR CITIZEN ID"
     bring = bring_requirements_for(answers.get("application_type"))
     appointment = appointment_for(application) or {}
+    location = location_by_code(appointment.get("location_code")) or {}
+    location_address = location.get("address") or appointment.get("address") or ""
+    bring_note = bring.get("note") or ""
+    if location_address:
+        location_label = appointment.get("location_label") or location.get("label") or "the selected OSCA office"
+        bring_note = " ".join(
+            part for part in (bring_note, f"Bring them to {location_label}: {location_address}") if part
+        )
     appointment_rows = ()
     if appointment:
         appointment_rows = (
@@ -64,7 +68,7 @@ def ensure_confirmation_pdf(application):
         absolute,
         {
             "confirmation_id": conf_id,
-            "tracking_number": application.tracking_number,
+            "show_tracking_number": False,
             "subtitle": "Senior Citizen ID request confirmation",
             "watermark": watermark,
             "footer": (
@@ -82,8 +86,6 @@ def ensure_confirmation_pdf(application):
                     answers.get("application_type") or summary.get("application_type") or "",
                 ),
                 ("Citizenship status", answers.get("citizenship_status") or ""),
-                ("Representative", answers.get("representative") or "No"),
-                ("ID transfer", answers.get("id_transfer") or "No"),
                 ("Contact number", answers.get("contact_number") or ""),
                 ("Email", answers.get("email") or ""),
                 (
@@ -107,7 +109,7 @@ def ensure_confirmation_pdf(application):
                 ("Payment status", summary.get("status_label") or "Not Applicable"),
             ),
             "bring_title": "Bring to the OSCA office (physical documents)",
-            "bring_note": bring.get("note"),
+            "bring_note": bring_note,
             "bring_items": bring.get("items") or (),
         },
     )

@@ -24,12 +24,7 @@ def _kind(application):
 
 
 def confirmation_id_for(application):
-    details = read_details(application)
-    confirmation = details.get("confirmation") or {}
-    if confirmation.get("confirmation_id"):
-        return confirmation["confirmation_id"]
-    prefix = "DEMO-RES" if _kind(application) == "residency" else "DEMO-BRGY"
-    return f"{prefix}-{application.tracking_number}"
+    return application.tracking_number
 
 
 def ensure_confirmation_pdf(application):
@@ -41,8 +36,7 @@ def ensure_confirmation_pdf(application):
     answers = field_map(application)
     summary = payment_summary(application)
     payment = latest_payment(application)
-    prefix = "DEMO-RES" if kind == "residency" else "DEMO-BRGY"
-    conf_id = confirmation.get("confirmation_id") or f"{prefix}-{secrets.token_hex(4).upper()}"
+    conf_id = application.tracking_number
     full_name = " ".join(
         part
         for part in (
@@ -126,8 +120,7 @@ def ensure_confirmation_pdf(application):
         absolute,
         {
             "confirmation_id": conf_id,
-            "tracking_number": application.tracking_number,
-            "show_tracking_number": kind != "barangay",
+            "show_tracking_number": False,
             "subtitle": (
                 "Certificate of residency request confirmation"
                 if kind == "residency"

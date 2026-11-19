@@ -18,11 +18,7 @@ def _upload_root():
 
 
 def confirmation_id_for(application):
-    details = read_details(application)
-    confirmation = details.get("confirmation") or {}
-    if confirmation.get("confirmation_id"):
-        return confirmation["confirmation_id"]
-    return f"DEMO-BIRTH-{application.tracking_number}"
+    return application.tracking_number
 
 
 def ensure_confirmation_pdf(application):
@@ -33,7 +29,7 @@ def ensure_confirmation_pdf(application):
     answers = field_map(application)
     summary = payment_summary(application)
     payment = latest_payment(application)
-    conf_id = confirmation.get("confirmation_id") or f"DEMO-BIRTH-{secrets.token_hex(4).upper()}"
+    conf_id = application.tracking_number
     requester = " ".join(
         part
         for part in (
@@ -84,7 +80,7 @@ def ensure_confirmation_pdf(application):
         absolute,
         {
             "confirmation_id": conf_id,
-            "tracking_number": application.tracking_number,
+            "show_tracking_number": False,
             "subtitle": "Birth certificate request confirmation",
             "watermark": watermark,
             "footer": (

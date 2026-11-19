@@ -8,7 +8,7 @@ from flask import current_app
 from app.services.application_service import field_map, read_details, write_details
 from app.services.passport_payment import METHOD_LABELS, latest_payment, payment_summary
 from app.services.passport_requirements import bring_requirements_for, normalize_passport_type
-from app.services.passport_scheduling import appointment_for
+from app.services.passport_scheduling import appointment_for, location_by_code
 from app.services.receipt_pdf import write_receipt_pdf
 
 
@@ -19,11 +19,7 @@ def _upload_root():
 
 
 def confirmation_id_for(application):
-    details = read_details(application)
-    confirmation = details.get("confirmation") or {}
-    if confirmation.get("confirmation_id"):
-        return confirmation["confirmation_id"]
-    return f"DEMO-CONF-{application.tracking_number}"
+    return application.tracking_number
 
 
 def ensure_confirmation_pdf(application):
@@ -37,7 +33,15 @@ def ensure_confirmation_pdf(application):
     payment = latest_payment(application)
     application_type = normalize_passport_type(answers.get("application_type"))
     bring = bring_requirements_for(application_type)
-    conf_id = confirmation.get("confirmation_id") or f"DEMO-CONF-{secrets.token_hex(4).upper()}"
+    location = location_by_code(appointment.get("location_code")) or {}
+    location_address = location.get("address") or appointment.get("address") or ""
+    bring_note = bring.get("note") or ""
+    if location_address:
+        location_label = appointment.get("location_label") or location.get("label") or "the selected DFA office"
+        bring_note = " ".join(
+            part for part in (bring_note, f"Bring them to {location_label}: {location_address}") if part
+        )
+    conf_id = application.tracking_number
     full_name = " ".join(
         part
         for part in (
@@ -58,7 +62,7 @@ def ensure_confirmation_pdf(application):
         absolute,
         {
             "confirmation_id": conf_id,
-            "tracking_number": application.tracking_number,
+            "show_tracking_number": False,
             "subtitle": "Passport demonstration confirmation",
             "watermark": watermark,
             "footer": (
@@ -95,7 +99,7 @@ def ensure_confirmation_pdf(application):
                 ("Payment reference", payment.payment_reference if payment else ""),
             ),
             "bring_title": "Bring to your appointment (physical documents)",
-            "bring_note": bring.get("note"),
+            "bring_note": bring_note,
             "bring_items": bring.get("items") or (),
         },
     )

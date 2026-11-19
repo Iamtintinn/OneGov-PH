@@ -20,11 +20,7 @@ def _upload_root():
 
 
 def confirmation_id_for(application):
-    details = read_details(application)
-    confirmation = details.get("confirmation") or {}
-    if confirmation.get("confirmation_id"):
-        return confirmation["confirmation_id"]
-    return f"DEMO-NBI-{application.tracking_number}"
+    return application.tracking_number
 
 
 def ensure_confirmation_pdf(application):
@@ -40,7 +36,7 @@ def ensure_confirmation_pdf(application):
     appointment = appointment_for(application) if is_new else {}
     appointment = appointment or {}
     bring = bring_requirements_for(application_type) if is_new else {"items": (), "note": None}
-    conf_id = confirmation.get("confirmation_id") or f"DEMO-NBI-{secrets.token_hex(4).upper()}"
+    conf_id = application.tracking_number
     full_name = " ".join(
         part
         for part in (
@@ -82,7 +78,7 @@ def ensure_confirmation_pdf(application):
         absolute,
         {
             "confirmation_id": conf_id,
-            "tracking_number": application.tracking_number,
+            "show_tracking_number": False,
             "subtitle": "NBI clearance request confirmation",
             "watermark": watermark,
             "footer": (
