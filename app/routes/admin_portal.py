@@ -321,6 +321,8 @@ def tracking_detail_data(application, applicant=None, include_map=True):
     from app.services.application_forms import specification_for
     from app.services.application_service import field_map
     from app.services.passport_delivery import PICKUP
+    from app.services.nbi_delivery import PICKUP as NBI_PICKUP
+    from app.services.nbi_delivery import fulfillment_method as nbi_fulfillment_method
     from app.services.senior_admin import summary as senior_confirmation_summary
     from app.services.senior_delivery import PICKUP as SENIOR_PICKUP
     from app.services.senior_delivery import fulfillment_method as senior_fulfillment_method
@@ -328,8 +330,11 @@ def tracking_detail_data(application, applicant=None, include_map=True):
     passport = passport_summary(application)
     spec = specification_for(application.service, field_map(application))
     is_senior = bool(spec and spec.get("kind") == "senior")
+    is_nbi = bool(spec and spec.get("kind") == "nbi")
     senior_method = senior_fulfillment_method(application) if is_senior else ""
     senior_fulfillment = {"method": senior_method} if is_senior else None
+    nbi_method = nbi_fulfillment_method(application) if is_nbi else ""
+    nbi_fulfillment = {"method": nbi_method} if is_nbi else None
     senior_confirmation = senior_confirmation_summary(application)
     state = _admin_tracking_state(application)
     service_labels = _service_status_labels(application)
@@ -342,16 +347,22 @@ def tracking_detail_data(application, applicant=None, include_map=True):
         processing_label = "Ready for Pickup"
     elif is_senior and senior_method == SENIOR_PICKUP and processing_key == "ready_for_dispatch":
         processing_label = "Ready for Pickup"
+    elif is_nbi and nbi_method == NBI_PICKUP and processing_key == "ready_for_dispatch":
+        processing_label = "Ready for Pickup"
     delivery = _delivery_state(state)
     is_pickup = bool(
         (passport and passport["fulfillment_method"] == PICKUP)
         or (is_senior and senior_method == SENIOR_PICKUP)
+        or (is_nbi and nbi_method == NBI_PICKUP)
     )
     if is_pickup and application.application_status == "completed":
         delivery["label"] = "Received"
     map_payload = None
-    if include_map and not (passport and passport["fulfillment_method"] == PICKUP) and not (
-        is_senior and senior_method == SENIOR_PICKUP
+    if (
+        include_map
+        and not (passport and passport["fulfillment_method"] == PICKUP)
+        and not (is_senior and senior_method == SENIOR_PICKUP)
+        and not (is_nbi and nbi_method == NBI_PICKUP)
     ):
         map_payload = _delivery_map_data(application, delivery, applicant)
     gated = bool(passport and passport["gate_message"]) or bool(
@@ -360,8 +371,11 @@ def tracking_detail_data(application, applicant=None, include_map=True):
     can_manage_delivery = application.application_status == "ready_for_release" or bool(
         delivery["status"]
     )
-    if gated or (passport and passport["fulfillment_method"] == PICKUP) or (
-        is_senior and senior_method == SENIOR_PICKUP
+    if (
+        gated
+        or (passport and passport["fulfillment_method"] == PICKUP)
+        or (is_senior and senior_method == SENIOR_PICKUP)
+        or (is_nbi and nbi_method == NBI_PICKUP)
     ):
         can_manage_delivery = False
     return {
@@ -375,6 +389,7 @@ def tracking_detail_data(application, applicant=None, include_map=True):
         "citizen_delivery": _delivery_info(application),
         "passport_fulfillment": passport,
         "senior_fulfillment": senior_fulfillment,
+        "nbi_fulfillment": nbi_fulfillment,
         "senior_confirmation": senior_confirmation,
         "can_update_status": application.application_status not in {"draft", "cancelled"}
         and not gated,

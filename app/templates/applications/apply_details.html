@@ -6,7 +6,7 @@
 <div class="dash-page site-width">
     {% if spec.kind in ['passport', 'barangay', 'residency', 'senior', 'nbi', 'birth', 'cenomar', 'philsys', 'sss'] %}
     {% set modern_step_count = (step_labels|length) if step_labels else (7 if ((spec.kind == 'passport' and spec.type_first) or spec.kind in ['barangay', 'residency', 'cenomar']) else (6 if spec.kind in ['passport', 'philsys'] else (5 if spec.kind in ['sss'] else 4))) %}
-    {% set next_action = 'review' if spec.kind in ['passport', 'philsys'] else 'documents' %}
+    {% set next_action = 'review' if spec.kind == 'passport' or (spec.kind == 'philsys' and not spec.type_first) else 'documents' %}
     <section class="apply-card pay-shell confirm-shell passport-details-shell" aria-labelledby="apply-heading">
         {% include "applications/_progress.html" %}
 
@@ -360,8 +360,8 @@
                             <li>Review your request, then pay the ₱365.00-per-copy demonstration total.</li>
                             <li>Track updates in your OneGov PH account.</li>
                             {% elif spec.kind == 'philsys' %}
-                            <li>Review your details and uploaded documents.</li>
-                            <li>Choose a demonstration registration appointment.</li>
+                            <li>Upload the documents required for your selected National ID application type.</li>
+                            <li>Review your details and documents, then choose a demonstration registration appointment.</li>
                             <li>Confirm the free ₱0.00 payment step, then track updates in your account.</li>
                             {% elif spec.kind == 'sss' %}
                             <li>Upload a primary government ID, or two alternative documents if you cannot.</li>
@@ -378,7 +378,9 @@
             </div>
 
             <div class="pay-actions apply-actions">
-                {% if spec.kind in ['passport', 'philsys'] and application %}
+                {% if spec.kind == 'philsys' and spec.type_first %}
+                <a class="dash-button apply-cancel pay-btn-ghost" href="{{ url_for('citizen.apply_type', service_id=service.service_id) }}">Back</a>
+                {% elif spec.kind in ['passport', 'philsys'] and application %}
                 <a class="dash-button apply-cancel pay-btn-ghost" href="{{ url_for('citizen.apply_documents', application_id=application.application_id) }}">Back</a>
                 {% endif %}
                 <a class="dash-button apply-cancel pay-btn-ghost" href="{{ url_for('citizen.services') }}">Cancel</a>

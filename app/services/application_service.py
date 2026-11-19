@@ -668,8 +668,8 @@ def requirement_for(application, document_key):
 def missing_documents(application, spec):
     if spec.get("checklist"):
         return missing_checklist(application, spec)
-    # Temporary: allow Senior Citizen ID continue without uploaded documents.
-    if spec.get("kind") == "senior":
+    # Temporary: allow Senior Citizen ID and NBI continue without uploaded documents.
+    if spec.get("kind") in {"senior", "nbi"}:
         return []
     values = field_map(application)
     missing = []
@@ -1472,17 +1472,51 @@ def save_residency_application_type(application, application_type):
     return None
 
 
+def philsys_type_ready(application):
+    """True when a PhilSys application type was selected on step 1."""
+    from app.services.philsys_requirements import PHILSYS_APPLICATION_TYPES, normalize_philsys_type
+
+    selected = normalize_philsys_type(field_map(application).get("application_type"))
+    return selected in PHILSYS_APPLICATION_TYPES
+
+
+def save_philsys_application_type(application, application_type):
+    """Store the PhilSys application type without wiping other draft answers."""
+    from app.services.philsys_requirements import PHILSYS_APPLICATION_TYPES, normalize_philsys_type
+
+    selected = normalize_philsys_type(application_type)
+    if selected not in PHILSYS_APPLICATION_TYPES:
+        return "Select a PhilSys application type."
+    details = read_details(application)
+    details["fields"] = _upsert_field(
+        details["fields"],
+        "application_type",
+        "Application type",
+        selected,
+        "Request type",
+    )
+    write_details(application, details)
+    return None
+
+
 def passport_details_ready(application, spec=None):
-    """True when required passport or documents-first application fields are saved."""
+    """True when required passport/PhilSys or documents-first application fields are saved."""
     values = field_map(application)
     spec = spec or specification_for(application.service, values)
     if not spec or not (spec.get("kind") in {"passport", "philsys"} or spec.get("documents_first")):
         return False
+    kind = spec.get("kind")
     for field in spec.get("fields") or []:
         if not field.get("required"):
             continue
         if field.get("type") == "hidden" and field.get("key") == "application_type":
-            if not passport_type_ready(application):
+            if kind == "passport":
+                if not passport_type_ready(application):
+                    return False
+            elif kind == "philsys":
+                if not philsys_type_ready(application):
+                    return False
+            elif not str(values.get(field["key"]) or "").strip():
                 return False
             continue
         if field.get("show_rules") and not field_is_visible_from_map(field, values):
@@ -1656,10 +1690,18 @@ def continue_target(application):
             return "delivery"
         return "payment"
     if spec.get("kind") == "philsys":
-        if missing_documents(application, spec):
-            return "documents"
-        if not passport_details_ready(application, spec):
-            return "details"
+        if spec.get("type_first") and not philsys_type_ready(application):
+            return "type"
+        if spec.get("documents_first"):
+            if missing_documents(application, spec):
+                return "documents"
+            if not passport_details_ready(application, spec):
+                return "details"
+        else:
+            if not read_fields(application):
+                return "details"
+            if missing_documents(application, spec):
+                return "documents"
         if not philsys_review_ready(application):
             return "review"
         from app.services.philsys_scheduling import appointment_for
@@ -1681,6 +1723,10 @@ def continue_target(application):
 
             if appointment_for(application) is None:
                 return "schedule"
+        from app.services.nbi_delivery import delivery_ready
+
+        if not delivery_ready(application):
+            return "delivery"
         return "payment"
     if spec.get("kind") in {"barangay", "residency"}:
         if spec.get("type_first"):

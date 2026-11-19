@@ -300,6 +300,10 @@
                             <dd>{{ summary.full_name or "—" }}</dd>
                         </div>
                         <div>
+                            <dt>Fulfillment</dt>
+                            <dd>{{ summary.fulfillment_label or "—" }}</dd>
+                        </div>
+                        <div>
                             <dt>Location</dt>
                             <dd>{{ summary.appointment.location_label if summary.appointment else "—" }}</dd>
                         </div>

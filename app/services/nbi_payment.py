@@ -13,6 +13,7 @@ from app.models.payment import Payment
 from app.services.application_forms import specification_for
 from app.services.application_service import field_map, missing_documents, read_details
 from app.services.maya_checkout import MayaCheckoutError, create_checkout
+from app.services.nbi_delivery import DELIVERY, delivery_fee_for, fulfillment_method
 from app.services.nbi_requirements import is_nbi_new_application, requires_nbi_schedule
 from app.services.nbi_scheduling import appointment_for
 from app.services.passport_payment import METHOD_LABELS, ONLINE_METHODS, latest_payment
@@ -42,8 +43,11 @@ def _is_reviewed(application):
     return bool(read_details(application).get("nbi_reviewed"))
 
 
-def demo_fee():
-    return TOTAL_FEE
+def demo_fee(application=None):
+    fee = TOTAL_FEE
+    if application is not None:
+        fee += delivery_fee_for(application)
+    return fee
 
 
 def _needs_appointment(application):
@@ -52,7 +56,8 @@ def _needs_appointment(application):
 
 def payment_summary(application):
     answers = field_map(application)
-    amount = demo_fee()
+    amount = demo_fee(application)
+    delivery_fee = delivery_fee_for(application)
     payment = latest_payment(application)
     appointment = appointment_for(application) if _needs_appointment(application) else None
     status_label = None
@@ -82,12 +87,28 @@ def payment_summary(application):
         )
         if part
     ).strip()
+    method = fulfillment_method(application)
+    fee_lines = [
+        {"label": "Regular NBI Clearance", "amount_display": f"₱{CLEARANCE_FEE:,.2f}"},
+    ]
+    if delivery_fee:
+        fee_lines.append({"label": "Home delivery fee", "amount_display": f"₱{delivery_fee:,.2f}"})
+    fee_lines.append(
+        {"label": "Online payment convenience fee", "amount_display": f"₱{CONVENIENCE_FEE:,.2f}"}
+    )
     return {
         "service_kind": "nbi",
         "application_type": answers.get("application_type") or "",
         "full_name": full_name,
         "purpose": answers.get("purpose") or "",
         "appointment": appointment,
+        "fulfillment_label": (
+            "Home delivery"
+            if method == DELIVERY
+            else "Pickup at NBI Clearance Center"
+            if method
+            else "—"
+        ),
         "amount": amount,
         "amount_display": f"₱{amount:,.2f}",
         "application_fee": CLEARANCE_FEE,
@@ -96,7 +117,11 @@ def payment_summary(application):
         "processing_fee": CONVENIENCE_FEE,
         "processing_fee_display": f"₱{CONVENIENCE_FEE:,.2f}",
         "processing_fee_label": "Online payment convenience fee",
-        "total_label": "Regular online application total",
+        "fee_lines": fee_lines,
+        "delivery_fee": delivery_fee,
+        "delivery_fee_display": f"₱{delivery_fee:,.2f}",
+        "delivery_fee_label": "Home delivery fee",
+        "total_label": "Total including delivery" if delivery_fee else "Regular online application total",
         "payment": payment,
         "method_label": METHOD_LABELS.get(payment.payment_method) if payment else None,
         "status_label": status_label,
@@ -182,7 +207,7 @@ def record_demo_payment(application, user, choice, online_method=None):
     if application.application_status != "draft" and existing is not None:
         return None
 
-    amount = demo_fee()
+    amount = demo_fee(application)
     now = _now()
     online_only = not is_nbi_new_application(field_map(application).get("application_type"))
     if choice == "online":
@@ -259,7 +284,7 @@ def start_maya_checkout(application, user):
     if existing is not None and existing.payment_status == "paid":
         return None, "This application is already paid."
 
-    amount = demo_fee()
+    amount = demo_fee(application)
     now = _now()
     if existing is not None and existing.payment_method == "maya" and existing.payment_status == "pending":
         payment = existing

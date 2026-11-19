@@ -604,6 +604,15 @@ def application_detail(application_id):
             )
             for key, label, legacy in ADMIN_PROCESSING_STATUSES
         )
+    elif tracking["nbi_fulfillment"] and tracking["nbi_fulfillment"]["method"] == "pickup":
+        processing_statuses = tuple(
+            (
+                key,
+                "Ready for Pickup" if key == "ready_for_dispatch" else label,
+                legacy,
+            )
+            for key, label, legacy in ADMIN_PROCESSING_STATUSES
+        )
 
     return render_template(
         "admin/application_detail.html",

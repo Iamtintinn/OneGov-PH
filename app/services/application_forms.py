@@ -1517,7 +1517,8 @@ NBI_DISCLAIMER = (
 )
 NBI_FEE_NOTE = (
     "Regular NBI Clearance: ₱130.00. Online payment convenience fee: ₱30.00. "
-    "Regular online application total: ₱160.00."
+    "Regular online application total: ₱160.00. Choose pickup or home delivery after review; "
+    "home delivery adds ₱50.00."
 )
 _EDUCATION = ("Elementary", "High school", "Senior high school", "Vocational", "College", "Postgraduate")
 _EMPLOYMENT = ("Employed", "Self-employed", "Unemployed", "Student", "Retired", "Overseas worker")
@@ -1542,8 +1543,8 @@ def nbi_profile():
         "education_options": _EDUCATION,
         "employment_options": _EMPLOYMENT,
         "documents": {
-            "valid_id": True,
-            "valid_id_secondary": True,
+            "valid_id": False,
+            "valid_id_secondary": False,
         },
         "instructions": None,
     }
@@ -1564,11 +1565,7 @@ def _nbi_document(profile, key, label, help_text, default_required=False, id_cho
 
 def compose_nbi_clearance(values=None):
     """NBI clearance monitoring form. Other services keep their own questions."""
-    from app.services.nbi_requirements import (
-        document_requirements_for,
-        is_nbi_new_application,
-        requires_nbi_schedule,
-    )
+    from app.services.nbi_requirements import document_requirements_for, is_nbi_new_application
 
     answers = values or {}
     profile = nbi_profile()
@@ -1578,13 +1575,12 @@ def compose_nbi_clearance(values=None):
     background = "Education and employment"
     application_section = "Application type"
     selected_type = answers.get("application_type") or ""
-    needs_schedule = requires_nbi_schedule(selected_type)
     is_new = is_nbi_new_application(selected_type)
     fields = [
         _field(
             "application_type",
             "Application type",
-            "Selected on step 1. This determines whether you schedule an NBI visit or continue fully online.",
+            "Selected on step 1. This determines the documents you upload for this NBI request.",
             field_type="hidden",
             required=True,
             section=application_section,
@@ -1780,67 +1776,41 @@ def compose_nbi_clearance(values=None):
     office = {
         "heading": "National Bureau of Investigation",
         "note": (
-            "OneGov PH schedules a demonstration appointment only for New Application monitoring requests. "
+            "OneGov PH schedules a demonstration appointment at an NBI Clearance Center. "
             "It has no live connection to NBI. Confirm current requirements through NBI."
-            if needs_schedule
-            else (
-                "This request continues online without a demonstration appointment. "
-                "OneGov PH has no live connection to NBI. Confirm current requirements through NBI."
-            )
         ),
     }
     if profile["verified"] and profile.get("instructions"):
         office["instructions"] = profile["instructions"]
         office["instructions_heading"] = "Instructions"
-    if needs_schedule:
-        step_labels = (
-            "1. Application type",
-            "2. Application details",
-            "3. Documents",
-            "4. Review",
-            "5. Scheduling",
-            "6. Payment",
-            "7. Confirmation",
-        )
-        confirmation_step = 7
-        submit_label = "Continue to scheduling"
-        next_steps = [
-            "Keep your OneGov PH reference number. It is separate from any reference number NBI gives you.",
-            "Bring the physical documents listed on your confirmation page and receipt to the NBI Clearance Center.",
-            "Attend the demonstration appointment you scheduled, then complete biometrics and clearance issuance through NBI.",
-            "The regular online application total shown here is ₱160.00 (₱130.00 clearance + ₱30.00 convenience fee).",
-            "Open Application tracking to follow monitoring updates such as Submitted, Under review, Appointment scheduled, Payment pending, Payment completed, For biometrics, With hit, Ready for release, Completed, Rejected, or Cancelled.",
-        ]
-        reminders = [
-            "OneGov PH does not register this request with NBI.",
-            "New applicants must personally appear at an NBI Clearance Center for biometric registration.",
-            "The appointment you schedule here is a demonstration booking for monitoring only.",
-            "NBI takes the photograph and biometrics at the branch for an ordinary local application.",
-            "After you submit, only authorized personnel can change the monitoring status. Those statuses are notes in OneGov PH, not a live update from NBI.",
-        ]
-    else:
-        step_labels = (
-            "1. Application type",
-            "2. Application details",
-            "3. Documents",
-            "4. Review",
-            "5. Payment",
-            "6. Confirmation",
-        )
-        confirmation_step = 6
-        submit_label = "Continue to payment"
-        next_steps = [
-            "Keep your OneGov PH reference number. It is separate from any reference number NBI gives you.",
-            "This request continues online. NBI may still instruct you to appear for additional verification.",
-            "The regular online application total shown here is ₱160.00 (₱130.00 clearance + ₱30.00 convenience fee).",
-            "Open Application tracking to follow monitoring updates such as Submitted, Under review, Payment pending, Payment completed, For biometrics, With hit, Ready for release, Completed, Rejected, or Cancelled.",
-        ]
-        reminders = [
-            "OneGov PH does not register this request with NBI.",
-            "Eligible renewal, lost, or damaged requests may continue online when NBI does not require an immediate visit.",
-            "Original identification documents must be presented when physical verification is required.",
-            "After you submit, only authorized personnel can change the monitoring status. Those statuses are notes in OneGov PH, not a live update from NBI.",
-        ]
+    step_labels = (
+        "1. Application type",
+        "2. Application details",
+        "3. Documents",
+        "4. Review",
+        "5. Scheduling",
+        "6. Delivery",
+        "7. Payment",
+        "8. Confirmation",
+    )
+    confirmation_step = 8
+    submit_label = "Continue to scheduling"
+    next_steps = [
+        "Keep your OneGov PH reference number. It is separate from any reference number NBI gives you.",
+        "Bring the physical documents listed on your confirmation page and receipt to the selected NBI Clearance Center.",
+        "Attend the demonstration appointment you scheduled, then complete biometrics and clearance issuance through NBI.",
+        "If you chose home delivery, keep the pinned delivery address ready for tracking updates.",
+        "The regular online application total is ₱160.00 (₱130.00 clearance + ₱30.00 convenience fee). Home delivery adds ₱50.00.",
+        "Open Application tracking to follow monitoring updates such as Submitted, Under review, Appointment scheduled, Payment pending, Payment completed, For biometrics, With hit, Ready for release, Completed, Rejected, or Cancelled.",
+    ]
+    reminders = [
+        "OneGov PH does not register this request with NBI.",
+        "The appointment you schedule here is a demonstration booking for monitoring only.",
+        "Bring original identification documents when NBI requires physical verification.",
+        "NBI takes the photograph and biometrics at the branch for an ordinary local application.",
+        "Pickup has no extra fee. Home delivery adds ₱50.00 to the demonstration payment.",
+        "After you submit, only authorized personnel can change the monitoring status. Those statuses are notes in OneGov PH, not a live update from NBI.",
+    ]
     return {
         "kind": "nbi",
         "kicker": "Clearance monitoring",
@@ -1861,9 +1831,9 @@ def compose_nbi_clearance(values=None):
         "show_submitted_details": True,
         "step_labels": step_labels,
         "type_first": True,
-        "review_before_schedule": needs_schedule,
-        "payment_after_review": not needs_schedule,
-        "online_payment_only": not needs_schedule,
+        "review_before_schedule": True,
+        "payment_after_review": False,
+        "online_payment_only": not is_new,
         "submit_label": submit_label,
         "confirmation_step": confirmation_step,
         "reminders": reminders,
@@ -2587,7 +2557,7 @@ def specification_for(service, values=None):
     from app.services.philsys_national_id import SERVICE_NAMES, specification
 
     if service.service_name in SERVICE_NAMES:
-        return specification(values or {})
+        return specification(values or {}, service_name=service.service_name)
     spec = SERVICE_FORMS.get(service.service_name)
     if spec is None:
         return None

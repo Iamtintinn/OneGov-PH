@@ -1,9 +1,10 @@
-"""PhilSys National ID preparation. PSA still performs registration."""
+"""PhilSys National ID services. PSA still performs registration."""
 
 from app.services.application_forms import _document, _field
 
+REGISTRATION_SERVICE_NAME = "PhilSys National ID Registration Assistance"
 SERVICE_NAMES = frozenset({
-    "PhilSys National ID Registration Assistance",
+    REGISTRATION_SERVICE_NAME,
     "National ID Tracking and Concern Management",
 })
 
@@ -30,14 +31,6 @@ FEE_NOTE = (
 BIOMETRICS = (
     "These are captured personally at an authorized PhilSys registration center: a front-facing photograph, fingerprints, and an iris scan. "
     "Do not upload a photograph, fingerprint, or iris scan through OneGov PH."
-)
-STEP_LABELS = (
-    "1. Documents",
-    "2. Application details",
-    "3. Review",
-    "4. Scheduling",
-    "5. Payment",
-    "6. Confirmation",
 )
 NEXT_STEPS = (
     "Keep your OneGov PH reference number. It is not a PhilSys transaction number.",
@@ -81,13 +74,26 @@ def is_resident_alien(citizenship):
     return (citizenship or "").casefold() == "resident alien"
 
 
-def fields():
+def fields(include_application_type=False):
     """Demographic details for registration preparation. Biometrics are not collected here."""
+    request_type = "Request type"
     personal = "Personal information"
     address = "Address information"
     contact = "Contact information"
     reference = "PhilSys transaction reference"
-    return (
+    items = []
+    if include_application_type:
+        items.append(
+            _field(
+                "application_type",
+                "Application type",
+                "Selected on step 1. This determines the required documents for your request.",
+                field_type="hidden",
+                required=True,
+                section=request_type,
+            )
+        )
+    items.extend((
         _field("first_name", "First name", "Enter your first name as it should appear for registration.", max_length=80, section=personal),
         _field(
             "middle_name",
@@ -124,7 +130,7 @@ def fields():
         _field(
             "citizenship",
             "Citizenship status",
-            "Choose Filipino Citizen or Resident Alien. This chooses which supporting identification documents apply.",
+            "Choose Filipino Citizen or Resident Alien.",
             field_type="select",
             options=_CITIZENSHIP,
             section=personal,
@@ -181,11 +187,13 @@ def fields():
             max_length=40,
             section=reference,
         ),
-    )
+    ))
+    return tuple(items)
 
+
+# ----- Legacy PhilSys registration preparation (tracking/concern and existing flow) -----
 
 def filipino_groups():
-    """Supporting documents published at philsys.gov.ph/supporting-documents/."""
     primary = "Primary — bring any one"
     paired = "Primary — bring with the other item in this pair, or choose another primary document"
     secondary = "Secondary — only if you have no primary document"
@@ -202,46 +210,11 @@ def filipino_groups():
                 "A passport, UMID, or LTO student or driver's license can be used instead of that pair."
             ),
             "items": (
-                _doc(
-                    "psa_birth_certificate",
-                    "PSA-issued Certificate of Live Birth",
-                    "The civil registry birth certificate issued by the Philippine Statistics Authority.",
-                    paired,
-                    "Philippine passport or ePassport, UMID, or an LTO student or driver's license.",
-                    bring + " If you use this, also bring one government-issued photo ID.",
-                ),
-                _doc(
-                    "government_id",
-                    "Government-issued identification document",
-                    "An ID with your full name, a front-facing photograph, and your signature or thumb mark.",
-                    paired,
-                    "Philippine passport or ePassport, UMID, or an LTO student or driver's license.",
-                    bring + " Present this together with the PSA birth certificate.",
-                ),
-                _doc(
-                    "passport",
-                    "Philippine Passport or ePassport",
-                    "Issued by the Department of Foreign Affairs.",
-                    primary,
-                    _PRIMARY_ALT,
-                    bring,
-                ),
-                _doc(
-                    "umid",
-                    "Unified Multi-purpose Identification (UMID) Card",
-                    "Issued by the GSIS or the SSS.",
-                    primary,
-                    _PRIMARY_ALT,
-                    bring,
-                ),
-                _doc(
-                    "drivers_license",
-                    "LTO student license or driver's license",
-                    "A student's license permit, or a non-professional or professional driver's license issued by the LTO.",
-                    primary,
-                    _PRIMARY_ALT,
-                    bring,
-                ),
+                _doc("psa_birth_certificate", "PSA-issued Certificate of Live Birth", "The civil registry birth certificate issued by the Philippine Statistics Authority.", paired, "Philippine passport or ePassport, UMID, or an LTO student or driver's license.", bring + " If you use this, also bring one government-issued photo ID."),
+                _doc("government_id", "Government-issued identification document", "An ID with your full name, a front-facing photograph, and your signature or thumb mark.", paired, "Philippine passport or ePassport, UMID, or an LTO student or driver's license.", bring + " Present this together with the PSA birth certificate."),
+                _doc("passport", "Philippine Passport or ePassport", "Issued by the Department of Foreign Affairs.", primary, _PRIMARY_ALT, bring),
+                _doc("umid", "Unified Multi-purpose Identification (UMID) Card", "Issued by the GSIS or the SSS.", primary, _PRIMARY_ALT, bring),
+                _doc("drivers_license", "LTO student license or driver's license", "A student's license permit, or a non-professional or professional driver's license issued by the LTO.", primary, _PRIMARY_ALT, bring),
             ),
         },
         {
@@ -310,7 +283,6 @@ def filipino_groups():
 
 
 def resident_groups():
-    """Resident-alien documents from the Revised IRR of Republic Act No. 11055."""
     requirement = "Required for a resident alien"
     return (
         {
@@ -322,30 +294,9 @@ def resident_groups():
                 "PSA may ask for other documents. OneGov PH does not check these papers."
             ),
             "items": (
-                _doc(
-                    "acr",
-                    "Alien Certificate of Registration",
-                    "The ACR issued for your stay in the Philippines.",
-                    requirement,
-                    "ACR ID, together with the sworn certification of your length of stay.",
-                    "Bring the original. Either the ACR or the ACR ID may be presented.",
-                ),
-                _doc(
-                    "acr_id",
-                    "ACR ID",
-                    "The ACR identification card.",
-                    requirement,
-                    "Alien Certificate of Registration, together with the sworn certification of your length of stay.",
-                    "Bring the original. Either the ACR or the ACR ID may be presented.",
-                ),
-                _doc(
-                    "sworn_stay",
-                    "Sworn certification of length of stay",
-                    "Your sworn statement that you stayed in the Philippines for more than 180 days in total during the year before you apply.",
-                    requirement,
-                    "This is presented together with the ACR or ACR ID.",
-                    "Bring the signed certification to the registration center.",
-                ),
+                _doc("acr", "Alien Certificate of Registration", "The ACR issued for your stay in the Philippines.", requirement, "ACR ID, together with the sworn certification of your length of stay.", "Bring the original. Either the ACR or the ACR ID may be presented."),
+                _doc("acr_id", "ACR ID", "The ACR identification card.", requirement, "Alien Certificate of Registration, together with the sworn certification of your length of stay.", "Bring the original. Either the ACR or the ACR ID may be presented."),
+                _doc("sworn_stay", "Sworn certification of length of stay", "Your sworn statement that you stayed in the Philippines for more than 180 days in total during the year before you apply.", requirement, "This is presented together with the ACR or ACR ID.", "Bring the signed certification to the registration center."),
             ),
         },
     )
@@ -358,7 +309,6 @@ def checklist_groups(citizenship):
 
 
 def supporting_id_groups(citizenship):
-    """Identification documents from the published list. Birth records have their own upload."""
     groups = []
     for group in checklist_groups(citizenship):
         items = tuple(item for item in group["items"] if item["key"] not in _BIRTH_RECORD_KEYS)
@@ -367,7 +317,7 @@ def supporting_id_groups(citizenship):
     return groups
 
 
-def registration_documents(citizenship):
+def legacy_registration_documents(citizenship):
     return (
         _document(
             "supporting_id",
@@ -377,70 +327,7 @@ def registration_documents(citizenship):
     )
 
 
-def specification(values=None):
-    answers = values or {}
-    resident = is_resident_alien(answers.get("citizenship"))
-    if resident:
-        document_note = (
-            "A resident alien selects the Alien Certificate of Registration or ACR ID, and can also upload the sworn certification of length of stay. "
-            "OneGov PH does not capture biometrics and does not accept them as uploads."
-        )
-    else:
-        document_note = (
-            "Upload one valid supporting identification document. "
-            "OneGov PH does not capture biometrics and does not accept a photograph, fingerprint, or iris scan as an upload."
-        )
-    return {
-        "kind": "philsys",
-        "kicker": "National ID assistance",
-        "service_title": "PhilSys National ID Registration Assistance",
-        "process": PROCESS,
-        "department_label": DEPARTMENT_LABEL,
-        "include_personal": False,
-        "fields": fields(),
-        "documents": registration_documents(answers.get("citizenship")),
-        "document_note": document_note,
-        "upload_intro": (
-            "Upload one supporting identification document first. "
-            "Citizenship chosen later may change which documents apply."
-        ),
-        "checklist": False,
-        "reminders": REMINDERS,
-        "biometrics": BIOMETRICS,
-        "step_labels": STEP_LABELS,
-        "fee_note": FEE_NOTE,
-        "disclaimer": DISCLAIMER,
-        "reference_label": "OneGov PH reference number",
-        "show_submitted_details": True,
-        "documents_first": True,
-        "review_before_schedule": True,
-        "review_back": "details",
-        "submit_label": "Continue to scheduling",
-        "confirmation_step": 6,
-        "terms": TERMS,
-        "next_steps": NEXT_STEPS,
-        "submit_event": (
-            "National ID preparation, demonstration appointment, and free payment step were saved for assistance and tracking. "
-            "The person is not registered with PhilSys, and no National ID has been issued."
-        ),
-        "submit_notice": (
-            "Your National ID preparation {reference} was submitted in OneGov PH. "
-            "It is not PhilSys registration. Official registration, identity verification, biometric capture, and National ID issuance remain with authorized PSA personnel."
-        ),
-        "status_labels": {
-            "submitted": "Submitted",
-            "under_review": "Under review",
-            "pending_documents": "Additional documents required",
-            "scheduled": "Ready for registration",
-            "approved": "Registered",
-            "completed": "Completed",
-            "cancelled": "Cancelled",
-        },
-    }
-
-
 def document_choices(citizenship):
-    """Every accepted document, in the order shown in the dropdown."""
     choices = []
     for group in checklist_groups(citizenship):
         for item in group["items"]:
@@ -452,7 +339,6 @@ def document_by_key(citizenship, key):
     return next((item for item in document_choices(citizenship) if item["key"] == key), None)
 
 
-# Words that are printed on that document. The photo check looks for these words.
 DOCUMENT_MARKERS = {
     "psa_birth_certificate": ("CERTIFICATE OF LIVE BIRTH", "LIVE BIRTH"),
     "government_id": (),
@@ -505,37 +391,13 @@ DOCUMENT_MARKERS = {
     "sworn_stay": ("SWORN", "180"),
 }
 
-# A photo of one of these can satisfy the generic "government-issued ID" choice.
 GOVERNMENT_ID_KEYS = frozenset({
-    "passport",
-    "umid",
-    "drivers_license",
-    "ibp_id",
-    "prc_id",
-    "owwa_id",
-    "senior_id",
-    "sss_id",
-    "four_ps_id",
-    "nbi_clearance",
-    "police_clearance",
-    "solo_parent_id",
-    "pwd_id",
-    "voters_id",
-    "postal_id",
-    "tin_id",
-    "philhealth_id",
-    "marina_id",
-    "csc_eligibility",
-    "dependent_id",
-    "retiree_id",
-    "conductors_license",
-    "pvao_id",
-    "employee_id",
-    "school_id",
-    "city_id",
-    "barangay_id",
-    "acr",
-    "acr_id",
+    "passport", "umid", "drivers_license", "ibp_id", "prc_id", "owwa_id",
+    "senior_id", "sss_id", "four_ps_id", "nbi_clearance", "police_clearance",
+    "solo_parent_id", "pwd_id", "voters_id", "postal_id", "tin_id",
+    "philhealth_id", "marina_id", "csc_eligibility", "dependent_id",
+    "retiree_id", "conductors_license", "pvao_id", "employee_id", "school_id",
+    "city_id", "barangay_id", "acr", "acr_id",
 })
 
 
@@ -560,7 +422,6 @@ def _scores(text, citizenship):
 
 
 def check_document_text(citizenship, document_key, text):
-    """Return an error when the visible words do not match the selected document."""
     selected = document_by_key(citizenship, document_key)
     if selected is None:
         return "Select a document from the list."
@@ -598,7 +459,148 @@ def check_document_text(citizenship, document_key, text):
 
 
 def readiness_message(citizenship, saved):
-    """No extra warning once a matching document photo has been stored."""
     if any(item.get("value") == "matched" for item in saved):
         return ""
     return ""
+
+
+# ----- Specifications -----
+
+def _legacy_specification(values=None, service_name=None):
+    answers = values or {}
+    resident = is_resident_alien(answers.get("citizenship"))
+    if resident:
+        document_note = (
+            "A resident alien selects the Alien Certificate of Registration or ACR ID, and can also upload the sworn certification of length of stay. "
+            "OneGov PH does not capture biometrics and does not accept them as uploads."
+        )
+    else:
+        document_note = (
+            "Upload one valid supporting identification document. "
+            "OneGov PH does not capture biometrics and does not accept a photograph, fingerprint, or iris scan as an upload."
+        )
+    return {
+        "kind": "philsys",
+        "kicker": "National ID assistance",
+        "service_title": service_name or "PhilSys National ID Assistance",
+        "process": PROCESS,
+        "department_label": DEPARTMENT_LABEL,
+        "include_personal": False,
+        "fields": fields(include_application_type=False),
+        "documents": legacy_registration_documents(answers.get("citizenship")),
+        "document_note": document_note,
+        "upload_intro": (
+            "Upload one supporting identification document first. "
+            "Citizenship chosen later may change which documents apply."
+        ),
+        "checklist": False,
+        "reminders": REMINDERS,
+        "biometrics": BIOMETRICS,
+        "step_labels": (
+            "1. Documents",
+            "2. Application details",
+            "3. Review",
+            "4. Scheduling",
+            "5. Payment",
+            "6. Confirmation",
+        ),
+        "fee_note": FEE_NOTE,
+        "disclaimer": DISCLAIMER,
+        "reference_label": "OneGov PH reference number",
+        "show_submitted_details": True,
+        "documents_first": True,
+        "review_before_schedule": True,
+        "review_back": "details",
+        "submit_label": "Continue to scheduling",
+        "confirmation_step": 6,
+        "terms": TERMS,
+        "next_steps": NEXT_STEPS,
+        "submit_event": (
+            "National ID preparation, demonstration appointment, and free payment step were saved for assistance and tracking. "
+            "The person is not registered with PhilSys, and no National ID has been issued."
+        ),
+        "submit_notice": (
+            "Your National ID preparation {reference} was submitted in OneGov PH. "
+            "It is not PhilSys registration. Official registration, identity verification, biometric capture, and National ID issuance remain with authorized PSA personnel."
+        ),
+        "status_labels": {
+            "submitted": "Submitted",
+            "under_review": "Under review",
+            "pending_documents": "Additional documents required",
+            "scheduled": "Ready for registration",
+            "approved": "Registered",
+            "completed": "Completed",
+            "cancelled": "Cancelled",
+        },
+    }
+
+
+def _registration_specification(values=None):
+    from app.services.philsys_requirements import document_requirements_for
+
+    answers = values or {}
+    selected_type = answers.get("application_type") or ""
+    doc_info = document_requirements_for(selected_type)
+    step_labels = (
+        "1. Application Type",
+        "2. Application details",
+        "3. Documents",
+        "4. Review",
+        "5. Scheduling",
+        "6. Payment",
+        "7. Confirmation",
+    )
+    return {
+        "kind": "philsys",
+        "kicker": "National ID assistance",
+        "service_title": "PhilSys National ID Registration Assistance",
+        "process": PROCESS,
+        "department_label": DEPARTMENT_LABEL,
+        "include_personal": False,
+        "fields": fields(include_application_type=True),
+        "documents": tuple(doc_info.get("documents") or ()),
+        "document_note": doc_info.get("note") or "Required documents depend on the selected application type.",
+        "upload_intro": "Upload the documents required for the selected PhilSys National ID application type.",
+        "checklist": False,
+        "reminders": REMINDERS,
+        "biometrics": BIOMETRICS,
+        "step_labels": step_labels,
+        "fee_note": FEE_NOTE,
+        "disclaimer": DISCLAIMER,
+        "reference_label": "OneGov PH reference number",
+        "show_submitted_details": True,
+        "documents_first": False,
+        "type_first": True,
+        "review_before_schedule": True,
+        "review_back": "documents",
+        "submit_label": "Continue to scheduling",
+        "confirmation_step": 7,
+        "terms": TERMS,
+        "next_steps": NEXT_STEPS,
+        "submit_event": (
+            "National ID preparation, demonstration appointment, and free payment step were saved for assistance and tracking. "
+            "The person is not registered with PhilSys, and no National ID has been issued."
+        ),
+        "submit_notice": (
+            "Your National ID preparation {reference} was submitted in OneGov PH. "
+            "It is not PhilSys registration. Official registration, identity verification, biometric capture, and National ID issuance remain with authorized PSA personnel."
+        ),
+        "status_labels": {
+            "submitted": "Submitted",
+            "under_review": "Under review",
+            "pending_documents": "Additional documents required",
+            "scheduled": "Ready for registration",
+            "approved": "Registered",
+            "completed": "Completed",
+            "cancelled": "Cancelled",
+        },
+    }
+
+
+def specification(values=None, service_name=None):
+    if service_name == REGISTRATION_SERVICE_NAME:
+        return _registration_specification(values or {})
+    # Default to new registration flow for backward-compatible callers without service name,
+    # unless caller explicitly targets tracking (handled above). This keeps existing behavior
+    # sensible for the primary PhilSys registration assistance application.
+    return _registration_specification(values or {}) if service_name is None else _legacy_specification(values or {}, service_name)

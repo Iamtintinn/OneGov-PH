@@ -6,6 +6,14 @@ from pathlib import Path
 from flask import current_app
 
 from app.services.application_service import field_map, read_details, write_details
+from app.services.nbi_delivery import (
+    DELIVERY,
+    PICKUP,
+    delivery_address,
+    delivery_fee_for,
+    delivery_for,
+    fulfillment_method,
+)
 from app.services.nbi_payment import payment_summary
 from app.services.nbi_requirements import bring_requirements_for, is_nbi_new_application
 from app.services.nbi_scheduling import appointment_for
@@ -46,6 +54,9 @@ def ensure_confirmation_pdf(application):
         )
         if part
     ).strip() or application.tracking_number
+    delivery = delivery_for(application)
+    method = fulfillment_method(application)
+    delivery_fee = delivery_fee_for(application)
 
     relative = confirmation.get("pdf_path") or (
         f"{application.application_id}/nbi-confirmation-{secrets.token_hex(4)}.pdf"
@@ -74,6 +85,34 @@ def ensure_confirmation_pdf(application):
             ("Appointment date", appointment.get("appointment_date") or ""),
             ("Appointment time", appointment.get("appointment_time") or ""),
         )
+    if method == DELIVERY:
+        details_rows = details_rows + (
+            ("Fulfillment", "Home delivery"),
+            ("Delivery address", delivery_address(delivery)),
+            ("Recipient", (delivery or {}).get("recipient_name") or ""),
+        )
+    elif method == PICKUP:
+        details_rows = details_rows + (
+            ("Fulfillment", "Pickup at NBI Clearance Center"),
+            ("Pickup location", (delivery or {}).get("pickup_location") or ""),
+        )
+    fee_lines = [
+        {
+            "label": summary.get("application_fee_label") or "Regular NBI Clearance",
+            "amount_display": summary.get("application_fee_display") or "₱130.00",
+        },
+        {
+            "label": summary.get("processing_fee_label") or "Online payment convenience fee",
+            "amount_display": summary.get("processing_fee_display") or "₱30.00",
+        },
+    ]
+    if delivery_fee:
+        fee_lines.append(
+            {
+                "label": summary.get("delivery_fee_label") or "Home delivery fee",
+                "amount_display": summary.get("delivery_fee_display") or "₱50.00",
+            }
+        )
     write_receipt_pdf(
         absolute,
         {
@@ -89,17 +128,7 @@ def ensure_confirmation_pdf(application):
             "bring_title": "Bring to the NBI Clearance Center (physical documents)" if is_new else None,
             "bring_note": bring.get("note") if is_new else None,
             "bring_items": bring.get("items") or () if is_new else (),
-            "fee_lines": (
-                {
-                    "label": summary.get("application_fee_label") or "Regular NBI Clearance",
-                    "amount_display": summary.get("application_fee_display") or "₱130.00",
-                },
-                {
-                    "label": summary.get("processing_fee_label")
-                    or "Online payment convenience fee",
-                    "amount_display": summary.get("processing_fee_display") or "₱30.00",
-                },
-            ),
+            "fee_lines": tuple(fee_lines),
             "total_label": "TOTAL",
             "amount": summary.get("amount_display") or "₱160.00",
             "payment_rows": (

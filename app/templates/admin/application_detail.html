@@ -28,7 +28,7 @@
         </dl>
     </header>
 
-    {% set pickup_selected = (tracking.passport_fulfillment and tracking.passport_fulfillment.fulfillment_method == 'pickup') or (tracking.senior_fulfillment and tracking.senior_fulfillment.method == 'pickup') %}
+    {% set pickup_selected = (tracking.passport_fulfillment and tracking.passport_fulfillment.fulfillment_method == 'pickup') or (tracking.senior_fulfillment and tracking.senior_fulfillment.method == 'pickup') or (tracking.nbi_fulfillment and tracking.nbi_fulfillment.method == 'pickup') %}
     {% if not pickup_selected %}
     <section class="review-card review-map-card admin-track-map-panel">
         <div class="review-card-heading review-map-heading">
@@ -161,6 +161,25 @@
     </section>
     {% endif %}
 
+    {% set nbi_fulfillment = tracking.nbi_fulfillment %}
+    {% if nbi_fulfillment %}
+    <section class="review-card review-passport-confirmation-card" id="nbi-fulfillment">
+        <div class="review-card-heading">
+            <div><p class="review-kicker">NBI CLEARANCE DELIVERY</p><h2>Pickup or home delivery</h2></div>
+            <span class="admin-status-pill admin-status-pill--{{ 'approved' if nbi_fulfillment.method else 'pending' }}">{{ 'Selected' if nbi_fulfillment.method else 'Not selected' }}</span>
+        </div>
+        <dl class="review-detail-grid">
+            <div><dt>Fulfillment</dt><dd>{{ 'Home delivery' if nbi_fulfillment.method == 'delivery' else 'Pickup at NBI Clearance Center' }}</dd></div>
+            <div class="review-detail-wide"><dt>{% if nbi_fulfillment.method == 'delivery' %}Delivery address{% else %}Pickup office{% endif %}</dt><dd>{{ tracking.citizen_delivery.address or tracking.citizen_delivery.pickup_location or '—' }}</dd></div>
+        </dl>
+        {% if nbi_fulfillment.method == 'pickup' %}
+        <p class="review-hint">Pickup details are ready. Update the application status to Ready for Pickup when the clearance is available.</p>
+        {% else %}
+        <p class="review-hint">Home delivery details are available for dispatch after the clearance is ready for release.</p>
+        {% endif %}
+    </section>
+    {% endif %}
+
     <section class="review-control-grid" aria-label="Admin status management">
         <div class="review-card review-processing-card" id="processing-status">
             <div class="review-card-heading">
@@ -219,6 +238,11 @@
             {% elif tracking.senior_fulfillment and tracking.senior_fulfillment.method == 'pickup' %}
             <dl class="review-detail-grid">
                 <div><dt>Fulfillment</dt><dd>Pickup at OSCA office</dd></div>
+                <div class="review-detail-wide"><dt>Pickup office</dt><dd>{{ tracking.citizen_delivery.pickup_location or '—' }}</dd></div>
+            </dl>
+            {% elif tracking.nbi_fulfillment and tracking.nbi_fulfillment.method == 'pickup' %}
+            <dl class="review-detail-grid">
+                <div><dt>Fulfillment</dt><dd>Pickup at NBI Clearance Center</dd></div>
                 <div class="review-detail-wide"><dt>Pickup office</dt><dd>{{ tracking.citizen_delivery.pickup_location or '—' }}</dd></div>
             </dl>
             {% elif is_system_admin or is_department_admin %}

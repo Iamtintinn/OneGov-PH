@@ -76,6 +76,18 @@
             {% endif %}
         </dl>
         {% endif %}
+        {% if spec and spec.kind == 'nbi' and nbi_delivery %}
+        <h2>Pickup or delivery</h2>
+        <dl class="detail-list">
+            <div><dt>Fulfillment</dt><dd>{{ 'Home delivery' if nbi_delivery.method == 'delivery' else 'Pickup at NBI Clearance Center' }}</dd></div>
+            {% if nbi_delivery.method == 'delivery' %}
+            <div><dt>Delivery address</dt><dd>{{ nbi_delivery_address or "—" }}</dd></div>
+            {% if nbi_delivery.recipient_name %}<div><dt>Recipient</dt><dd>{{ nbi_delivery.recipient_name }}{% if nbi_delivery.contact_number %} · {{ nbi_delivery.contact_number }}{% endif %}</dd></div>{% endif %}
+            {% else %}
+            <div><dt>Pickup office</dt><dd>{{ nbi_delivery.pickup_location or "—" }}</dd></div>
+            {% endif %}
+        </dl>
+        {% endif %}
         {% if senior_admin_confirmation and senior_admin_confirmation.confirmed %}
         <h2>Documents and physical appearance</h2>
         <dl class="detail-list">

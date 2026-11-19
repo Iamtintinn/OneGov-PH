@@ -47,14 +47,14 @@ _DOCUMENTS_BY_TYPE = {
             "key": "valid_id",
             "label": "Valid Government-Issued ID",
             "help": "Choose one valid government ID from the searchable list, then upload a clear PDF or photo of that same ID.",
-            "required": True,
+            "required": False,
             "id_choices": "barangay",
         },
         {
             "key": "valid_id_secondary",
             "label": "Second valid government-issued ID",
             "help": "Choose a second valid government ID from the searchable list, then upload a clear PDF or photo of that same ID. Use a different ID from the first upload.",
-            "required": True,
+            "required": False,
             "id_choices": "barangay",
         },
     ),
@@ -63,20 +63,20 @@ _DOCUMENTS_BY_TYPE = {
             "key": "previous_nbi_clearance",
             "label": "Previous NBI Clearance",
             "help": "Upload a digital or scanned copy of your previous NBI Clearance.",
-            "required": True,
+            "required": False,
         },
         {
             "key": "valid_id",
             "label": "Valid Government-issued ID",
             "help": "Choose one valid government ID from the searchable list, then upload a clear PDF or photo of that same ID.",
-            "required": True,
+            "required": False,
             "id_choices": "barangay",
         },
         {
             "key": "renewal_reference",
             "label": "NBI Online Renewal Reference Number",
             "help": "Upload a printed or digital copy that shows your NBI online renewal reference number.",
-            "required": True,
+            "required": False,
         },
     ),
     NBI_TYPE_LOST: (
@@ -84,26 +84,26 @@ _DOCUMENTS_BY_TYPE = {
             "key": "valid_id",
             "label": "Valid Government-issued ID",
             "help": "Choose one valid government ID from the searchable list, then upload a clear PDF or photo of that same ID.",
-            "required": True,
+            "required": False,
             "id_choices": "barangay",
         },
         {
             "key": "previous_nbi_details",
             "label": "Previous NBI Clearance details",
             "help": "Upload any available copy or record of your previous NBI Clearance details.",
-            "required": True,
+            "required": False,
         },
         {
             "key": "application_reference",
             "label": "NBI Application Reference Number",
             "help": "Upload a printed or digital copy that shows your NBI application reference number.",
-            "required": True,
+            "required": False,
         },
         {
             "key": "affidavit_of_loss",
             "label": "Affidavit of Loss",
             "help": "Upload an Affidavit of Loss when NBI requires one for a lost clearance.",
-            "required": True,
+            "required": False,
         },
     ),
     NBI_TYPE_DAMAGED: (
@@ -111,26 +111,26 @@ _DOCUMENTS_BY_TYPE = {
             "key": "damaged_nbi_clearance",
             "label": "Damaged NBI Clearance",
             "help": "Upload a clear photo or scan of the damaged NBI Clearance, if available.",
-            "required": True,
+            "required": False,
         },
         {
             "key": "valid_id",
             "label": "Valid Government-issued ID",
             "help": "Choose one valid government ID from the searchable list, then upload a clear PDF or photo of that same ID.",
-            "required": True,
+            "required": False,
             "id_choices": "barangay",
         },
         {
             "key": "application_reference",
             "label": "NBI Application Reference Number",
             "help": "Upload a printed or digital copy that shows your NBI application reference number.",
-            "required": True,
+            "required": False,
         },
         {
             "key": "supporting_documents",
             "label": "Additional supporting documents",
             "help": "Upload any additional supporting documents requested for a damaged clearance replacement.",
-            "required": True,
+            "required": False,
         },
     ),
 }
@@ -148,7 +148,7 @@ def is_nbi_new_application(application_type):
 
 
 def requires_nbi_schedule(application_type):
-    return is_nbi_new_application(application_type)
+    return True
 
 
 def document_requirements_for(application_type):

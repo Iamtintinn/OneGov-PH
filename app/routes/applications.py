@@ -41,6 +41,7 @@ from app.services.application_service import (
     nbi_review_ready,
     nbi_type_ready,
     philsys_review_ready,
+    philsys_type_ready,
     owned_application,
     passport_details_ready,
     passport_review_ready,
@@ -63,6 +64,7 @@ from app.services.application_service import (
     save_draft,
     save_nbi_application_type,
     save_passport_application_type,
+    save_philsys_application_type,
     save_passport_id,
     save_residency_application_type,
     save_senior_application_type,
@@ -143,7 +145,7 @@ def apply_type(service_id):
     kind = spec.get("kind")
     if not (
         spec.get("type_first")
-        and kind in {"passport", "barangay", "residency", "senior", "nbi", "birth", "cenomar"}
+        and kind in {"passport", "barangay", "residency", "senior", "nbi", "birth", "cenomar", "philsys"}
     ):
         return redirect(url_for("citizen.apply_details", service_id=service.service_id))
 
@@ -216,6 +218,18 @@ def apply_type(service_id):
         continue_label = "Continue to application details"
         type_heading = "CENOMAR application types"
         type_intro = "Choose the purpose that matches your request. A valid government-issued ID is required for every type."
+    elif kind == "philsys":
+        from app.services.philsys_requirements import PHILSYS_TYPE_OPTIONS as TYPE_OPTIONS
+
+        save_type = save_philsys_application_type
+        next_endpoint = "citizen.apply_details"
+        next_kwargs = {"service_id": service.service_id}
+        continue_label = "Continue to application details"
+        type_heading = "PhilSys National ID application types"
+        type_intro = (
+            "Choose the National ID request that matches your situation. "
+            "Required document uploads depend on this choice."
+        )
     else:
         from app.services.passport_requirements import PASSPORT_TYPE_OPTIONS as TYPE_OPTIONS
 
@@ -326,6 +340,8 @@ def apply_details(service_id):
         return redirect(url_for("citizen.apply_type", service_id=service.service_id))
     if spec.get("kind") == "cenomar" and spec.get("type_first") and not cenomar_type_ready(draft):
         return redirect(url_for("citizen.apply_type", service_id=service.service_id))
+    if spec.get("kind") == "philsys" and spec.get("type_first") and not philsys_type_ready(draft):
+        return redirect(url_for("citizen.apply_type", service_id=service.service_id))
     if request.method == "POST":
         stored, errors = validate_answers(
             service,
@@ -337,14 +353,14 @@ def apply_details(service_id):
             draft = save_draft(current_user, service, stored, draft)
             return redirect(url_for("citizen.apply_documents", application_id=draft.application_id))
         values = {item["key"]: item["value"] for item in stored}
-        if spec.get("kind") in {"barangay", "residency", "cenomar", "birth", "senior", "nbi", "sss"}:
+        if spec.get("kind") in {"barangay", "residency", "cenomar", "birth", "senior", "nbi", "philsys", "sss"}:
             flash(
                 "This application cannot continue to documents yet. "
                 "Fix the highlighted fields below, then try Continue again.",
                 "warning",
             )
     error_items = []
-    if errors and spec.get("kind") in {"barangay", "residency", "cenomar", "birth", "senior", "nbi", "sss"}:
+    if errors and spec.get("kind") in {"barangay", "residency", "cenomar", "birth", "senior", "nbi", "philsys", "sss"}:
         error_items = [
             {"key": field["key"], "label": field["label"], "message": errors[field["key"]]}
             for field in spec["fields"]
@@ -353,7 +369,7 @@ def apply_details(service_id):
     details_step = (
         2
         if (
-            spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar"}
+            spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar", "philsys"}
             and spec.get("type_first")
         )
         else 1
@@ -396,6 +412,8 @@ def apply_documents(application_id):
         return redirect(url_for("citizen.apply_type", service_id=application.service_id))
     if spec.get("kind") == "cenomar" and spec.get("type_first") and not cenomar_type_ready(application):
         return redirect(url_for("citizen.apply_type", service_id=application.service_id))
+    if spec.get("kind") == "philsys" and spec.get("type_first") and not philsys_type_ready(application):
+        return redirect(url_for("citizen.apply_type", service_id=application.service_id))
     if spec.get("kind") == "cenomar":
         from app.services.application_forms import cenomar_incomplete_step
 
@@ -407,7 +425,7 @@ def apply_documents(application_id):
     if spec.get("kind") == "passport" and spec.get("type_first"):
         document_step = 2
     elif (
-        spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar"}
+        spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar", "philsys"}
         and spec.get("type_first")
     ):
         document_step = 3
@@ -416,7 +434,7 @@ def apply_documents(application_id):
     else:
         document_step = 2
     context = _common(application, document_step)
-    if context["spec"].get("kind") == "philsys":
+    if context["spec"].get("kind") == "philsys" and context["spec"].get("documents_first") and not context["spec"].get("type_first"):
         from app.services.philsys_national_id import supporting_id_groups
 
         matched = next(
@@ -458,7 +476,7 @@ def apply_documents(application_id):
             ),
             None,
         )
-    elif context["spec"].get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar"}:
+    elif context["spec"].get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar", "philsys"}:
         from app.services.barangay_ids import barangay_id_groups
 
         context["id_picker_groups"] = barangay_id_groups()
@@ -691,6 +709,9 @@ def apply_schedule(application_id):
             save_appointment,
         )
     elif kind == "philsys":
+        if spec.get("type_first") and not philsys_type_ready(application):
+            flash("Select an application type before scheduling.", "warning")
+            return redirect(url_for("citizen.apply_type", service_id=application.service_id))
         if not passport_details_ready(application, spec):
             flash("Complete the application details before scheduling.", "warning")
             return redirect(url_for("citizen.apply_details", service_id=application.service_id))
@@ -758,12 +779,12 @@ def apply_schedule(application_id):
         )
         if error:
             flash(error, "warning")
-        elif kind in {"passport", "senior"}:
+        elif kind in {"passport", "senior", "nbi"}:
             return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
         else:
             return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
 
-    if kind in {"passport", "barangay", "residency", "senior", "nbi"} and spec.get("type_first"):
+    if kind in {"passport", "barangay", "residency", "senior", "nbi", "philsys"} and spec.get("type_first"):
         schedule_step = 5
     else:
         schedule_step = 4
@@ -783,6 +804,7 @@ def apply_delivery(application_id):
     spec = specification_for(application.service, field_map(application))
     kind = spec.get("kind")
     fulfillment_choice = ""
+    delivery_step = 6 if kind in {"passport", "senior"} else 5
     if kind == "barangay":
         if not barangay_review_ready(application):
             flash("Review your application before setting the delivery details.", "warning")
@@ -1031,13 +1053,100 @@ def apply_delivery(application_id):
                 }
             )
             return render_template("applications/apply_passport_fulfillment.html", **context)
+    elif kind == "nbi":
+        if not nbi_review_ready(application):
+            flash("Review your application before setting the delivery details.", "warning")
+            return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+        from app.services.nbi_delivery import (
+            CITY,
+            DEFAULT_LAT,
+            DEFAULT_LNG,
+            DELIVERY,
+            DELIVERY_FEE,
+            DEMO_BARANGAYS,
+            PICKUP,
+            PROVINCE,
+            REGION,
+            delivery_address,
+            delivery_ready,
+            delivery_values,
+            fulfillment_method,
+            nbi_center,
+            save_delivery,
+            save_pickup,
+            validate_delivery_form,
+        )
+        from app.services.nbi_scheduling import appointment_for
+
+        appointment = appointment_for(application)
+        if appointment is None:
+            flash("Select a demonstration appointment before choosing delivery.", "warning")
+            return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
+        delivery_step = 6
+
+        if request.method == "POST":
+            choice = clean_text(request.form.get("fulfillment_method")).lower()
+            if choice == PICKUP:
+                error = save_pickup(application, current_user)
+                if error:
+                    flash(error, "warning")
+                else:
+                    flash("NBI clearance pickup selected.", "success")
+                    return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+            elif choice == DELIVERY:
+                fulfillment_choice = DELIVERY
+            else:
+                flash("Choose pickup or home delivery.", "warning")
+                return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
+
+        if request.method != "POST":
+            fulfillment_choice = (
+                clean_text(request.values.get("method")).lower()
+                or fulfillment_method(application)
+            )
+        if fulfillment_choice == PICKUP:
+            return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+        if fulfillment_choice not in {PICKUP, DELIVERY}:
+            context = _common(application, delivery_step)
+            back_endpoint = "citizen.apply_schedule"
+            context.update(
+                {
+                    "appointment": appointment,
+                    "delivery_back_url": url_for(back_endpoint, application_id=application.application_id),
+                    "fulfillment_options": (
+                        {
+                            "key": PICKUP,
+                            "title": "Pick up at the NBI Clearance Center",
+                            "help": (
+                                "Collect your NBI clearance at the NBI Clearance Center. "
+                                "No delivery fee is added."
+                            ),
+                            "href": None,
+                        },
+                        {
+                            "key": DELIVERY,
+                            "title": "Request home delivery",
+                            "help": (
+                                "Pin your delivery address on the map and add ₱50.00 to the "
+                                "demonstration payment."
+                            ),
+                            "href": url_for(
+                                "citizen.apply_delivery",
+                                application_id=application.application_id,
+                                method=DELIVERY,
+                            ),
+                        },
+                    ),
+                }
+            )
+            return render_template("applications/apply_passport_fulfillment.html", **context)
     else:
         return redirect(url_for("citizen.application_continue", application_id=application.application_id))
 
     values = delivery_values(application)
     errors = {}
     if request.method == "POST":
-        if kind in {"passport", "senior"}:
+        if kind in {"passport", "senior", "nbi"}:
             values, errors = validate_delivery_form(request.form, application)
         else:
             values, errors = validate_delivery_form(request.form)
@@ -1082,6 +1191,12 @@ def apply_delivery(application_id):
                 initial_lat, initial_lng = center["latitude"], center["longitude"]
             else:
                 initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
+        elif kind == "nbi":
+            center = nbi_center(values.get("barangay") or field_map(application).get("barangay"))
+            if center:
+                initial_lat, initial_lng = center["latitude"], center["longitude"]
+            else:
+                initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
         else:
             center = barangay_center(values.get("barangay") or field_map(application).get("barangay"))
             if center:
@@ -1090,9 +1205,9 @@ def apply_delivery(application_id):
                 initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
 
     delivery_region_val = REGION
-    context = _common(application, 6 if kind in {"passport", "senior"} else 5)
+    context = _common(application, delivery_step)
     delivery_address_preview = ""
-    if kind in {"birth", "cenomar", "passport", "senior"}:
+    if kind in {"birth", "cenomar", "passport", "senior", "nbi"}:
         delivery_address_preview = delivery_address(
             {
                 "house_number": values.get("house_number"),
@@ -1121,6 +1236,10 @@ def apply_delivery(application_id):
         from app.services.senior_payment import payment_summary as senior_payment_summary
 
         context["senior_payment_summary"] = senior_payment_summary(application)
+    elif kind == "nbi":
+        from app.services.nbi_payment import payment_summary as nbi_payment_summary
+
+        context["nbi_payment_summary"] = nbi_payment_summary(application)
     context.update(
         {
             "values": values,
@@ -1134,10 +1253,15 @@ def apply_delivery(application_id):
             "delivery_saved": delivery_ready(application),
             "initial_lat": initial_lat,
             "initial_lng": initial_lng,
-            "show_origin_map": kind in {"barangay", "residency", "birth", "cenomar", "passport", "senior"},
-            "fixed_origin_map": kind in {"birth", "cenomar", "passport", "senior"},
-            "auto_pin_map": kind in {"barangay", "residency", "birth", "cenomar", "passport", "senior"},
-            "fulfillment_method": DELIVERY if kind in {"passport", "senior"} else "",
+            "show_origin_map": kind in {"barangay", "residency", "birth", "cenomar", "passport", "senior", "nbi"},
+            "fixed_origin_map": kind in {"birth", "cenomar", "passport", "senior", "nbi"},
+            "auto_pin_map": kind in {"barangay", "residency", "birth", "cenomar", "passport", "senior", "nbi"},
+            "fulfillment_method": DELIVERY if kind in {"passport", "senior", "nbi"} else "",
+            "delivery_back_url": (
+                url_for("citizen.apply_schedule", application_id=application.application_id)
+                if kind == "nbi" and spec.get("review_before_schedule")
+                else url_for("citizen.apply_review", application_id=application.application_id)
+            ),
             "saved_origin_lat": values.get("origin_latitude"),
             "saved_origin_lng": values.get("origin_longitude"),
             "origin_confirmed": values.get("origin_location_confirmed"),
@@ -1234,6 +1358,9 @@ def apply_payment(application_id):
         from app.services.philsys_payment import confirm_free_application, payment_summary
         from app.services.philsys_scheduling import appointment_for
 
+        if spec.get("type_first") and not philsys_type_ready(application):
+            flash("Select an application type before payment.", "warning")
+            return redirect(url_for("citizen.apply_type", service_id=application.service_id))
         if not passport_details_ready(application, spec):
             flash("Complete the application details before payment.", "warning")
             return redirect(url_for("citizen.apply_details", service_id=application.service_id))
@@ -1243,7 +1370,7 @@ def apply_payment(application_id):
         if appointment_for(application) is None:
             flash("Select a demonstration appointment before payment.", "warning")
             return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
-        payment_step = 5
+        payment_step = 6 if spec.get("type_first") else 5
         back_endpoint = "citizen.apply_schedule"
         free_payment = True
         ONLINE_METHODS = ()
@@ -1265,6 +1392,7 @@ def apply_payment(application_id):
         record_demo_payment = None
         start_maya_checkout = None
     elif kind == "nbi":
+        from app.services.nbi_delivery import delivery_ready
         from app.services.nbi_payment import (
             payment_summary,
             record_demo_payment,
@@ -1286,11 +1414,13 @@ def apply_payment(application_id):
             if appointment_for(application) is None:
                 flash("Select a demonstration appointment before payment.", "warning")
                 return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
-            payment_step = 6 if spec.get("type_first") else 5
-            back_endpoint = "citizen.apply_schedule"
+            payment_step = 7 if spec.get("type_first") else 6
         else:
-            payment_step = 5 if spec.get("type_first") else 4
-            back_endpoint = "citizen.apply_review"
+            payment_step = 6 if spec.get("type_first") else 5
+        back_endpoint = "citizen.apply_delivery"
+        if not delivery_ready(application):
+            flash("Choose pickup or home delivery before payment.", "warning")
+            return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
         free_payment = False
     elif kind == "birth":
         from app.services.birth_payment import (
@@ -1613,7 +1743,7 @@ def apply_review(application_id):
         return redirect(url_for("citizen.application_continue", application_id=application.application_id))
     if spec.get("kind") == "passport" and spec.get("type_first"):
         review_step = 4
-    elif spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar"} and spec.get(
+    elif spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar", "philsys"} and spec.get(
         "type_first"
     ):
         review_step = 4
@@ -1679,6 +1809,9 @@ def apply_submit(application_id):
         mark_passport_reviewed(application)
         return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
     if spec.get("kind") == "philsys":
+        if spec.get("type_first") and not philsys_type_ready(application):
+            flash("Select an application type before continuing.", "warning")
+            return redirect(url_for("citizen.apply_type", service_id=application.service_id))
         if missing_documents(application, spec):
             flash("Upload every required document before scheduling.", "warning")
             return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
@@ -1700,7 +1833,7 @@ def apply_submit(application_id):
         mark_nbi_reviewed(application)
         if spec.get("review_before_schedule"):
             return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
-        return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+        return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
     if spec.get("kind") == "cenomar" and not cenomar_type_ready(application):
         flash("Select an application type before continuing.", "warning")
         return redirect(url_for("citizen.apply_type", service_id=application.service_id))
@@ -1907,6 +2040,7 @@ def apply_confirmation(application_id):
         }
     elif spec.get("kind") == "nbi":
         from app.services.nbi_confirmation_pdf import confirmation_id_for, ensure_confirmation_pdf
+        from app.services.nbi_delivery import delivery_address, delivery_for
         from app.services.nbi_payment import payment_summary
         from app.services.nbi_requirements import bring_requirements_for, is_nbi_new_application
 
@@ -1914,6 +2048,10 @@ def apply_confirmation(application_id):
         ensure_confirmation_pdf(application)
         context["summary"] = payment_summary(application)
         context["confirmation_id"] = confirmation_id_for(application)
+        context["delivery"] = delivery_for(application)
+        context["delivery_address"] = (
+            delivery_address(context["delivery"]) if context["delivery"] else ""
+        )
         if is_nbi_new_application(answers.get("application_type")):
             context["bring_requirements"] = bring_requirements_for(answers.get("application_type"))
             context["appointment"] = (context["summary"] or {}).get("appointment")

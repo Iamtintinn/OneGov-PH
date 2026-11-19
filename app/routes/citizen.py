@@ -331,6 +331,8 @@ def application_detail(application_id):
     senior_delivery = None
     senior_delivery_address = ""
     senior_admin_confirmation = None
+    nbi_delivery = None
+    nbi_delivery_address = ""
     if spec and spec.get("kind") == "passport":
         from app.services.passport_admin import summary as physical_summary
         from app.services.passport_confirmation_pdf import confirmation_id_for
@@ -363,9 +365,12 @@ def application_detail(application_id):
             barangay_confirmation_id = confirmation_id_for(application)
     elif spec and spec.get("kind") == "nbi":
         from app.services.nbi_confirmation_pdf import confirmation_id_for
+        from app.services.nbi_delivery import delivery_address, delivery_for
         from app.services.nbi_payment import payment_summary
 
         barangay_summary = payment_summary(application)
+        nbi_delivery = delivery_for(application)
+        nbi_delivery_address = delivery_address(nbi_delivery) if nbi_delivery else ""
         if application.application_status != "draft":
             barangay_confirmation_id = confirmation_id_for(application)
     elif spec and spec.get("kind") == "birth":
@@ -415,6 +420,8 @@ def application_detail(application_id):
         senior_delivery=senior_delivery,
         senior_delivery_address=senior_delivery_address,
         senior_admin_confirmation=senior_admin_confirmation,
+        nbi_delivery=nbi_delivery,
+        nbi_delivery_address=nbi_delivery_address,
     )
 
 
