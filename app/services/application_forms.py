@@ -461,23 +461,6 @@ SERVICE_FORMS = {
             "pickup_id_prefix": "PU",
             "pickup_lead_business_days": 7,
         },
-        "admin_status_options": (
-            {"key": "submitted", "label": "Submitted", "legacy_status": "submitted"},
-            {"key": "under_review", "label": "Under Review", "legacy_status": "under_review"},
-            {"key": "corrections_requested", "label": "Corrections Requested", "legacy_status": "pending_documents"},
-            {"key": "for_payment", "label": "For Payment", "legacy_status": "for_payment"},
-            {"key": "paid", "label": "Paid", "legacy_status": "paid"},
-            {"key": "appointment_scheduled", "label": "Appointment Scheduled", "legacy_status": "scheduled"},
-            {"key": "for_personal_appearance", "label": "For Personal Appearance", "legacy_status": "for_biometrics"},
-            {"key": "personal_appearance_completed", "label": "Personal Appearance Completed", "legacy_status": "approved"},
-            {"key": "for_processing", "label": "For Processing", "legacy_status": "processing"},
-            {"key": "for_printing", "label": "For Printing", "legacy_status": "approved"},
-            {"key": "ready_for_pickup", "label": "Ready for Pickup", "legacy_status": "ready_for_release"},
-            {"key": "released_claimed", "label": "Released / Claimed", "legacy_status": "completed"},
-            {"key": "completed", "label": "Completed", "legacy_status": "completed"},
-            {"key": "rejected", "label": "Rejected", "legacy_status": "rejected"},
-            {"key": "cancelled", "label": "Cancelled", "legacy_status": "cancelled"},
-        ),
         "status_labels": {
             "submitted": "Submitted",
             "under_review": "Under Review",
@@ -1498,8 +1481,30 @@ def compose_senior_citizen_id(values=None):
         "status_labels": {
             "not_applicable": "Not applicable",
             "submitted": "Submitted",
-            "pending_documents": "Additional documents required",
-            "ready_for_release": "Ready for pickup",
+            "under_review": "Under Review",
+            "pending_documents": "Corrections Requested",
+            "for_payment": "For Payment",
+            "paid": "Paid",
+            "scheduled": "Appointment Scheduled",
+            "for_biometrics": "For Personal Appearance",
+            "approved": "Personal Appearance Completed",
+            "processing": "For Processing",
+            "ready_for_release": "Ready for Pickup",
+            "completed": "Completed",
+            "rejected": "Rejected",
+            "cancelled": "Cancelled",
+        },
+        "senior_confirmation": {
+            "label": "Confirm documents and physical appearance",
+            "help": (
+                "Confirm that the applicant submitted the required documents or completed physical appearance "
+                "at the OSCA office before updating the application status or dispatch status."
+            ),
+            "gate_message": (
+                "Confirm the applicant's submitted documents or physical appearance before updating the application status or dispatch status."
+            ),
+            "pickup_id_prefix": "OSCA-PU",
+            "pickup_lead_business_days": 7,
         },
     }
 

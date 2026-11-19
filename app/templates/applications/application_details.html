@@ -76,6 +76,15 @@
             {% endif %}
         </dl>
         {% endif %}
+        {% if senior_admin_confirmation and senior_admin_confirmation.confirmed %}
+        <h2>Documents and physical appearance</h2>
+        <dl class="detail-list">
+            <div><dt>Confirmed at</dt><dd>{{ senior_admin_confirmation.confirmed_at_label or "—" }}</dd></div>
+            <div><dt>Confirmation basis</dt><dd>{{ "Physical appearance at OSCA" if senior_admin_confirmation.physical_appearance else "Required documents submitted" }}</dd></div>
+            {% if senior_admin_confirmation.pickup_id %}<div><dt>Pickup ID</dt><dd class="pay-mono">{{ senior_admin_confirmation.pickup_id }}</dd></div>{% endif %}
+            {% if senior_admin_confirmation.pickup_date_label %}<div><dt>Pickup date</dt><dd>{{ senior_admin_confirmation.pickup_date_label }}</dd></div>{% endif %}
+        </dl>
+        {% endif %}
         {% if spec and spec.kind == 'passport' and passport_appointment %}
         <h2>Demonstration appointment</h2>
         <p class="notice notice-warning">Demonstration Appointment – Not an Official DFA Appointment</p>

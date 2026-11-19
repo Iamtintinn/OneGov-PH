@@ -68,8 +68,12 @@ def read_details(application):
         details["delivery"] = raw["delivery"]
     if isinstance(raw.get("physical_requirements"), dict):
         details["physical_requirements"] = raw["physical_requirements"]
+    if isinstance(raw.get("senior_confirmation"), dict):
+        details["senior_confirmation"] = raw["senior_confirmation"]
     if raw.get("passport_status_key"):
         details["passport_status_key"] = raw["passport_status_key"]
+    if raw.get("senior_status_key"):
+        details["senior_status_key"] = raw["senior_status_key"]
     if raw.get("admin_tracking"):
         details["admin_tracking"] = raw["admin_tracking"]
     if raw.get("confirmation"):
@@ -110,8 +114,12 @@ def write_details(application, details, commit=True):
         payload["delivery"] = details["delivery"]
     if isinstance(details.get("physical_requirements"), dict):
         payload["physical_requirements"] = details["physical_requirements"]
+    if isinstance(details.get("senior_confirmation"), dict):
+        payload["senior_confirmation"] = details["senior_confirmation"]
     if details.get("passport_status_key"):
         payload["passport_status_key"] = details["passport_status_key"]
+    if details.get("senior_status_key"):
+        payload["senior_status_key"] = details["senior_status_key"]
     if details.get("admin_tracking"):
         payload["admin_tracking"] = details["admin_tracking"]
     if details.get("confirmation"):

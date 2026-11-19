@@ -35,10 +35,11 @@ from app.utils.validators import clean_text, normalize_contact_number
 admin_portal_bp = Blueprint("admin_portal", __name__)
 
 
-def _passport_confirmation_gate(application):
+def _confirmation_gate(application):
     from app.services.passport_admin import gate_message
+    from app.services.senior_admin import gate_message as senior_gate_message
 
-    return gate_message(application)
+    return gate_message(application) or senior_gate_message(application)
 
 
 LEGACY_STATUS_LABELS = {
@@ -63,10 +64,12 @@ ADMIN_PROCESSING_STATUSES = (
     ("application_submitted", "Application Submitted", "submitted"),
     ("payment_confirmed", "Payment Confirmed", "paid"),
     ("requirements_under_review", "Requirements Under Review", "under_review"),
+    ("rejected", "Rejected", "rejected"),
     ("requirements_verified", "Requirements Verified", "approved"),
     ("processing_document", "Processing Document", "processing"),
     ("document_approved", "Document Approved", "approved"),
     ("ready_for_dispatch", "Ready for Dispatch", "ready_for_release"),
+    ("completed", "Completed", "completed"),
 )
 PASSPORT_PROCESSING_STATUSES = (
     ("cancelled", "Cancelled", "cancelled"),
@@ -318,6 +321,7 @@ def tracking_detail_data(application, applicant=None, include_map=True):
     from app.services.application_forms import specification_for
     from app.services.application_service import field_map
     from app.services.passport_delivery import PICKUP
+    from app.services.senior_admin import summary as senior_confirmation_summary
     from app.services.senior_delivery import PICKUP as SENIOR_PICKUP
     from app.services.senior_delivery import fulfillment_method as senior_fulfillment_method
 
@@ -326,6 +330,7 @@ def tracking_detail_data(application, applicant=None, include_map=True):
     is_senior = bool(spec and spec.get("kind") == "senior")
     senior_method = senior_fulfillment_method(application) if is_senior else ""
     senior_fulfillment = {"method": senior_method} if is_senior else None
+    senior_confirmation = senior_confirmation_summary(application)
     state = _admin_tracking_state(application)
     service_labels = _service_status_labels(application)
     processing_key, processing_label = _current_processing(
@@ -335,13 +340,23 @@ def tracking_detail_data(application, applicant=None, include_map=True):
         processing_label = status_label(application) or processing_label
     elif passport and passport["fulfillment_method"] == PICKUP and processing_key == "ready_for_dispatch":
         processing_label = "Ready for Pickup"
+    elif is_senior and senior_method == SENIOR_PICKUP and processing_key == "ready_for_dispatch":
+        processing_label = "Ready for Pickup"
     delivery = _delivery_state(state)
+    is_pickup = bool(
+        (passport and passport["fulfillment_method"] == PICKUP)
+        or (is_senior and senior_method == SENIOR_PICKUP)
+    )
+    if is_pickup and application.application_status == "completed":
+        delivery["label"] = "Received"
     map_payload = None
     if include_map and not (passport and passport["fulfillment_method"] == PICKUP) and not (
         is_senior and senior_method == SENIOR_PICKUP
     ):
         map_payload = _delivery_map_data(application, delivery, applicant)
-    gated = bool(passport and passport["gate_message"])
+    gated = bool(passport and passport["gate_message"]) or bool(
+        senior_confirmation and senior_confirmation["gate_message"]
+    )
     can_manage_delivery = application.application_status == "ready_for_release" or bool(
         delivery["status"]
     )
@@ -360,6 +375,7 @@ def tracking_detail_data(application, applicant=None, include_map=True):
         "citizen_delivery": _delivery_info(application),
         "passport_fulfillment": passport,
         "senior_fulfillment": senior_fulfillment,
+        "senior_confirmation": senior_confirmation,
         "can_update_status": application.application_status not in {"draft", "cancelled"}
         and not gated,
         "can_manage_delivery": can_manage_delivery,
@@ -425,7 +441,7 @@ def _update_processing_status(application):
     if application.application_status in {"draft", "cancelled"}:
         flash("Only applications at the Confirmation stage or later can be updated.", "warning")
         return _tracking_redirect(application.application_id)
-    confirmation_gate = _passport_confirmation_gate(application)
+    confirmation_gate = _confirmation_gate(application)
     if confirmation_gate:
         flash(confirmation_gate, "warning")
         return _tracking_redirect(application.application_id)
@@ -433,21 +449,7 @@ def _update_processing_status(application):
         flash("Remarks must be 500 characters or fewer.", "warning")
         return _tracking_redirect(application.application_id)
 
-    from app.services.application_service import read_details, write_details
-    from app.services.passport_admin import admin_status_options, status_key_for_legacy
-
-    passport_options = admin_status_options(application)
-    option_keys = {item.get("key") for item in passport_options}
-    passport_key = (
-        target["key"]
-        if target["key"] in option_keys
-        else status_key_for_legacy(application, target["legacy_status"])
-    )
-    passport_label = next(
-        (item.get("label") for item in passport_options if item.get("key") == passport_key),
-        None,
-    )
-    target_label = passport_label or target["label"]
+    target_label = target["label"]
     state = _admin_tracking_state(application)
     processing = state["processing"]
     now = datetime.now().replace(microsecond=0)
@@ -477,11 +479,6 @@ def _update_processing_status(application):
     )
     _save_admin_tracking(application, state)
 
-    if passport_key:
-        details = read_details(application)
-        details["passport_status_key"] = passport_key
-        write_details(application, details, commit=False)
-
     previous_status = application.application_status
     application.application_status = target["legacy_status"]
     description = f"Administrator set processing status to {target_label}."
@@ -494,7 +491,7 @@ def _update_processing_status(application):
 
 
 def _assign_courier(application):
-    confirmation_gate = _passport_confirmation_gate(application)
+    confirmation_gate = _confirmation_gate(application)
     if confirmation_gate:
         flash(confirmation_gate, "warning")
         return _tracking_redirect(application.application_id)
@@ -554,7 +551,7 @@ def _assign_courier(application):
 
 
 def _update_delivery_status(application):
-    confirmation_gate = _passport_confirmation_gate(application)
+    confirmation_gate = _confirmation_gate(application)
     if confirmation_gate:
         flash(confirmation_gate, "warning")
         return _tracking_redirect(application.application_id)

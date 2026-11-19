@@ -574,11 +574,12 @@ def application_detail(application_id):
         PASSPORT_PROCESSING_STATUSES,
         tracking_detail_data,
     )
-    from app.services.passport_admin import admin_status_options, current_status_key
     from app.services.passport_delivery import PICKUP
+    from app.services.senior_admin import summary as senior_confirmation_summary
 
     tracking = tracking_detail_data(application, applicant)
     passport = tracking["passport_fulfillment"]
+    senior_confirmation = senior_confirmation_summary(application)
     processing_statuses = ADMIN_PROCESSING_STATUSES
     if passport:
         is_pickup = passport["fulfillment_method"] == PICKUP
@@ -591,7 +592,18 @@ def application_detail(application_id):
                 legacy,
             )
             for key, label, legacy in ADMIN_PROCESSING_STATUSES
-        ) + PASSPORT_PROCESSING_STATUSES
+        ) + tuple(
+            item for item in PASSPORT_PROCESSING_STATUSES if item[0] != "rejected"
+        )
+    elif senior_confirmation and senior_confirmation["fulfillment_method"] == PICKUP:
+        processing_statuses = tuple(
+            (
+                key,
+                "Ready for Pickup" if key == "ready_for_dispatch" else label,
+                legacy,
+            )
+            for key, label, legacy in ADMIN_PROCESSING_STATUSES
+        )
 
     return render_template(
         "admin/application_detail.html",
@@ -605,8 +617,7 @@ def application_detail(application_id):
         tracking=tracking,
         processing_statuses=processing_statuses,
         delivery_statuses=DELIVERY_STATUSES,
-        passport_status_options=admin_status_options(application),
-        passport_status_key=current_status_key(application),
+        senior_confirmation=senior_confirmation,
     )
 
 
@@ -636,6 +647,34 @@ def confirm_physical_requirements(application_id):
     return redirect(url_for("admin.application_detail", application_id=application_id))
 
 
+@admin_bp.route("/admin/applications/<int:application_id>/senior-confirmation", methods=["POST"])
+@admin_console_required
+def confirm_senior_requirements(application_id):
+    application = _application_or_404(application_id)
+    from app.services.senior_admin import confirm, is_confirmed, is_senior_application
+
+    if not is_senior_application(application):
+        abort(400, description="Confirmation is only available for Senior Citizen ID applications.")
+    if is_confirmed(application):
+        flash("Documents and physical appearance are already confirmed for this application.", "info")
+        return redirect(url_for("admin.application_detail", application_id=application_id))
+
+    physical_appearance = request.form.get("physical_appearance") in {"1", "on", "true", "yes"}
+    remarks = clean_text(request.form.get("remarks"))
+    record, error = confirm(application, current_user, physical_appearance, remarks)
+    if error:
+        flash(error, "warning")
+        return redirect(url_for("admin.application_detail", application_id=application_id))
+
+    description = "Confirmed submitted documents or completed physical appearance."
+    if record.get("pickup_id"):
+        description += f" Pickup ID {record['pickup_id']} is scheduled for {record['pickup_date_label']}."
+    _log_application_event(application, application.application_status, description)
+    db.session.commit()
+    flash("Senior Citizen ID documents and physical appearance confirmed.", "success")
+    return redirect(url_for("admin.application_detail", application_id=application_id))
+
+
 @admin_bp.route("/admin/applications/<int:application_id>/update", methods=["POST"])
 @role_required(User.ROLE_SYSTEM_ADMIN, User.ROLE_DEPARTMENT_STAFF, User.ROLE_DEPARTMENT_SUPERVISOR)
 def update_application(application_id):
@@ -648,16 +687,33 @@ def update_application(application_id):
         is_passport_application,
         resolve_status_update,
     )
+    from app.services.senior_admin import (
+        gate_message as senior_gate_message,
+        is_senior_application,
+        resolve_status_update as resolve_senior_status_update,
+    )
 
     passport_application = is_passport_application(application)
+    senior_application = is_senior_application(application)
     target_status = target_key
     display_label = STATUS_LABELS.get(target_status, target_status)
+    spec_status_key = ""
     if passport_application:
         passport_status, passport_label = resolve_status_update(application, target_key)
-        if not passport_status:
-            abort(400, description="Choose a valid passport application status.")
-        target_status = passport_status
-        display_label = passport_label
+        if passport_status:
+            spec_status_key = target_key
+            target_status = passport_status
+            display_label = passport_label
+        elif target_key not in APPLICATION_STATUSES:
+            abort(400, description="Choose a valid application status.")
+    elif senior_application:
+        senior_status, senior_label = resolve_senior_status_update(application, target_key)
+        if senior_status:
+            spec_status_key = target_key
+            target_status = senior_status
+            display_label = senior_label
+        elif target_key not in APPLICATION_STATUSES:
+            abort(400, description="Choose a valid application status.")
     if target_status not in APPLICATION_STATUSES or target_status == "draft":
         abort(400, description="Choose a valid application status.")
     if len(remarks) > 500:
@@ -667,16 +723,17 @@ def update_application(application_id):
         flash("Add a reason when rejecting an application or requesting corrections.", "warning")
         return redirect(url_for("admin.application_detail", application_id=application_id))
 
-    confirmation_gate = gate_message(application)
+    confirmation_gate = gate_message(application) or senior_gate_message(application)
     if confirmation_gate:
         flash(confirmation_gate, "warning")
         return redirect(url_for("admin.application_detail", application_id=application_id))
 
     previous_status = application.application_status
     application.application_status = target_status
-    if passport_application:
+    if spec_status_key:
         details = read_details(application)
-        details["passport_status_key"] = target_key
+        status_key_field = "passport_status_key" if passport_application else "senior_status_key"
+        details[status_key_field] = spec_status_key
         write_details(application, details, commit=False)
     description = f"Status changed to {display_label}."
     if remarks:
