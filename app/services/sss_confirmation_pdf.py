@@ -8,6 +8,8 @@ from flask import current_app
 from app.services.application_service import field_map, read_details, write_details
 from app.services.receipt_pdf import write_receipt_pdf
 from app.services.sss_payment import payment_summary
+from app.services.sss_requirements import bring_requirements_for
+from app.services.sss_scheduling import appointment_for
 
 
 def _upload_root():
@@ -27,6 +29,27 @@ def ensure_confirmation_pdf(application):
 
     answers = field_map(application)
     summary = payment_summary(application)
+    bring = bring_requirements_for(answers.get("application_type"))
+    bring_items = list(bring.get("items") or ())
+    appointment = appointment_for(application)
+    bring_lead = None
+    if bring_items and appointment:
+        location_label = (appointment.get("location_label") or "").strip()
+        address = (appointment.get("address") or "").strip()
+        place = " — ".join(part for part in (location_label, address) if part)
+        if place:
+            when = " ".join(
+                part
+                for part in (
+                    (appointment.get("appointment_date") or "").strip(),
+                    (appointment.get("appointment_time") or "").strip(),
+                )
+                if part
+            ).strip()
+            bring_lead = f"Appointment location (demonstration): {place}"
+            if when:
+                bring_lead = f"{bring_lead} on {when}"
+    has_bring_items = bool(bring_items or bring_lead)
     conf_id = application.tracking_number
     full_name = " ".join(
         part
@@ -57,6 +80,7 @@ def ensure_confirmation_pdf(application):
             ),
             "details": (
                 ("Applicant", full_name),
+                ("Application type", answers.get("application_type") or ""),
                 ("Date of birth", answers.get("date_of_birth") or ""),
                 ("Sex", answers.get("sex") or ""),
                 ("Civil status", answers.get("civil_status") or ""),
@@ -71,6 +95,10 @@ def ensure_confirmation_pdf(application):
                     else "",
                 ),
             ),
+            "bring_title": "Requirements and information to prepare" if has_bring_items else None,
+            "bring_note": bring.get("note") if has_bring_items else None,
+            "bring_lead": bring_lead,
+            "bring_items": tuple(bring_items),
             "fee_lines": (
                 {
                     "label": "SSS processing fee",

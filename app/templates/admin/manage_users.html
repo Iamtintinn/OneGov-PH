@@ -30,7 +30,17 @@
                         <td>{{ user.department.department_name if user.department else "—" }}</td>
                         <td>{{ user.date_registered.strftime("%d %b %Y") }}</td>
                         <td><span class="admin-status-pill admin-status-pill--{{ user.account_status }}">{{ user.account_status|title }}</span></td>
-                        <td><a class="admin-row-action" href="{{ url_for('admin.account_detail', user_id=user.user_id) }}">Manage <span aria-hidden="true">→</span></a></td>
+                        <td>
+                            <a class="admin-row-action" href="{{ url_for('admin.account_detail', user_id=user.user_id) }}">Manage <span aria-hidden="true">→</span></a>
+                            {% if user.account_status == 'active' and user.user_id != current_user.user_id %}
+                            <form method="post" action="{{ url_for('admin.account_detail', user_id=user.user_id) }}" style="display:inline-block;margin-left:0.5rem;" onsubmit="return confirm('Deactivate this user account? They will no longer be able to sign in.');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="action" value="deactivate">
+                                <input type="hidden" name="next" value="accounts">
+                                <button class="admin-row-action" type="submit" style="background:none;border:none;padding:0;cursor:pointer;color:inherit;text-decoration:underline;">Deactivate</button>
+                            </form>
+                            {% endif %}
+                        </td>
                     </tr>
                 {% endfor %}</tbody>
             </table>

@@ -1043,6 +1043,33 @@ def account_detail(user_id):
             )
             db.session.commit()
             flash("Password reset. Share the temporary password securely; it is shown only once.", "success")
+        elif action == "deactivate":
+            if account.account_status != "active":
+                flash("Account is already not active.", "info")
+            elif account.user_id == current_user.user_id:
+                flash("You cannot deactivate your own account.", "warning")
+            elif (
+                account.role == User.ROLE_SYSTEM_ADMIN
+                and (db.session.scalar(
+                    db.select(func.count(User.user_id)).where(
+                        User.role == User.ROLE_SYSTEM_ADMIN,
+                        User.account_status == "active",
+                    )
+                ) or 0) <= 1
+            ):
+                flash("At least one active system administrator must remain.", "warning")
+            else:
+                account.account_status = "inactive"
+                _record_account_activity(
+                    account,
+                    "account_deactivated",
+                    f"Account deactivated by {current_user.full_name}.",
+                )
+                db.session.commit()
+                flash("User account deactivated.", "success")
+                form = _account_form_values(account)
+                if clean_text(request.form.get("next")) == "accounts":
+                    return redirect(url_for("admin.accounts"))
         else:
             abort(400, description="Choose a valid account action.")
 

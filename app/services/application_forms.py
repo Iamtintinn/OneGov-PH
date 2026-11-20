@@ -2211,9 +2211,40 @@ def _sss_document(key, label, help_text, required=False, required_when=None, id_
     return item
 
 
-def compose_sss(values=None):
-    """SS Number registration assistance: details, ID documents, review, free payment, confirmation."""
+SSS_MYSSS_TYPE_NEW = "New Application – MySSS Card"
+SSS_MYSSS_TYPE_LOST = "Replacement – Lost MySSS Card"
+SSS_MYSSS_TYPE_DAMAGED = "Replacement – Damaged MySSS Card"
+SSS_MYSSS_TYPE_OPTIONS = (
+    {
+        "key": SSS_MYSSS_TYPE_NEW,
+        "title": SSS_MYSSS_TYPE_NEW,
+        "help": "For qualified SSS members applying for their first MySSS Card.",
+    },
+    {
+        "key": SSS_MYSSS_TYPE_LOST,
+        "title": SSS_MYSSS_TYPE_LOST,
+        "help": "For members whose previously issued MySSS Card has been lost.",
+    },
+    {
+        "key": SSS_MYSSS_TYPE_DAMAGED,
+        "title": SSS_MYSSS_TYPE_DAMAGED,
+        "help": "For members whose MySSS Card is damaged or no longer usable.",
+    },
+)
+_SSS_MYSSS_TYPE_KEYS = tuple(option["key"] for option in SSS_MYSSS_TYPE_OPTIONS)
+
+
+def normalize_sss_mysss_type(value):
+    value = str(value or "").strip()
+    return value if value in _SSS_MYSSS_TYPE_KEYS else ""
+
+
+def compose_sss(values=None, service_name=None):
+    """SS Number/MySSS card assistance: details, ID documents, review, free payment, confirmation."""
     answers = values or {}
+    is_mysss_card = service_name == "SS Number Registration Assistance and Tracking"
+    selected_type = normalize_sss_mysss_type(answers.get("application_type")) if is_mysss_card else ""
+    answers = {**answers, "application_type": selected_type} if is_mysss_card else answers
     personal = "Personal information"
     contact = "Contact information"
     address = "Address"
@@ -2223,7 +2254,20 @@ def compose_sss(values=None):
     identification = "Identification"
     primary_yes = ("has_primary_id", SSS_HAS_PRIMARY_YES)
     primary_no = ("has_primary_id", SSS_HAS_PRIMARY_NO)
-    fields = [
+    fields = []
+    if is_mysss_card:
+        fields.append(
+            _field(
+                "application_type",
+                "Application type",
+                "Selected on step 1 for MySSS Card requests.",
+                field_type="hidden",
+                required=True,
+                default="",
+                section=purpose,
+            )
+        )
+    fields.append(
         _field(
             "sss_path",
             "Request type",
@@ -2231,7 +2275,9 @@ def compose_sss(values=None):
             field_type="hidden",
             required=False,
             default=SSS_PATH_NEW,
-        ),
+        )
+    )
+    fields.extend([
         _field(
             "first_name",
             "First name",
@@ -2439,61 +2485,137 @@ def compose_sss(values=None):
             options=SSS_BENEFICIARY_RELATIONSHIPS,
             section=benefits,
         ),
-        _field(
-            "has_primary_id",
-            "Can you provide a primary government ID?",
-            "Choose Yes if you can upload one primary ID from the SSS list. Choose No only when you cannot provide a primary ID and will upload two alternative documents instead.",
-            field_type="select",
-            options=(SSS_HAS_PRIMARY_YES, SSS_HAS_PRIMARY_NO),
-            section=identification,
-            placeholder="Select an answer",
-        ),
-    ]
-    documents = (
-        _sss_document(
-            "valid_id",
-            "Section A: Primary identification",
-            "Choose one primary ID (Driver’s License, Philippine Passport, PhilSys National ID / ePhilID, PRC ID, UMID Card, or Seaman’s Book), then upload a clear PDF or photo of that same ID.",
-            required_when=primary_yes,
-            id_choices="sss",
-            status_label="Required",
-        ),
-        _sss_document(
-            "alt_id_1",
-            "Section B: Alternative identification — first document",
-            "Shown only when you cannot provide a primary ID. Upload the first of two alternative documents (for example Barangay ID, NBI Clearance, School ID, Birth Certificate, TIN ID, or Police Clearance).",
-            required_when=primary_no,
-            id_choices="sss_alt",
-            status_label="Required",
-        ),
-        _sss_document(
-            "alt_id_2",
-            "Section B: Alternative identification — second document",
-            "Upload a second alternative document that differs from the first. Common pairs: Barangay ID + NBI Clearance, School ID + Birth Certificate, or TIN ID + Police Clearance.",
-            required_when=primary_no,
-            id_choices="sss_alt",
-            status_label="Required",
-        ),
-    )
-    return {
+    ])
+    if not is_mysss_card or selected_type == SSS_MYSSS_TYPE_NEW:
+        fields.append(
+            _field(
+                "has_primary_id",
+                "Can you provide a primary government ID?",
+                "Choose Yes if you can upload one primary ID from the SSS list. Choose No only when you cannot provide a primary ID and will upload two alternative documents instead.",
+                field_type="select",
+                options=(SSS_HAS_PRIMARY_YES, SSS_HAS_PRIMARY_NO),
+                section=identification,
+                placeholder="Select an answer",
+            )
+        )
+    if is_mysss_card and selected_type == SSS_MYSSS_TYPE_LOST:
+        documents = (
+            _document(
+                "sss_number_proof",
+                "Permanent SSS Number",
+                "Upload a record, card copy, or document showing your permanent SSS Number.",
+                required=True,
+            ),
+            _document(
+                "valid_government_id",
+                "Valid Government-Issued ID",
+                "Upload a clear copy of a valid government-issued ID.",
+                required=True,
+            ),
+            _document(
+                "affidavit_of_loss",
+                "Affidavit of Loss",
+                "Upload an Affidavit of Loss if required by the partner bank.",
+                required=False,
+            ),
+            _document(
+                "registered_national_id",
+                "Registered National ID (for identity verification)",
+                "Upload a copy of your registered Philippine National ID (PhilSys) for identity verification.",
+                required=True,
+            ),
+        )
+        document_note = (
+            "Upload the required documents for a lost MySSS Card replacement request. "
+            "Files saved here are not submitted to SSS."
+        )
+        upload_intro = (
+            "Upload a clear PDF or photo of each document listed for this replacement request. "
+            "OneGov PH stores the copy you choose. It is not submitted to SSS."
+        )
+    elif is_mysss_card and selected_type == SSS_MYSSS_TYPE_DAMAGED:
+        documents = (
+            _document(
+                "sss_number_proof",
+                "Permanent SSS Number",
+                "Upload a record, card copy, or document showing your permanent SSS Number.",
+                required=True,
+            ),
+            _document(
+                "valid_government_id",
+                "Valid Government-Issued ID",
+                "Upload a clear copy of a valid government-issued ID.",
+                required=True,
+            ),
+            _document(
+                "damaged_mysss_card",
+                "Previously Issued Damaged MySSS Card",
+                "Upload a clear photo or copy of your previously issued damaged MySSS Card.",
+                required=True,
+            ),
+            _document(
+                "registered_national_id",
+                "Registered National ID (for identity verification)",
+                "Upload a copy of your registered Philippine National ID (PhilSys) for identity verification.",
+                required=True,
+            ),
+        )
+        document_note = (
+            "Upload the required documents for a damaged MySSS Card replacement request. "
+            "Files saved here are not submitted to SSS."
+        )
+        upload_intro = (
+            "Upload a clear PDF or photo of each document listed for this replacement request. "
+            "OneGov PH stores the copy you choose. It is not submitted to SSS."
+        )
+    else:
+        documents = (
+            _sss_document(
+                "valid_id",
+                "Section A: Primary identification",
+                "Choose one primary ID (Driver’s License, Philippine Passport, PhilSys National ID / ePhilID, PRC ID, UMID Card, or Seaman’s Book), then upload a clear PDF or photo of that same ID.",
+                required_when=primary_yes,
+                id_choices="sss",
+                status_label="Required",
+            ),
+            _sss_document(
+                "alt_id_1",
+                "Section B: Alternative identification — first document",
+                "Shown only when you cannot provide a primary ID. Upload the first of two alternative documents (for example Barangay ID, NBI Clearance, School ID, Birth Certificate, TIN ID, or Police Clearance).",
+                required_when=primary_no,
+                id_choices="sss_alt",
+                status_label="Required",
+            ),
+            _sss_document(
+                "alt_id_2",
+                "Section B: Alternative identification — second document",
+                "Upload a second alternative document that differs from the first. Common pairs: Barangay ID + NBI Clearance, School ID + Birth Certificate, or TIN ID + Police Clearance.",
+                required_when=primary_no,
+                id_choices="sss_alt",
+                status_label="Required",
+            ),
+        )
+        document_note = (
+            "Section A accepts one primary government ID. "
+            "Section B appears only when you cannot provide a primary ID, and then two alternative documents are required. "
+            "Files saved here are not submitted to SSS."
+        )
+        upload_intro = (
+            "Upload a clear PDF or photo of each required identification document. "
+            "OneGov PH stores the copy you choose. It is not submitted to SSS."
+        )
+    base = {
         "kind": "sss",
         "kicker": "Social Security assistance",
         "department_label": "Social Security System (SSS)",
-        "service_title": "SS Number Registration Assistance and Tracking",
+        "service_title": service_name or "SS Number Registration Assistance and Tracking",
         "process": SSS_DESCRIPTION,
         "disclaimer": SSS_NOTICE,
         "fee_note": SSS_FEE_NOTE,
         "fields": fields,
         "documents": documents,
-        "document_note": (
-            "Section A accepts one primary government ID. "
-            "Section B appears only when you cannot provide a primary ID, and then two alternative documents are required. "
-            "Files saved here are not submitted to SSS."
-        ),
-        "upload_intro": (
-            "Upload a clear PDF or photo of each required identification document. "
-            "OneGov PH stores the copy you choose. It is not submitted to SSS."
-        ),
+        "document_note": document_note,
+        "upload_intro": upload_intro,
         "upload_accept": ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png",
         "reference_label": "OneGov PH reference number",
         "private_keys": SSS_PRIVATE_KEYS,
@@ -2549,6 +2671,70 @@ def compose_sss(values=None):
         "document_statuses": SSS_DOCUMENT_STATUSES,
         "file_rules": SSS_FILE_RULES,
     }
+    if is_mysss_card:
+        requires_schedule = selected_type == SSS_MYSSS_TYPE_NEW
+        base.update({
+            "type_first": True,
+            "type_options": SSS_MYSSS_TYPE_OPTIONS,
+            "step_labels": (
+                (
+                    "1. Application type",
+                    "2. Application details",
+                    "3. Documents",
+                    "4. Review",
+                    "5. Scheduling",
+                    "6. Delivery",
+                    "7. Payment",
+                    "8. Confirmation",
+                )
+                if requires_schedule
+                else (
+                    "1. Application type",
+                    "2. Application details",
+                    "3. Documents",
+                    "4. Review",
+                    "5. Delivery",
+                    "6. Payment",
+                    "7. Confirmation",
+                )
+            ),
+            "confirmation_step": 8 if requires_schedule else 7,
+            "payment_after_review": False,
+            "review_before_schedule": requires_schedule,
+            "submit_label": "Continue to scheduling" if requires_schedule else "Continue to delivery",
+            "service_title": "SS Number Registration Assistance and Tracking",
+            "process": (
+                "Choose the MySSS Card request that applies to you, prepare your details and identification, "
+                "and track this assistance request in OneGov PH. SSS remains the official channel for issuance or replacement."
+            ),
+            "submit_event": (
+                "MySSS Card assistance request and demonstration appointment were saved for tracking. "
+                "No payment was required. SSS has not received this as an official filing."
+                if requires_schedule
+                else "MySSS Card assistance request saved for tracking. "
+                "No payment was required. SSS has not received this as an official filing."
+            ),
+            "submit_notice": (
+                "Your MySSS Card assistance request {reference} was submitted in OneGov PH. "
+                "No payment was collected. Complete the official SSS process through SSS channels."
+            ),
+            "reminders": [
+                "Select the correct MySSS Card request type before entering your details.",
+                "OneGov PH does not issue or replace a MySSS Card and does not send this form to SSS.",
+                "Upload one primary ID when you have one. Otherwise upload two alternative documents.",
+            ],
+            "next_steps": [
+                "Complete the official MySSS Card application or replacement process through SSS channels.",
+                "Keep the OneGov PH reference number for tracking this assistance request.",
+                "Record any SSS reference or card update details here when available.",
+            ],
+        })
+        if requires_schedule:
+            base["reminders"].insert(1, "New MySSS Card applications include a demonstration appointment in OneGov PH; this is not an official SSS booking.")
+            base["next_steps"].insert(0, "Attend the demonstration appointment you scheduled and bring the required identification for verification through SSS channels.")
+        else:
+            base["next_steps"].insert(0, "Provide your home delivery details for this assistance request before payment.")
+    return base
 
 
 
@@ -2574,7 +2760,7 @@ def specification_for(service, values=None):
     if spec.get("compose") == "cenomar":
         return compose_cenomar(values or {})
     if spec.get("compose") == "sss":
-        return compose_sss(values or {})
+        return compose_sss(values or {}, service_name=service.service_name)
     result = {
         "process": spec["process"],
         "fields": PERSONAL_FIELDS + spec["fields"],

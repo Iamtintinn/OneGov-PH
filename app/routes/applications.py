@@ -145,7 +145,7 @@ def apply_type(service_id):
     kind = spec.get("kind")
     if not (
         spec.get("type_first")
-        and kind in {"passport", "barangay", "residency", "senior", "nbi", "birth", "cenomar", "philsys"}
+        and kind in {"passport", "barangay", "residency", "senior", "nbi", "birth", "cenomar", "philsys", "sss"}
     ):
         return redirect(url_for("citizen.apply_details", service_id=service.service_id))
 
@@ -229,6 +229,18 @@ def apply_type(service_id):
         type_intro = (
             "Choose the National ID request that matches your situation. "
             "Required document uploads depend on this choice."
+        )
+    elif kind == "sss":
+        from app.services.application_forms import SSS_MYSSS_TYPE_OPTIONS as TYPE_OPTIONS
+        from app.services.application_service import save_sss_application_type
+
+        save_type = save_sss_application_type
+        next_endpoint = "citizen.apply_details"
+        next_kwargs = {"service_id": service.service_id}
+        continue_label = "Continue to application details"
+        type_heading = "MySSS Card application types"
+        type_intro = (
+            "Choose the MySSS Card request that matches your situation before entering your details."
         )
     else:
         from app.services.passport_requirements import PASSPORT_TYPE_OPTIONS as TYPE_OPTIONS
@@ -342,6 +354,10 @@ def apply_details(service_id):
         return redirect(url_for("citizen.apply_type", service_id=service.service_id))
     if spec.get("kind") == "philsys" and spec.get("type_first") and not philsys_type_ready(draft):
         return redirect(url_for("citizen.apply_type", service_id=service.service_id))
+    if spec.get("kind") == "sss" and spec.get("type_first"):
+        from app.services.application_service import sss_type_ready
+        if not sss_type_ready(draft):
+            return redirect(url_for("citizen.apply_type", service_id=service.service_id))
     if request.method == "POST":
         stored, errors = validate_answers(
             service,
@@ -369,7 +385,7 @@ def apply_details(service_id):
     details_step = (
         2
         if (
-            spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar", "philsys"}
+            spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar", "philsys", "sss"}
             and spec.get("type_first")
         )
         else 1
@@ -414,6 +430,10 @@ def apply_documents(application_id):
         return redirect(url_for("citizen.apply_type", service_id=application.service_id))
     if spec.get("kind") == "philsys" and spec.get("type_first") and not philsys_type_ready(application):
         return redirect(url_for("citizen.apply_type", service_id=application.service_id))
+    if spec.get("kind") == "sss" and spec.get("type_first"):
+        from app.services.application_service import sss_type_ready
+        if not sss_type_ready(application):
+            return redirect(url_for("citizen.apply_type", service_id=application.service_id))
     if spec.get("kind") == "cenomar":
         from app.services.application_forms import cenomar_incomplete_step
 
@@ -425,7 +445,7 @@ def apply_documents(application_id):
     if spec.get("kind") == "passport" and spec.get("type_first"):
         document_step = 2
     elif (
-        spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar", "philsys"}
+        spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar", "philsys", "sss"}
         and spec.get("type_first")
     ):
         document_step = 3
@@ -689,7 +709,7 @@ def apply_schedule(application_id):
     values = field_map(application)
     spec = specification_for(application.service, values)
     kind = spec.get("kind")
-    if kind not in {"passport", "nbi", "philsys", "barangay", "senior"}:
+    if kind not in {"passport", "nbi", "philsys", "barangay", "senior", "sss"}:
         return redirect(url_for("citizen.apply_review", application_id=application.application_id))
     if missing_documents(application, spec) and kind != "barangay":
         flash("Upload every required document before scheduling.", "warning")
@@ -751,7 +771,7 @@ def apply_schedule(application_id):
             location_by_code,
             save_appointment,
         )
-    else:
+    elif kind == "nbi":
         if not nbi_type_ready(application):
             flash("Select an application type before scheduling.", "warning")
             return redirect(url_for("citizen.apply_type", service_id=application.service_id))
@@ -771,6 +791,31 @@ def apply_schedule(application_id):
             location_by_code,
             save_appointment,
         )
+    elif kind == "sss":
+        from app.services.application_forms import SSS_MYSSS_TYPE_NEW
+        from app.services.application_service import sss_type_ready
+
+        if spec.get("type_first") and not sss_type_ready(application):
+            flash("Select an application type before scheduling.", "warning")
+            return redirect(url_for("citizen.apply_type", service_id=application.service_id))
+        if field_map(application).get("application_type") != SSS_MYSSS_TYPE_NEW:
+            flash("Scheduling is only required for New Application – MySSS Card requests.", "warning")
+            return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+        if not read_fields(application):
+            flash("Complete the application details before scheduling.", "warning")
+            return redirect(url_for("citizen.apply_details", service_id=application.service_id))
+        if not sss_review_ready(application):
+            flash("Review your application before scheduling.", "warning")
+            return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+        from app.services.sss_scheduling import (
+            LOCATIONS,
+            appointment_for,
+            available_month_calendars,
+            location_by_code,
+            save_appointment,
+        )
+    else:
+        return redirect(url_for("citizen.apply_review", application_id=application.application_id))
 
     selected_location = request.values.get("location_code") or (appointment_for(application) or {}).get(
         "location_code"
@@ -788,12 +833,15 @@ def apply_schedule(application_id):
         )
         if error:
             flash(error, "warning")
-        elif kind in {"passport", "senior", "nbi"} or (kind == "philsys" and spec.get("type_first")):
+        elif (
+            kind in {"passport", "senior", "nbi", "sss"}
+            or (kind == "philsys" and spec.get("type_first"))
+        ):
             return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
         else:
             return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
 
-    if kind in {"passport", "barangay", "residency", "senior", "nbi", "philsys"} and spec.get("type_first"):
+    if kind in {"passport", "barangay", "residency", "senior", "nbi", "philsys", "sss"} and spec.get("type_first"):
         schedule_step = 5
     else:
         schedule_step = 4
@@ -1264,13 +1312,124 @@ def apply_delivery(application_id):
                 }
             )
             return render_template("applications/apply_passport_fulfillment.html", **context)
+    elif kind == "sss":
+        if not sss_review_ready(application):
+            flash("Review your application before setting the delivery details.", "warning")
+            return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+        from app.services.application_forms import SSS_MYSSS_TYPE_NEW
+        from app.services.sss_delivery import (
+            CITY,
+            DEFAULT_LAT,
+            DEFAULT_LNG,
+            DELIVERY,
+            DELIVERY_FEE,
+            DEMO_BARANGAYS,
+            PICKUP,
+            PROVINCE,
+            REGION,
+            delivery_address,
+            delivery_only,
+            delivery_ready,
+            delivery_values,
+            fulfillment_method,
+            save_delivery,
+            save_pickup,
+            sss_center,
+            validate_delivery_form,
+        )
+        from app.services.sss_scheduling import appointment_for
+
+        is_new = field_map(application).get("application_type") == SSS_MYSSS_TYPE_NEW
+        appointment = appointment_for(application) if is_new else None
+        if is_new and appointment is None:
+            flash("Select a demonstration appointment before choosing delivery.", "warning")
+            return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
+        delivery_step = 6 if is_new else 5
+        sss_delivery_only = delivery_only(application)
+
+        if request.method == "POST":
+            choice = clean_text(request.form.get("fulfillment_method")).lower()
+            if choice == PICKUP and sss_delivery_only:
+                flash("Pickup is not available for this application type. Choose home delivery.", "warning")
+                return redirect(
+                    url_for(
+                        "citizen.apply_delivery",
+                        application_id=application.application_id,
+                        method=DELIVERY,
+                    )
+                )
+            if choice == PICKUP:
+                error = save_pickup(application, current_user)
+                if error:
+                    flash(error, "warning")
+                else:
+                    flash("MySSS Card pickup selected.", "success")
+                    return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+            elif choice == DELIVERY:
+                fulfillment_choice = DELIVERY
+            else:
+                flash(
+                    "Choose home delivery." if sss_delivery_only else "Choose pickup or home delivery.",
+                    "warning",
+                )
+                return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
+
+        if request.method != "POST":
+            fulfillment_choice = (
+                clean_text(request.values.get("method")).lower()
+                or fulfillment_method(application)
+            )
+        if sss_delivery_only and fulfillment_choice != DELIVERY:
+            return redirect(
+                url_for(
+                    "citizen.apply_delivery",
+                    application_id=application.application_id,
+                    method=DELIVERY,
+                )
+            )
+        if fulfillment_choice == PICKUP:
+            return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+        if fulfillment_choice not in {PICKUP, DELIVERY}:
+            context = _common(application, delivery_step)
+            back_endpoint = "citizen.apply_schedule" if is_new else "citizen.apply_review"
+            context.update(
+                {
+                    "appointment": appointment,
+                    "delivery_back_url": url_for(back_endpoint, application_id=application.application_id),
+                    "fulfillment_options": (
+                        {
+                            "key": PICKUP,
+                            "title": "Pick up at the SSS or partner office",
+                            "help": (
+                                "Collect your MySSS Card at the selected SSS or partner office. "
+                                "No delivery fee is added."
+                            ),
+                            "href": None,
+                        },
+                        {
+                            "key": DELIVERY,
+                            "title": "Request home delivery",
+                            "help": (
+                                "Pin your delivery address on the map. Home delivery is free for this "
+                                "MySSS Card assistance request in OneGov PH."
+                            ),
+                            "href": url_for(
+                                "citizen.apply_delivery",
+                                application_id=application.application_id,
+                                method=DELIVERY,
+                            ),
+                        },
+                    ),
+                }
+            )
+            return render_template("applications/apply_passport_fulfillment.html", **context)
     else:
         return redirect(url_for("citizen.application_continue", application_id=application.application_id))
 
     values = delivery_values(application)
     errors = {}
     if request.method == "POST":
-        if kind in {"passport", "senior", "nbi", "philsys"}:
+        if kind in {"passport", "senior", "nbi", "philsys", "sss"}:
             values, errors = validate_delivery_form(request.form, application)
         else:
             values, errors = validate_delivery_form(request.form)
@@ -1345,6 +1504,12 @@ def apply_delivery(application_id):
                 initial_lat, initial_lng = center["latitude"], center["longitude"]
             else:
                 initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
+        elif kind == "sss":
+            center = sss_center(values.get("barangay") or field_map(application).get("barangay"))
+            if center:
+                initial_lat, initial_lng = center["latitude"], center["longitude"]
+            else:
+                initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
         else:
             center = barangay_center(values.get("barangay") or field_map(application).get("barangay"))
             if center:
@@ -1355,7 +1520,7 @@ def apply_delivery(application_id):
     delivery_region_val = REGION
     context = _common(application, delivery_step)
     delivery_address_preview = ""
-    if kind in {"birth", "cenomar", "passport", "senior", "nbi", "philsys"}:
+    if kind in {"birth", "cenomar", "passport", "senior", "nbi", "philsys", "sss"}:
         delivery_address_preview = delivery_address(
             {
                 "house_number": values.get("house_number"),
@@ -1392,6 +1557,10 @@ def apply_delivery(application_id):
         from app.services.philsys_payment import payment_summary as philsys_payment_summary
 
         context["philsys_payment_summary"] = philsys_payment_summary(application)
+    elif kind == "sss":
+        from app.services.sss_payment import payment_summary as sss_payment_summary
+
+        context["sss_payment_summary"] = sss_payment_summary(application)
     context.update(
         {
             "values": values,
@@ -1405,10 +1574,10 @@ def apply_delivery(application_id):
             "delivery_saved": delivery_ready(application),
             "initial_lat": initial_lat,
             "initial_lng": initial_lng,
-            "show_origin_map": kind in {"barangay", "residency", "birth", "cenomar", "passport", "senior", "nbi", "philsys"},
-            "fixed_origin_map": kind in {"birth", "cenomar", "passport", "senior", "nbi", "philsys"},
-            "auto_pin_map": kind in {"barangay", "residency", "birth", "cenomar", "passport", "senior", "nbi", "philsys"},
-            "fulfillment_method": DELIVERY if kind in {"passport", "senior", "nbi", "philsys"} else "",
+            "show_origin_map": kind in {"barangay", "residency", "birth", "cenomar", "passport", "senior", "nbi", "philsys", "sss"},
+            "fixed_origin_map": kind in {"birth", "cenomar", "passport", "senior", "nbi", "philsys", "sss"},
+            "auto_pin_map": kind in {"barangay", "residency", "birth", "cenomar", "passport", "senior", "nbi", "philsys", "sss"},
+            "fulfillment_method": DELIVERY if kind in {"passport", "senior", "nbi", "philsys", "sss"} else "",
             "delivery_back_url": (
                 url_for("citizen.apply_schedule", application_id=application.application_id)
                 if (
@@ -1417,6 +1586,11 @@ def apply_delivery(application_id):
                         kind == "philsys"
                         and spec.get("review_before_schedule")
                         and not scheduling_skipped(field_map(application).get("application_type"))
+                    )
+                    or (
+                        kind == "sss"
+                        and spec.get("type_first")
+                        and field_map(application).get("application_type") == "New Application – MySSS Card"
                     )
                 )
                 else url_for("citizen.apply_review", application_id=application.application_id)
@@ -1571,6 +1745,8 @@ def apply_payment(application_id):
         record_demo_payment = None
         start_maya_checkout = None
     elif kind == "sss":
+        from app.services.application_forms import SSS_MYSSS_TYPE_NEW
+        from app.services.sss_delivery import delivery_ready
         from app.services.sss_payment import confirm_free_application, payment_summary
 
         if not read_fields(application):
@@ -1579,8 +1755,33 @@ def apply_payment(application_id):
         if not sss_review_ready(application):
             flash("Review your application before payment.", "warning")
             return redirect(url_for("citizen.apply_review", application_id=application.application_id))
-        payment_step = 4
-        back_endpoint = "citizen.apply_review"
+        if spec.get("type_first") and values.get("application_type") == SSS_MYSSS_TYPE_NEW:
+            from app.services.sss_scheduling import appointment_for
+
+            if appointment_for(application) is None:
+                flash("Select a demonstration appointment before payment.", "warning")
+                return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
+            if not delivery_ready(application):
+                flash("Choose pickup or home delivery before payment.", "warning")
+                return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
+            payment_step = 7
+            back_endpoint = "citizen.apply_delivery"
+        elif spec.get("type_first"):
+            if not delivery_ready(application):
+                from app.services.sss_delivery import delivery_only
+
+                flash(
+                    "Set your home delivery details before payment."
+                    if delivery_only(application)
+                    else "Choose pickup or home delivery before payment.",
+                    "warning",
+                )
+                return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
+            payment_step = 6
+            back_endpoint = "citizen.apply_delivery"
+        else:
+            payment_step = 4
+            back_endpoint = "citizen.apply_review"
         free_payment = True
         ONLINE_METHODS = ()
         record_demo_payment = None
@@ -1937,7 +2138,7 @@ def apply_review(application_id):
         return redirect(url_for("citizen.application_continue", application_id=application.application_id))
     if spec.get("kind") == "passport" and spec.get("type_first"):
         review_step = 4
-    elif spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar", "philsys"} and spec.get(
+    elif spec.get("kind") in {"barangay", "residency", "senior", "nbi", "birth", "cenomar", "philsys", "sss"} and spec.get(
         "type_first"
     ):
         review_step = 4
@@ -2071,7 +2272,20 @@ def apply_submit(application_id):
             return redirect(url_for("citizen.apply_type", service_id=application.service_id))
         mark_senior_reviewed(application)
         return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
-    if spec.get("kind") in {"barangay", "residency", "senior", "birth", "cenomar", "sss"} or spec.get(
+    if spec.get("kind") == "sss":
+        if missing_documents(application, spec):
+            flash("Upload every required document before continuing.", "warning")
+            return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
+        if not read_fields(application):
+            flash("Complete the application details before continuing.", "warning")
+            return redirect(url_for("citizen.apply_details", service_id=application.service_id))
+        mark_sss_reviewed(application)
+        from app.services.application_forms import SSS_MYSSS_TYPE_NEW
+
+        if spec.get("type_first") and field_map(application).get("application_type") == SSS_MYSSS_TYPE_NEW:
+            return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
+        return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
+    if spec.get("kind") in {"barangay", "residency", "senior", "birth", "cenomar"} or spec.get(
         "payment_after_review"
     ):
         if missing_documents(application, spec) and spec.get("kind") != "barangay":
@@ -2088,8 +2302,6 @@ def apply_submit(application_id):
             mark_birth_reviewed(application)
         elif spec.get("kind") == "cenomar":
             mark_cenomar_reviewed(application)
-        elif spec.get("kind") == "sss":
-            mark_sss_reviewed(application)
         else:
             mark_barangay_reviewed(application)
         if spec.get("kind") in {"barangay", "residency", "birth", "cenomar"}:
@@ -2303,12 +2515,21 @@ def apply_confirmation(application_id):
         context["payment_skipped"] = payment_skipped(answers.get("application_type"))
     elif spec.get("kind") == "sss":
         from app.services.sss_confirmation_pdf import confirmation_id_for, ensure_confirmation_pdf
+        from app.services.sss_delivery import delivery_address, delivery_for
         from app.services.sss_payment import payment_summary
+        from app.services.sss_requirements import bring_requirements_for
+        from app.services.sss_scheduling import appointment_for
 
         answers = field_map(application)
         ensure_confirmation_pdf(application)
         context["summary"] = payment_summary(application)
         context["confirmation_id"] = confirmation_id_for(application)
+        context["appointment"] = appointment_for(application)
+        context["delivery"] = delivery_for(application)
+        context["delivery_address"] = (
+            delivery_address(context["delivery"]) if context["delivery"] else ""
+        )
+        context["bring_requirements"] = bring_requirements_for(answers.get("application_type"))
         context["sss_answers"] = {
             "full_name": " ".join(
                 part

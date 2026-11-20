@@ -89,21 +89,6 @@
                     </div>
                 </section>
 
-                {% if spec.kind == 'sss' and spec.official_url %}
-                <section class="pay-panel confirm-panel confirm-panel--next review-panel">
-                    <div class="pay-panel-head confirm-panel-head">
-                        <span class="confirm-panel-icon confirm-panel-icon--green" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M14 3h7v7h-2V6.4l-9.3 9.3-1.4-1.4L17.6 5H14V3zM5 5h6v2H7v10h10v-4h2v6H5V5z"/></svg>
-                        </span>
-                        <div>
-                            <h2>{{ spec.official_heading }}</h2>
-                            <p>{{ spec.official_text }}</p>
-                        </div>
-                    </div>
-                    <p><a class="dash-button pay-btn-primary" href="{{ spec.official_url }}" target="_blank" rel="noopener noreferrer">{{ spec.official_action }}</a></p>
-                    <p class="field-help">Opening this link does not register you with SSS, does not generate an SS Number, and does not change the OneGov PH status. Save the request below if you want OneGov PH to keep monitoring it.</p>
-                </section>
-                {% endif %}
             </div>
 
             <aside class="review-side" aria-label="Documents and summary">

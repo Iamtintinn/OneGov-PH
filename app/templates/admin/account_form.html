@@ -60,6 +60,16 @@
         </form>
     </section>
 
+    {% if account.account_status == 'active' and account.user_id != current_user.user_id %}
+    <section class="admin-panel admin-password-panel">
+        <div><p class="admin-eyebrow">ACCOUNT STATUS</p><h2>Deactivate account</h2><p>Deactivate this user account to prevent sign-in. The account record and history are kept.</p></div>
+        <form method="post" action="{{ url_for('admin.account_detail', user_id=account.user_id) }}" onsubmit="return confirm('Deactivate this user account? They will no longer be able to sign in.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="deactivate">
+            <button class="admin-button admin-button--danger" type="submit">Deactivate account</button>
+        </form>
+    </section>
+    {% endif %}
+
     <section class="admin-panel admin-table-panel">
         <div class="admin-panel-heading"><div><p class="admin-eyebrow">ACCOUNT HISTORY</p><h2>Applications</h2></div><span class="admin-count-chip">{{ account_applications|length }} shown</span></div>
         {% if account_applications %}

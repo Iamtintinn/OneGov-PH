@@ -61,6 +61,7 @@ def read_details(application):
         "birth_reviewed": bool(raw.get("birth_reviewed")),
         "cenomar_reviewed": bool(raw.get("cenomar_reviewed")),
         "philsys_reviewed": bool(raw.get("philsys_reviewed")),
+        "sss_reviewed": bool(raw.get("sss_reviewed")),
     }
     if raw.get("appointment"):
         details["appointment"] = raw["appointment"]
@@ -108,6 +109,8 @@ def write_details(application, details, commit=True):
         payload["cenomar_reviewed"] = True
     if details.get("philsys_reviewed"):
         payload["philsys_reviewed"] = True
+    if details.get("sss_reviewed"):
+        payload["sss_reviewed"] = True
     if details.get("appointment"):
         payload["appointment"] = details["appointment"]
     if details.get("delivery"):
@@ -668,8 +671,8 @@ def requirement_for(application, document_key):
 def missing_documents(application, spec):
     if spec.get("checklist"):
         return missing_checklist(application, spec)
-    # Temporary: allow Senior Citizen ID, NBI, and PhilSys registration to continue without uploaded documents.
-    if spec.get("kind") in {"senior", "nbi"} or (
+    # Temporary: allow Senior Citizen ID, NBI, PhilSys, and SSS flows to continue without uploaded documents.
+    if spec.get("kind") in {"senior", "nbi", "sss"} or (
         spec.get("kind") == "philsys" and spec.get("type_first")
     ):
         return []
@@ -1394,6 +1397,33 @@ def save_senior_application_type(application, application_type):
     return None
 
 
+
+def sss_type_ready(application):
+    """True when an SSS MySSS Card application type was selected on step 1."""
+    from app.services.application_forms import normalize_sss_mysss_type
+
+    return bool(normalize_sss_mysss_type(field_map(application).get("application_type")))
+
+
+def save_sss_application_type(application, application_type):
+    """Store the SSS MySSS Card application type without wiping other draft answers."""
+    from app.services.application_forms import normalize_sss_mysss_type
+
+    selected = normalize_sss_mysss_type(application_type)
+    if not selected:
+        return "Select an application type."
+    details = read_details(application)
+    details["fields"] = _upsert_field(
+        details["fields"],
+        "application_type",
+        "Application type",
+        selected,
+        "Request type",
+    )
+    write_details(application, details)
+    return None
+
+
 def nbi_type_ready(application):
     """True when an NBI clearance application type was selected on step 1."""
     from app.services.nbi_requirements import NBI_APPLICATION_TYPES, normalize_nbi_type
@@ -1818,13 +1848,25 @@ def continue_target(application):
             return "delivery"
         return "payment"
     if spec.get("kind") == "sss":
+        if spec.get("type_first") and not sss_type_ready(application):
+            return "type"
         if not read_fields(application):
             return "details"
         if missing_documents(application, spec):
             return "documents"
-        reviewed = sss_review_ready(application)
-        if not reviewed:
+        if not sss_review_ready(application):
             return "review"
+        if spec.get("type_first"):
+            from app.services.application_forms import SSS_MYSSS_TYPE_NEW
+            from app.services.sss_delivery import delivery_ready
+
+            if field_map(application).get("application_type") == SSS_MYSSS_TYPE_NEW:
+                from app.services.sss_scheduling import appointment_for
+
+                if appointment_for(application) is None:
+                    return "schedule"
+            if not delivery_ready(application):
+                return "delivery"
         return "payment"
     if spec.get("documents_first"):
         if missing_documents(application, spec):

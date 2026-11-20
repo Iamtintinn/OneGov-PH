@@ -259,20 +259,39 @@
                         {% elif summary.service_kind == 'sss' %}
                         <div>
                             <dt>Applicant</dt>
-                            <dd>{{ summary.full_name or "—" }}</dd>
+                            <dd>{{ summary.applicant_name or summary.full_name or "—" }}</dd>
+                        </div>
+                        {% if summary.mysss_type_label %}
+                        <div>
+                            <dt>Request type</dt>
+                            <dd>{{ summary.mysss_type_label }}</dd>
+                        </div>
+                        {% endif %}
+                        {% if summary.appointment %}
+                        <div>
+                            <dt>Appointment</dt>
+                            <dd>{{ summary.appointment.appointment_date }} · {{ summary.appointment.appointment_time }}</dd>
                         </div>
                         <div>
-                            <dt>Barangay</dt>
-                            <dd>{{ summary.barangay or "—" }}</dd>
+                            <dt>Appointment office</dt>
+                            <dd>{{ summary.appointment.location_label or "—" }}</dd>
                         </div>
+                        {% endif %}
                         <div>
-                            <dt>City / municipality</dt>
-                            <dd>{{ summary.city or "—" }}</dd>
+                            <dt>Fulfillment</dt>
+                            <dd>{{ summary.fulfillment_label or "—" }}</dd>
                         </div>
+                        {% if summary.delivery and summary.delivery.method == 'delivery' %}
                         <div>
-                            <dt>Primary ID available</dt>
-                            <dd>{{ summary.has_primary_id or "—" }}</dd>
+                            <dt>Delivery address</dt>
+                            <dd>{{ summary.delivery_address or "—" }}</dd>
                         </div>
+                        {% elif summary.delivery %}
+                        <div>
+                            <dt>Pickup office</dt>
+                            <dd>{{ summary.delivery.pickup_location or "—" }}</dd>
+                        </div>
+                        {% endif %}
                         <div>
                             <dt>Payment required</dt>
                             <dd>{{ summary.payment_required_label or "No" }}</dd>

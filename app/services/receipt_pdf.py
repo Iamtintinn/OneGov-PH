@@ -179,7 +179,8 @@ def write_receipt_pdf(path, data):
             detail_row(label, value)
 
     bring_items = list(data.get("bring_items") or ())
-    if bring_items:
+    bring_lead = str(data.get("bring_lead") or "").strip()
+    if bring_items or bring_lead:
         if y < 55 * mm:
             pdf.showPage()
             y = height - 25 * mm
@@ -196,6 +197,19 @@ def write_receipt_pdf(path, data):
                 pdf.drawString(left, y, line)
                 y -= 4 * mm
             y -= 1.5 * mm
+        if bring_lead:
+            pdf.setFillColorRGB(0.12, 0.16, 0.22)
+            pdf.setFont("Helvetica-Bold", 9)
+            lead_lines = wrap_text(pdf, bring_lead, "Helvetica-Bold", 9, content_width - 2 * mm)
+            for line in lead_lines:
+                if y < 28 * mm:
+                    pdf.showPage()
+                    y = height - 25 * mm
+                    pdf.setFillColorRGB(0.12, 0.16, 0.22)
+                    pdf.setFont("Helvetica-Bold", 9)
+                pdf.drawString(left, y, line)
+                y -= 4.2 * mm
+            y -= 1.2 * mm
         pdf.setFillColorRGB(0.12, 0.16, 0.22)
         pdf.setFont("Helvetica", 9)
         for index, item in enumerate(bring_items, start=1):

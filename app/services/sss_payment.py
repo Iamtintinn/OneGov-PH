@@ -8,7 +8,7 @@ from sqlalchemy import update
 from app import db
 from app.models.application import Application
 from app.models.notification import Notification
-from app.services.application_forms import specification_for
+from app.services.application_forms import SSS_MYSSS_TYPE_NEW, specification_for
 from app.services.application_service import field_map, missing_documents, read_details, write_details
 from app.services.tracking_service import add_event
 
@@ -43,6 +43,7 @@ def fee_configuration(application=None):
 
 def payment_summary(application):
     answers = field_map(application)
+    spec = specification_for(application.service, answers) or {}
     config = fee_configuration(application)
     amount = NEW_APPLICATION_FEE
     full_name = " ".join(
@@ -54,19 +55,55 @@ def payment_summary(application):
         )
         if part
     ).strip()
+    fulfillment_label = "—"
+    delivery_fee = Decimal("0.00")
+    delivery = None
+    appointment = None
+    delivery_address = ""
+    if spec.get("type_first"):
+        from app.services.sss_delivery import delivery_address_display, delivery_fee_for, delivery_for, fulfillment_method
+        from app.services.sss_scheduling import appointment_for
+
+        method = fulfillment_method(application)
+        delivery = delivery_for(application)
+        appointment = appointment_for(application)
+        delivery_fee = delivery_fee_for(application)
+        delivery_address = delivery_address_display(application) if method == "delivery" else ""
+        fulfillment_label = (
+            "Home delivery"
+            if method == "delivery"
+            else "Pickup at SSS/partner office"
+            if method
+            else "—"
+        )
+    mysss_type_label = (
+        answers.get("application_type")
+        if spec.get("type_first") and answers.get("application_type")
+        else None
+    )
     return {
         "service_kind": "sss",
-        "application_type": "SSS assistance",
-        "full_name": full_name,
+        "application_type": answers.get("application_type") or "SSS assistance",
+        "mysss_type_label": mysss_type_label,
+        "applicant_name": full_name or answers.get("full_name") or "",
+        "full_name": full_name or answers.get("full_name") or "",
+        "birthdate": answers.get("date_of_birth") or answers.get("birthdate") or "",
+        "contact_mobile": answers.get("mobile_number") or answers.get("contact_mobile") or "",
         "barangay": answers.get("barangay") or "",
         "city": answers.get("city") or "",
         "has_primary_id": answers.get("has_primary_id") or "",
+        "fulfillment_label": fulfillment_label,
+        "delivery": delivery,
+        "delivery_address": delivery_address,
+        "appointment": appointment,
         "amount": amount,
         "amount_display": f"₱{amount:,.2f}",
         "application_fee": amount,
         "application_fee_display": f"₱{amount:,.2f}",
         "processing_fee": Decimal("0.00"),
         "processing_fee_display": "₱0.00",
+        "delivery_fee": delivery_fee,
+        "delivery_fee_display": f"₱{delivery_fee:,.2f}",
         "payment": None,
         "method_label": None,
         "status_label": config["payment_status_label"],
@@ -80,13 +117,23 @@ def payment_summary(application):
 
 
 def finalize_sss_application(application, user, new_status="submitted"):
-    """Leave draft after review when no payment is required."""
+    """Leave draft after review, scheduling, and delivery when no payment is required."""
     values = field_map(application)
     spec = specification_for(application.service, values) or {}
     if missing_documents(application, spec):
         return "Upload every required document before you continue."
     if not _is_reviewed(application):
         return "Review your application before payment."
+    if spec.get("type_first"):
+        from app.services.sss_delivery import delivery_ready
+
+        if values.get("application_type") == SSS_MYSSS_TYPE_NEW:
+            from app.services.sss_scheduling import appointment_for
+
+            if appointment_for(application) is None:
+                return "Select a demonstration appointment before payment."
+        if not delivery_ready(application):
+            return "Choose pickup or home delivery before payment."
     if application.application_status != "draft":
         return None
     now = _now()
@@ -153,9 +200,21 @@ def finalize_sss_application(application, user, new_status="submitted"):
 
 
 def confirm_free_application(application, user):
-    """Confirm the free new-application payment step and finalize."""
+    """Confirm the free payment step and finalize."""
+    values = field_map(application)
+    spec = specification_for(application.service, values) or {}
     if not _is_reviewed(application):
         return "Review your application before payment."
+    if spec.get("type_first"):
+        from app.services.sss_delivery import delivery_ready
+
+        if values.get("application_type") == SSS_MYSSS_TYPE_NEW:
+            from app.services.sss_scheduling import appointment_for
+
+            if appointment_for(application) is None:
+                return "Select a demonstration appointment before payment."
+        if not delivery_ready(application):
+            return "Choose pickup or home delivery before payment."
     if application.application_status != "draft":
         return None
     return finalize_sss_application(application, user, "submitted")
