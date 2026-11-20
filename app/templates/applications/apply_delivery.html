@@ -13,9 +13,9 @@
         <header class="pay-hero confirm-hero delivery-page-hero">
             <div class="pay-hero-copy">
                 <p class="pay-kicker">Home delivery</p>
-                <h1 id="delivery-heading">{% if spec.kind == 'passport' %}Where should we deliver your passport?{% elif spec.kind == 'senior' %}Where should we deliver your Senior Citizen ID?{% elif spec.kind == 'nbi' %}Where should we deliver your NBI clearance?{% elif spec.kind in ['residency', 'birth', 'cenomar'] %}Where should we deliver your certificate?{% else %}Where should we deliver your clearance?{% endif %}</h1>
+                <h1 id="delivery-heading">{% if spec.kind == 'passport' %}Where should we deliver your passport?{% elif spec.kind == 'senior' %}Where should we deliver your Senior Citizen ID?{% elif spec.kind == 'nbi' %}Where should we deliver your NBI clearance?{% elif spec.kind == 'philsys' %}Where should we deliver your National ID?{% elif spec.kind in ['residency', 'birth', 'cenomar'] %}Where should we deliver your certificate?{% else %}Where should we deliver your clearance?{% endif %}</h1>
                 <p class="welcome-text">
-                    Pin the exact delivery location on the map first, then complete the recipient and address details below. {% if spec.kind == 'passport' %}Your passport{% elif spec.kind == 'senior' %}Your Senior Citizen ID{% elif spec.kind == 'nbi' %}Your NBI clearance{% elif spec.kind == 'residency' %}Certificate of Residency{% elif spec.kind == 'birth' %}Birth Certificate{% elif spec.kind == 'cenomar' %}CENOMAR{% else %}Barangay Clearance{% endif %} is delivered to this address only.
+                    Pin the exact delivery location on the map first, then complete the recipient and address details below. {% if spec.kind == 'passport' %}Your passport{% elif spec.kind == 'senior' %}Your Senior Citizen ID{% elif spec.kind == 'nbi' %}Your NBI clearance{% elif spec.kind == 'philsys' %}Your National ID{% elif spec.kind == 'residency' %}Certificate of Residency{% elif spec.kind == 'birth' %}Birth Certificate{% elif spec.kind == 'cenomar' %}CENOMAR{% else %}Barangay Clearance{% endif %} is delivered to this address only.
                 </p>
             </div>
             <div class="confirm-success-chip" aria-hidden="true">
@@ -200,7 +200,7 @@
                     <div class="passport-details-fields delivery-fields">
                         <div class="apply-field{% if errors.get('recipient_name') %} has-error{% endif %}">
                             <label for="recipient_name">Recipient full name</label>
-                            <p class="field-help" id="recipient_name-help">Enter the name of the person who will receive the {% if spec.kind == 'passport' %}passport{% elif spec.kind == 'senior' %}Senior Citizen ID{% elif spec.kind in ['residency', 'birth', 'cenomar'] %}certificate{% else %}clearance{% endif %}.</p>
+                            <p class="field-help" id="recipient_name-help">Enter the name of the person who will receive the {% if spec.kind == 'passport' %}passport{% elif spec.kind == 'senior' %}Senior Citizen ID{% elif spec.kind == 'philsys' %}National ID{% elif spec.kind in ['residency', 'birth', 'cenomar'] %}certificate{% else %}clearance{% endif %}.</p>
                             <div class="text-input">
                                 <input id="recipient_name" name="recipient_name" type="text" maxlength="200" autocomplete="off" value="{{ values.recipient_name }}" required aria-describedby="recipient_name-help{% if errors.get('recipient_name') %} recipient_name-error{% endif %}">
                             </div>
@@ -371,6 +371,23 @@
                             <div>
                                 <dt>Total at payment</dt>
                                 <dd>₱{{ "{:,.2f}".format(nbi_payment_summary.application_fee + nbi_payment_summary.processing_fee + delivery_fee) }}</dd>
+                            </div>
+                            <div>
+                                <dt>Delivery coverage</dt>
+                                <dd>Quezon City demonstration barangays only</dd>
+                            </div>
+                            {% elif spec.kind == 'philsys' %}
+                            <div>
+                                <dt>PhilSys registration fee</dt>
+                                <dd>{{ philsys_payment_summary.application_fee_display }}</dd>
+                            </div>
+                            <div>
+                                <dt>Home delivery fee</dt>
+                                <dd>{{ philsys_payment_summary.delivery_fee_display }}</dd>
+                            </div>
+                            <div>
+                                <dt>Total at payment</dt>
+                                <dd>{{ philsys_payment_summary.amount_display }}</dd>
                             </div>
                             <div>
                                 <dt>Delivery coverage</dt>

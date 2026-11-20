@@ -668,8 +668,10 @@ def requirement_for(application, document_key):
 def missing_documents(application, spec):
     if spec.get("checklist"):
         return missing_checklist(application, spec)
-    # Temporary: allow Senior Citizen ID and NBI continue without uploaded documents.
-    if spec.get("kind") in {"senior", "nbi"}:
+    # Temporary: allow Senior Citizen ID, NBI, and PhilSys registration to continue without uploaded documents.
+    if spec.get("kind") in {"senior", "nbi"} or (
+        spec.get("kind") == "philsys" and spec.get("type_first")
+    ):
         return []
     values = field_map(application)
     missing = []
@@ -1704,10 +1706,16 @@ def continue_target(application):
                 return "documents"
         if not philsys_review_ready(application):
             return "review"
+        from app.services.philsys_requirements import scheduling_skipped
         from app.services.philsys_scheduling import appointment_for
 
-        if appointment_for(application) is None:
+        if not scheduling_skipped(field_map(application).get("application_type")) and appointment_for(application) is None:
             return "schedule"
+        if spec.get("type_first"):
+            from app.services.philsys_delivery import delivery_ready
+
+            if not delivery_ready(application):
+                return "delivery"
         return "payment"
     if spec.get("kind") == "nbi":
         if spec.get("type_first") and not nbi_type_ready(application):

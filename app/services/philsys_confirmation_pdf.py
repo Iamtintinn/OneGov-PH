@@ -6,7 +6,15 @@ from pathlib import Path
 from flask import current_app
 
 from app.services.application_service import field_map, read_details, write_details
+from app.services.philsys_delivery import (
+    DELIVERY,
+    PICKUP,
+    delivery_address,
+    delivery_for,
+    fulfillment_method,
+)
 from app.services.philsys_payment import payment_summary
+from app.services.philsys_requirements import bring_requirements_for
 from app.services.philsys_scheduling import appointment_for
 from app.services.receipt_pdf import write_receipt_pdf
 
@@ -39,6 +47,8 @@ def ensure_confirmation_pdf(application):
     answers = field_map(application)
     summary = payment_summary(application)
     appointment = appointment_for(application) or {}
+    delivery = delivery_for(application)
+    method = fulfillment_method(application)
     conf_id = application.tracking_number
     full_name = summary.get("applicant_name") or " ".join(
         part
@@ -49,6 +59,8 @@ def ensure_confirmation_pdf(application):
         )
         if part
     ).strip() or application.tracking_number
+    bring = bring_requirements_for(answers.get("application_type"))
+    has_bring_items = bool(bring.get("items"))
 
     relative = confirmation.get("pdf_path") or (
         f"{application.application_id}/philsys-confirmation-{secrets.token_hex(4)}.pdf"
@@ -56,6 +68,32 @@ def ensure_confirmation_pdf(application):
     absolute = _upload_root() / relative
     absolute.parent.mkdir(parents=True, exist_ok=True)
     watermark = "DEMONSTRATION ONLY – NOT AN OFFICIAL NATIONAL ID"
+    details_rows = (
+        ("Applicant", full_name),
+        ("Citizenship", answers.get("citizenship") or ""),
+        ("Date of birth", answers.get("date_of_birth") or ""),
+        ("Place of birth", answers.get("place_of_birth") or ""),
+        ("Appointment location", appointment.get("location_label") or ""),
+        ("Appointment date", appointment.get("appointment_date") or ""),
+        ("Appointment time", appointment.get("appointment_time") or ""),
+        (
+            "Date submitted",
+            application.submission_date.strftime("%d %b %Y, %I:%M %p")
+            if application.submission_date
+            else "",
+        ),
+    )
+    if method == DELIVERY:
+        details_rows = details_rows + (
+            ("Fulfillment", "Home delivery"),
+            ("Delivery address", delivery_address(delivery)),
+            ("Recipient", (delivery or {}).get("recipient_name") or ""),
+        )
+    elif method == PICKUP:
+        details_rows = details_rows + (
+            ("Fulfillment", "Pickup at PSA PhilSys registration center"),
+            ("Pickup location", (delivery or {}).get("pickup_location") or ""),
+        )
     write_receipt_pdf(
         absolute,
         {
@@ -67,21 +105,10 @@ def ensure_confirmation_pdf(application):
                 "OneGov PH is an independent portfolio demonstration. "
                 "This is not an official PhilSys registration or National ID."
             ),
-            "details": (
-                ("Applicant", full_name),
-                ("Citizenship", answers.get("citizenship") or ""),
-                ("Date of birth", answers.get("date_of_birth") or ""),
-                ("Place of birth", answers.get("place_of_birth") or ""),
-                ("Appointment location", appointment.get("location_label") or ""),
-                ("Appointment date", appointment.get("appointment_date") or ""),
-                ("Appointment time", appointment.get("appointment_time") or ""),
-                (
-                    "Date submitted",
-                    application.submission_date.strftime("%d %b %Y, %I:%M %p")
-                    if application.submission_date
-                    else "",
-                ),
-            ),
+            "details": details_rows,
+            "bring_title": "Bring to the PSA Registration Center (physical documents)" if has_bring_items else None,
+            "bring_note": bring.get("note") if has_bring_items else None,
+            "bring_items": bring.get("items") or (),
             "fee_lines": (
                 {
                     "label": "PhilSys registration fee",

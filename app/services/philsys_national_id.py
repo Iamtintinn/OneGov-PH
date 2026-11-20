@@ -35,6 +35,7 @@ BIOMETRICS = (
 NEXT_STEPS = (
     "Keep your OneGov PH reference number. It is not a PhilSys transaction number.",
     "Attend the demonstration registration appointment you scheduled, then complete identity verification and biometrics at an authorized PSA center.",
+    "Choose pickup at the PSA registration center or pin a home-delivery address for the demonstration fulfillment record.",
     "Do not send biometric data through OneGov PH.",
     "Registration at the center is free. OneGov PH has not registered you with PhilSys.",
     "When PSA gives you a transaction reference, save it on this request. Saving it does not change your status to Registered.",
@@ -536,20 +537,30 @@ def _legacy_specification(values=None, service_name=None):
 
 
 def _registration_specification(values=None):
-    from app.services.philsys_requirements import document_requirements_for
+    from app.services.philsys_requirements import (
+        document_requirements_for,
+        payment_skipped,
+        scheduling_skipped,
+    )
 
     answers = values or {}
     selected_type = answers.get("application_type") or ""
     doc_info = document_requirements_for(selected_type)
-    step_labels = (
+    skips_payment = payment_skipped(selected_type)
+    skips_schedule = scheduling_skipped(selected_type)
+    steps = [
         "1. Application Type",
         "2. Application details",
         "3. Documents",
         "4. Review",
-        "5. Scheduling",
-        "6. Payment",
-        "7. Confirmation",
-    )
+    ]
+    if not skips_schedule:
+        steps.append(f"{len(steps) + 1}. Scheduling")
+    steps.append(f"{len(steps) + 1}. Delivery")
+    if not skips_payment:
+        steps.append(f"{len(steps) + 1}. Payment")
+    steps.append(f"{len(steps) + 1}. Confirmation")
+    step_labels = tuple(steps)
     return {
         "kind": "philsys",
         "kicker": "National ID assistance",
@@ -574,7 +585,7 @@ def _registration_specification(values=None):
         "review_before_schedule": True,
         "review_back": "documents",
         "submit_label": "Continue to scheduling",
-        "confirmation_step": 7,
+        "confirmation_step": len(step_labels),
         "terms": TERMS,
         "next_steps": NEXT_STEPS,
         "submit_event": (

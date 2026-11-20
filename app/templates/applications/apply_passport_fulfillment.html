@@ -10,11 +10,11 @@
 
         <header class="pay-hero confirm-hero">
             <div class="pay-hero-copy">
-                <p class="pay-kicker">{% if spec.kind == 'passport' %}Passport delivery{% elif spec.kind == 'nbi' %}NBI clearance delivery{% else %}Senior Citizen ID delivery{% endif %}</p>
-                <h1 id="fulfillment-heading" class="passport-details-title">How would you like to receive your {% if spec.kind == 'passport' %}passport{% elif spec.kind == 'nbi' %}NBI clearance{% else %}Senior Citizen ID{% endif %}?</h1>
+                <p class="pay-kicker">{% if spec.kind == 'passport' %}Passport delivery{% elif spec.kind == 'nbi' %}NBI clearance delivery{% elif spec.kind == 'philsys' %}PhilSys delivery{% else %}Senior Citizen ID delivery{% endif %}</p>
+                <h1 id="fulfillment-heading" class="passport-details-title">How would you like to receive your {% if spec.kind == 'passport' %}passport{% elif spec.kind == 'nbi' %}NBI clearance{% elif spec.kind == 'philsys' %}National ID{% else %}Senior Citizen ID{% endif %}?</h1>
                 <p class="welcome-text">
-                    {% if appointment %}Your demonstration appointment is at {{ appointment.location_label or 'your selected NBI Clearance Center' }}.{% elif spec.kind == 'nbi' %}Select a demonstration appointment before choosing delivery.{% else %}Your demonstration appointment is at {{ appointment.location_label or ('your selected DFA office' if spec.kind == 'passport' else 'your selected OSCA office') }}.{% endif %}
-                    Choose pickup to continue straight to payment, or choose home delivery to pin where the {% if spec.kind == 'passport' %}passport{% elif spec.kind == 'nbi' %}NBI clearance{% else %}Senior Citizen ID{% endif %} should be delivered.
+                    {% if appointment %}Your demonstration appointment is at {{ appointment.location_label or ('your selected NBI Clearance Center' if spec.kind == 'nbi' else ('your selected PSA PhilSys registration center' if spec.kind == 'philsys' else ('your selected DFA office' if spec.kind == 'passport' else 'your selected OSCA office'))) }}.{% elif spec.kind == 'nbi' %}Select a demonstration appointment before choosing delivery.{% else %}Your demonstration appointment is at {{ appointment.location_label or ('your selected DFA office' if spec.kind == 'passport' else ('your selected PSA PhilSys registration center' if spec.kind == 'philsys' else 'your selected OSCA office')) }}.{% endif %}
+                    Choose pickup to continue straight to payment, or choose home delivery to pin where the {% if spec.kind == 'passport' %}passport{% elif spec.kind == 'nbi' %}NBI clearance{% elif spec.kind == 'philsys' %}National ID{% else %}Senior Citizen ID{% endif %} should be delivered.
                 </p>
             </div>
             <div class="confirm-success-chip passport-step-chip" aria-hidden="true">
@@ -30,7 +30,7 @@
                 </span>
                 <div>
                     <h2 id="fulfillment-options-heading">Choose one option</h2>
-                    <p>{% if spec.kind in ['passport', 'nbi'] %}Home delivery adds ₱50.00 to the demonstration payment.{% else %}New Senior Citizen ID requests stay free for pickup or home delivery.{% endif %}</p>
+                    <p>{% if spec.kind in ['passport', 'nbi'] %}Home delivery adds ₱50.00 to the demonstration payment.{% elif spec.kind == 'philsys' %}Pickup and home delivery are free for PhilSys registration assistance.{% else %}New Senior Citizen ID requests stay free for pickup or home delivery.{% endif %}</p>
                 </div>
             </div>
 

@@ -718,6 +718,15 @@ def apply_schedule(application_id):
         if not philsys_review_ready(application):
             flash("Review your application before scheduling.", "warning")
             return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+        from app.services.philsys_requirements import scheduling_skipped
+        if spec.get("type_first") and scheduling_skipped(field_map(application).get("application_type")):
+            return redirect(
+                url_for(
+                    "citizen.apply_delivery",
+                    application_id=application.application_id,
+                    method="delivery",
+                )
+            )
         from app.services.philsys_scheduling import (
             LOCATIONS,
             appointment_for,
@@ -779,7 +788,7 @@ def apply_schedule(application_id):
         )
         if error:
             flash(error, "warning")
-        elif kind in {"passport", "senior", "nbi"}:
+        elif kind in {"passport", "senior", "nbi"} or (kind == "philsys" and spec.get("type_first")):
             return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
         else:
             return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
@@ -1140,13 +1149,128 @@ def apply_delivery(application_id):
                 }
             )
             return render_template("applications/apply_passport_fulfillment.html", **context)
+    elif kind == "philsys":
+        if not spec.get("type_first"):
+            return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+        if not philsys_type_ready(application):
+            flash("Select an application type before choosing delivery.", "warning")
+            return redirect(url_for("citizen.apply_type", service_id=application.service_id))
+        if not passport_details_ready(application, spec):
+            flash("Complete the application details before choosing delivery.", "warning")
+            return redirect(url_for("citizen.apply_details", service_id=application.service_id))
+        if not philsys_review_ready(application):
+            flash("Review your application before setting the delivery details.", "warning")
+            return redirect(url_for("citizen.apply_review", application_id=application.application_id))
+        from app.services.philsys_delivery import (
+            CITY,
+            DEFAULT_LAT,
+            DEFAULT_LNG,
+            DELIVERY,
+            DELIVERY_FEE,
+            DEMO_BARANGAYS,
+            PICKUP,
+            PROVINCE,
+            REGION,
+            delivery_address,
+            delivery_ready,
+            delivery_values,
+            fulfillment_method,
+            philsys_center,
+            save_delivery,
+            save_pickup,
+            validate_delivery_form,
+        )
+        from app.services.philsys_requirements import home_delivery_only, payment_skipped, scheduling_skipped
+        from app.services.philsys_scheduling import appointment_for
+
+        skips_schedule = scheduling_skipped(field_map(application).get("application_type"))
+        appointment = appointment_for(application)
+        if not skips_schedule and appointment is None:
+            flash("Select a demonstration appointment before choosing delivery.", "warning")
+            return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
+        delivery_step = 5 if skips_schedule else 6
+        delivery_only = home_delivery_only(field_map(application).get("application_type"))
+
+        if request.method == "POST":
+            choice = clean_text(request.form.get("fulfillment_method")).lower()
+            if choice == PICKUP and delivery_only:
+                flash("Pickup is not available for this application type. Choose home delivery.", "warning")
+                return redirect(
+                    url_for(
+                        "citizen.apply_delivery",
+                        application_id=application.application_id,
+                        method=DELIVERY,
+                    )
+                )
+            if choice == PICKUP:
+                error = save_pickup(application, current_user)
+                if error:
+                    flash(error, "warning")
+                else:
+                    flash("PhilSys pickup selected.", "success")
+                    return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+            elif choice == DELIVERY:
+                fulfillment_choice = DELIVERY
+            else:
+                flash("Choose pickup or home delivery.", "warning")
+                return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
+
+        if request.method != "POST":
+            fulfillment_choice = (
+                clean_text(request.values.get("method")).lower()
+                or fulfillment_method(application)
+            )
+        if delivery_only and fulfillment_choice != DELIVERY:
+            return redirect(
+                url_for(
+                    "citizen.apply_delivery",
+                    application_id=application.application_id,
+                    method=DELIVERY,
+                )
+            )
+        if fulfillment_choice == PICKUP:
+            return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
+        if fulfillment_choice not in {PICKUP, DELIVERY}:
+            context = _common(application, delivery_step)
+            back_endpoint = "citizen.apply_schedule"
+            context.update(
+                {
+                    "appointment": appointment,
+                    "delivery_back_url": url_for(back_endpoint, application_id=application.application_id),
+                    "fulfillment_options": (
+                        {
+                            "key": PICKUP,
+                            "title": "Pick up at the PSA PhilSys registration center",
+                            "help": (
+                                "Collect your National ID at the PSA registration center. "
+                                "No delivery fee is added."
+                            ),
+                            "href": None,
+                        },
+                        {
+                            "key": DELIVERY,
+                            "title": "Request home delivery",
+                            "help": (
+                                "Pin your delivery address on the map. Home delivery is free "
+                                "for PhilSys registration assistance."
+                            ),
+                            "href": url_for(
+                                "citizen.apply_delivery",
+                                application_id=application.application_id,
+                                method=DELIVERY,
+                            ),
+                        },
+                    ),
+                }
+            )
+            return render_template("applications/apply_passport_fulfillment.html", **context)
     else:
         return redirect(url_for("citizen.application_continue", application_id=application.application_id))
 
     values = delivery_values(application)
     errors = {}
     if request.method == "POST":
-        if kind in {"passport", "senior", "nbi"}:
+        if kind in {"passport", "senior", "nbi", "philsys"}:
             values, errors = validate_delivery_form(request.form, application)
         else:
             values, errors = validate_delivery_form(request.form)
@@ -1155,6 +1279,24 @@ def apply_delivery(application_id):
             if error:
                 flash(error, "warning")
             else:
+                if kind == "philsys" and payment_skipped(field_map(application).get("application_type")):
+                    from app.services.philsys_confirmation_pdf import ensure_confirmation_pdf
+                    from app.services.philsys_payment import confirm_free_application
+
+                    finalize_error = confirm_free_application(application, current_user)
+                    if finalize_error:
+                        flash(finalize_error, "warning")
+                        return redirect(
+                            url_for("citizen.application_continue", application_id=application.application_id)
+                        )
+                    ensure_confirmation_pdf(application)
+                    flash(
+                        "Delivery details saved. No payment step is required for this application type.",
+                        "success",
+                    )
+                    return redirect(
+                        url_for("citizen.apply_confirmation", application_id=application.application_id)
+                    )
                 flash("Delivery details saved.", "success")
                 return redirect(url_for("citizen.apply_payment", application_id=application.application_id))
 
@@ -1197,6 +1339,12 @@ def apply_delivery(application_id):
                 initial_lat, initial_lng = center["latitude"], center["longitude"]
             else:
                 initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
+        elif kind == "philsys":
+            center = philsys_center(values.get("barangay") or field_map(application).get("barangay"))
+            if center:
+                initial_lat, initial_lng = center["latitude"], center["longitude"]
+            else:
+                initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
         else:
             center = barangay_center(values.get("barangay") or field_map(application).get("barangay"))
             if center:
@@ -1207,7 +1355,7 @@ def apply_delivery(application_id):
     delivery_region_val = REGION
     context = _common(application, delivery_step)
     delivery_address_preview = ""
-    if kind in {"birth", "cenomar", "passport", "senior", "nbi"}:
+    if kind in {"birth", "cenomar", "passport", "senior", "nbi", "philsys"}:
         delivery_address_preview = delivery_address(
             {
                 "house_number": values.get("house_number"),
@@ -1240,6 +1388,10 @@ def apply_delivery(application_id):
         from app.services.nbi_payment import payment_summary as nbi_payment_summary
 
         context["nbi_payment_summary"] = nbi_payment_summary(application)
+    elif kind == "philsys":
+        from app.services.philsys_payment import payment_summary as philsys_payment_summary
+
+        context["philsys_payment_summary"] = philsys_payment_summary(application)
     context.update(
         {
             "values": values,
@@ -1253,13 +1405,20 @@ def apply_delivery(application_id):
             "delivery_saved": delivery_ready(application),
             "initial_lat": initial_lat,
             "initial_lng": initial_lng,
-            "show_origin_map": kind in {"barangay", "residency", "birth", "cenomar", "passport", "senior", "nbi"},
-            "fixed_origin_map": kind in {"birth", "cenomar", "passport", "senior", "nbi"},
-            "auto_pin_map": kind in {"barangay", "residency", "birth", "cenomar", "passport", "senior", "nbi"},
-            "fulfillment_method": DELIVERY if kind in {"passport", "senior", "nbi"} else "",
+            "show_origin_map": kind in {"barangay", "residency", "birth", "cenomar", "passport", "senior", "nbi", "philsys"},
+            "fixed_origin_map": kind in {"birth", "cenomar", "passport", "senior", "nbi", "philsys"},
+            "auto_pin_map": kind in {"barangay", "residency", "birth", "cenomar", "passport", "senior", "nbi", "philsys"},
+            "fulfillment_method": DELIVERY if kind in {"passport", "senior", "nbi", "philsys"} else "",
             "delivery_back_url": (
                 url_for("citizen.apply_schedule", application_id=application.application_id)
-                if kind == "nbi" and spec.get("review_before_schedule")
+                if (
+                    (kind == "nbi" and spec.get("review_before_schedule"))
+                    or (
+                        kind == "philsys"
+                        and spec.get("review_before_schedule")
+                        and not scheduling_skipped(field_map(application).get("application_type"))
+                    )
+                )
                 else url_for("citizen.apply_review", application_id=application.application_id)
             ),
             "saved_origin_lat": values.get("origin_latitude"),
@@ -1356,7 +1515,32 @@ def apply_payment(application_id):
         start_maya_checkout = None
     elif kind == "philsys":
         from app.services.philsys_payment import confirm_free_application, payment_summary
+        from app.services.philsys_requirements import payment_skipped
         from app.services.philsys_scheduling import appointment_for
+
+        if payment_skipped(values.get("application_type")):
+            from app.services.philsys_confirmation_pdf import ensure_confirmation_pdf
+            from app.services.philsys_delivery import delivery_ready
+
+            if not delivery_ready(application):
+                flash("Set your home delivery details before continuing.", "warning")
+                return redirect(
+                    url_for(
+                        "citizen.apply_delivery",
+                        application_id=application.application_id,
+                        method="delivery",
+                    )
+                )
+            error = confirm_free_application(application, current_user)
+            if error:
+                flash(error, "warning")
+                return redirect(
+                    url_for("citizen.application_continue", application_id=application.application_id)
+                )
+            ensure_confirmation_pdf(application)
+            return redirect(
+                url_for("citizen.apply_confirmation", application_id=application.application_id)
+            )
 
         if spec.get("type_first") and not philsys_type_ready(application):
             flash("Select an application type before payment.", "warning")
@@ -1367,11 +1551,21 @@ def apply_payment(application_id):
         if not philsys_review_ready(application):
             flash("Review your application before payment.", "warning")
             return redirect(url_for("citizen.apply_review", application_id=application.application_id))
-        if appointment_for(application) is None:
+        from app.services.philsys_requirements import scheduling_skipped
+        if not scheduling_skipped(values.get("application_type")) and appointment_for(application) is None:
             flash("Select a demonstration appointment before payment.", "warning")
             return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
-        payment_step = 6 if spec.get("type_first") else 5
-        back_endpoint = "citizen.apply_schedule"
+        if spec.get("type_first"):
+            from app.services.philsys_delivery import delivery_ready
+
+            if not delivery_ready(application):
+                flash("Choose pickup or home delivery before payment.", "warning")
+                return redirect(url_for("citizen.apply_delivery", application_id=application.application_id))
+            payment_step = 7
+            back_endpoint = "citizen.apply_delivery"
+        else:
+            payment_step = 5
+            back_endpoint = "citizen.apply_schedule"
         free_payment = True
         ONLINE_METHODS = ()
         record_demo_payment = None
@@ -1813,12 +2007,22 @@ def apply_submit(application_id):
             flash("Select an application type before continuing.", "warning")
             return redirect(url_for("citizen.apply_type", service_id=application.service_id))
         if missing_documents(application, spec):
-            flash("Upload every required document before scheduling.", "warning")
+            flash("Upload every required document before continuing.", "warning")
             return redirect(url_for("citizen.apply_documents", application_id=application.application_id))
         if not passport_details_ready(application, spec):
-            flash("Complete the application details before scheduling.", "warning")
+            flash("Complete the application details before continuing.", "warning")
             return redirect(url_for("citizen.apply_details", service_id=application.service_id))
         mark_philsys_reviewed(application)
+        from app.services.philsys_requirements import scheduling_skipped
+
+        if spec.get("type_first") and scheduling_skipped(field_map(application).get("application_type")):
+            return redirect(
+                url_for(
+                    "citizen.apply_delivery",
+                    application_id=application.application_id,
+                    method="delivery",
+                )
+            )
         return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
     if spec.get("kind") == "nbi":
         if missing_documents(application, spec):
@@ -2081,13 +2285,22 @@ def apply_confirmation(application_id):
         )
     elif spec.get("kind") == "philsys":
         from app.services.philsys_confirmation_pdf import confirmation_id_for, ensure_confirmation_pdf
+        from app.services.philsys_delivery import delivery_address, delivery_for
         from app.services.philsys_payment import payment_summary
+        from app.services.philsys_requirements import bring_requirements_for, payment_skipped
         from app.services.philsys_scheduling import appointment_for
 
+        answers = field_map(application)
         ensure_confirmation_pdf(application)
         context["summary"] = payment_summary(application)
         context["confirmation_id"] = confirmation_id_for(application)
         context["appointment"] = appointment_for(application)
+        context["delivery"] = delivery_for(application)
+        context["delivery_address"] = (
+            delivery_address(context["delivery"]) if context["delivery"] else ""
+        )
+        context["bring_requirements"] = bring_requirements_for(answers.get("application_type"))
+        context["payment_skipped"] = payment_skipped(answers.get("application_type"))
     elif spec.get("kind") == "sss":
         from app.services.sss_confirmation_pdf import confirmation_id_for, ensure_confirmation_pdf
         from app.services.sss_payment import payment_summary

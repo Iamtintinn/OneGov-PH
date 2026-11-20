@@ -206,7 +206,7 @@
                 <div class="review-form-actions"><button class="admin-button admin-button--primary" type="submit">Save Processing Status</button></div>
             </form>
             {% else %}<p class="admin-empty">This application is closed and cannot be updated here.</p>{% endif %}
-            {% if not passport and not senior_confirmation %}
+            {% if not passport and not senior_confirmation and tracking.citizen_delivery.get('method') != 'delivery' %}
             <details class="review-secondary-form">
                 <summary>Request correction or other status update</summary>
                 <form class="review-form" method="post" action="{{ url_for('admin.update_application', application_id=application.application_id) }}">

@@ -375,6 +375,16 @@
                             </dd>
                         </div>
                         <div>
+                            <dt>Fulfillment</dt>
+                            <dd>{{ summary.fulfillment_label or "—" }}</dd>
+                        </div>
+                        {% if summary.delivery and summary.delivery.method == 'delivery' %}
+                        <div>
+                            <dt>Delivery address</dt>
+                            <dd>{{ summary.delivery_address or "—" }}</dd>
+                        </div>
+                        {% endif %}
+                        <div>
                             <dt>Payment required</dt>
                             <dd>{{ summary.payment_required_label or "No" }}</dd>
                         </div>
