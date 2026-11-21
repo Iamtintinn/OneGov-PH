@@ -5,15 +5,32 @@
 {% block content %}
 <div class="dash-page site-width">
     <section class="dash-section" aria-labelledby="notifications-heading">
-        <p class="dash-kicker">Updates</p>
-        <h1 id="notifications-heading">Notifications</h1>
+        <div class="section-heading">
+            <div>
+                <p class="dash-kicker">Updates</p>
+                <h1 id="notifications-heading">Notifications</h1>
+            </div>
+            {% if unread_notification_count %}
+            <form method="post" action="{{ url_for('citizen.notifications_read_all') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="dash-button dash-button-secondary" type="submit">Mark all as read</button>
+            </form>
+            {% endif %}
+        </div>
         {% if notifications %}
         <ul class="notice-page-list">
             {% for notice in notifications %}
-            <li class="detail-card">
+            <li class="detail-card{% if notice.read_status == 'unread' %} is-unread{% endif %}">
                 <p class="notice-title">{{ notice.notification_title }}</p>
                 <p>{{ notice.notification_message }}</p>
-                <p class="notice-meta">{{ notice.created_date.strftime("%d %b %Y") }} · {{ notice.notification_type|replace('_', ' ') }} · {{ notice.read_status }}</p>
+                <p class="notice-meta">{{ notice.created_date.strftime("%d %b %Y %H:%M") if notice.created_date else "" }} · {{ notice.notification_type|replace('_', ' ')|title }} · {{ 'Unread' if notice.read_status == 'unread' else 'Read' }}</p>
+                {% if notice.read_status == 'unread' %}
+                <form method="post" action="{{ url_for('citizen.notification_read', notification_id=notice.notification_id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="next" value="{{ url_for('citizen.notifications') }}">
+                    <button class="dash-button dash-button-secondary" type="submit">Mark as read</button>
+                </form>
+                {% endif %}
             </li>
             {% endfor %}
         </ul>

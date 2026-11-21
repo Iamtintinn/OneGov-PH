@@ -28,11 +28,9 @@
                 </div>
             </form>
         </header>
-
         {% if service_query %}
         <p class="search-result" role="status">Showing services matching “{{ service_query }}”. <a href="{{ url_for('citizen.services', category=service_category or none) }}">View all services</a></p>
         {% endif %}
-
         {% if services %}
         <div class="service-grid service-grid-modern">
             {% for service in services %}
@@ -70,7 +68,7 @@
                     </span>
                     <details class="service-menu">
                         <summary aria-label="Service details for {{ service.service_name }}">
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <path d="M4 7h16"></path>
                                 <path d="M4 12h16"></path>
                                 <path d="M4 17h16"></path>
@@ -116,11 +114,10 @@
                     </span>
                     {% endif %}
                 </div>
-                <div class="service-tile-progress" aria-hidden="true"><span></span></div>
                 <div class="service-tile-actions">
                     {% if can_apply %}
                     <a class="dash-button dash-button-apply" href="{{ url_for('citizen.apply_details', service_id=service.service_id) }}">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
                         Apply now
                     </a>
                     {% else %}

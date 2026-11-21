@@ -1,5 +1,6 @@
 from flask_login import UserMixin
 from sqlalchemy.dialects.mysql import INTEGER
+from sqlalchemy.orm import deferred
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import db
@@ -61,6 +62,15 @@ class User(UserMixin, db.Model):
         default="unverified",
         server_default="unverified",
     )
+    _otp_login_enabled = deferred(
+        db.Column(
+            "otp_login_enabled",
+            db.Boolean,
+            nullable=False,
+            default=True,
+            server_default=db.text("1"),
+        )
+    )
     department_id = db.Column(
         INTEGER(unsigned=True),
         db.ForeignKey("departments.department_id"),
@@ -120,6 +130,18 @@ class User(UserMixin, db.Model):
             permissions = {key: True for key in (self.admin_permissions or ())}
         permissions.pop(self.TEMPORARY_PASSWORD_FLAG, None)
         self.admin_permissions = permissions or None
+
+    @property
+    def login_otp_enabled(self):
+        try:
+            value = self._otp_login_enabled
+        except Exception:
+            return True
+        return True if value is None else bool(value)
+
+    @login_otp_enabled.setter
+    def login_otp_enabled(self, value):
+        self._otp_login_enabled = bool(value)
 
     def check_password(self, password):
         if not self.password_hash:

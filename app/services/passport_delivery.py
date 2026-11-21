@@ -6,7 +6,7 @@ from decimal import Decimal
 from app import db
 from app.models.notification import Notification
 from app.services.application_service import read_details, write_details
-from app.services.passport_scheduling import appointment_for, location_by_code
+from app.services.passport_scheduling import appointment_for
 from app.utils.validators import clean_text, normalize_contact_number
 
 REGION = "National Capital Region"
@@ -23,13 +23,10 @@ LNG_MIN, LNG_MAX = 116.0, 127.0
 
 DEFAULT_LAT = 14.5995
 DEFAULT_LNG = 120.9842
-DEFAULT_ORIGIN_LAT = 14.5325
-DEFAULT_ORIGIN_LNG = 120.9800
-DEFAULT_ORIGIN_NAME = "DFA Aseana"
-DEFAULT_ORIGIN_ADDRESS = (
-    "Aseana Business Park, Bradco Avenue corner Macapagal Boulevard, "
-    "Parañaque City, Metro Manila."
-)
+DEFAULT_ORIGIN_LAT = 13.756465
+DEFAULT_ORIGIN_LNG = 121.058308
+DEFAULT_ORIGIN_NAME = "APO Production Unit, Inc. – LIMA High-Security Printing Facility"
+DEFAULT_ORIGIN_ADDRESS = "APO Production Unit, Inc. – LIMA High-Security Printing Facility"
 
 DEMO_BARANGAYS = (
     {"name": "Commonwealth", "latitude": 14.6986, "longitude": 121.0850},
@@ -93,13 +90,11 @@ def passport_center(name):
 
 
 def _origin(application):
-    appointment = appointment_for(application) or {}
-    location = location_by_code(appointment.get("location_code")) or {}
     return {
-        "name": location.get("label") or appointment.get("location_label") or DEFAULT_ORIGIN_NAME,
-        "address": location.get("address") or DEFAULT_ORIGIN_ADDRESS,
-        "latitude": location.get("latitude") or DEFAULT_ORIGIN_LAT,
-        "longitude": location.get("longitude") or DEFAULT_ORIGIN_LNG,
+        "name": DEFAULT_ORIGIN_NAME,
+        "address": DEFAULT_ORIGIN_ADDRESS,
+        "latitude": DEFAULT_ORIGIN_LAT,
+        "longitude": DEFAULT_ORIGIN_LNG,
     }
 
 
@@ -112,9 +107,9 @@ def delivery_values(application):
         "method": fulfillment_method(application),
         "recipient_name": delivery.get("recipient_name") or "",
         "contact_number": delivery.get("contact_number") or "",
-        "region": delivery.get("region") or REGION,
-        "province": delivery.get("province") or PROVINCE,
-        "city": delivery.get("city") or CITY,
+        "region": delivery.get("region") or "",
+        "province": delivery.get("province") or "",
+        "city": delivery.get("city") or "",
         "barangay": delivery.get("barangay") or "",
         "house_number": delivery.get("house_number") or "",
         "street": delivery.get("street") or "",
@@ -176,6 +171,10 @@ def validate_delivery_form(form, application):
     subdivision = clean_text(form.get("subdivision"))[:200]
     landmark = clean_text(form.get("landmark"))[:200]
 
+    region = clean_text(form.get("region"))[:200]
+    province = clean_text(form.get("province"))[:200]
+    city = clean_text(form.get("city"))[:200]
+
     latitude = _as_float(form.get("latitude"))
     longitude = _as_float(form.get("longitude"))
     if latitude is None or longitude is None:
@@ -193,9 +192,9 @@ def validate_delivery_form(form, application):
         "method": DELIVERY,
         "recipient_name": recipient,
         "contact_number": contact,
-        "region": REGION,
-        "province": PROVINCE,
-        "city": CITY,
+        "region": region,
+        "province": province,
+        "city": city,
         "barangay": barangay,
         "house_number": house_number,
         "street": street,
@@ -248,9 +247,9 @@ def save_delivery(application, user, values):
         "method": DELIVERY,
         "recipient_name": values.get("recipient_name") or "",
         "contact_number": values.get("contact_number") or "",
-        "region": values.get("region") or REGION,
-        "province": values.get("province") or PROVINCE,
-        "city": values.get("city") or CITY,
+        "region": values.get("region") or "",
+        "province": values.get("province") or "",
+        "city": values.get("city") or "",
         "barangay": values.get("barangay") or "",
         "house_number": values.get("house_number") or "",
         "street": values.get("street") or "",

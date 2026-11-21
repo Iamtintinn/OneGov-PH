@@ -40,3 +40,15 @@ class Config:
 
     OSRM_API = os.getenv("OSRM_API", "").strip().rstrip("/")
     NOMINATIM_API = os.getenv("NOMINATIM_API", "").strip().rstrip("/")
+
+    # Brevo transactional email (OTP)
+    BREVO_API_KEY = os.getenv("BREVO_API_KEY", "").strip()
+    BREVO_API_URL = os.getenv("BREVO_API_URL", "https://api.brevo.com/v3/smtp/email").strip()
+    BREVO_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL", "no-reply@onegovph.local").strip()
+    BREVO_SENDER_NAME = os.getenv("BREVO_SENDER_NAME", "OneGov PH").strip()
+    BREVO_SMTP_LOGIN = os.getenv("BREVO_SMTP_LOGIN", "").strip()
+    BREVO_SMTP_SERVER = os.getenv("BREVO_SMTP_SERVER", "smtp-relay.brevo.com").strip()
+    BREVO_SMTP_PORT = int(os.getenv("BREVO_SMTP_PORT", "587") or 587)
+    OTP_EXPIRY_MINUTES = int(os.getenv("OTP_EXPIRY_MINUTES", "5") or 5)
+    OTP_MAX_ATTEMPTS = int(os.getenv("OTP_MAX_ATTEMPTS", "5") or 5)
+    OTP_RESEND_COOLDOWN_SECONDS = int(os.getenv("OTP_RESEND_COOLDOWN_SECONDS", "60") or 60)

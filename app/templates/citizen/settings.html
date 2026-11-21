@@ -32,6 +32,7 @@
         <h2>Change password</h2>
         <form class="dash-form" method="post" action="{{ url_for('citizen.settings') }}" novalidate>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="password">
             <label for="current_password">Current password</label>
             <input id="current_password" name="current_password" type="password" autocomplete="current-password" required aria-invalid="{{ 'true' if errors.current_password else 'false' }}">
             {% if errors.current_password %}<p class="field-error">{{ errors.current_password }}</p>{% endif %}
@@ -43,6 +44,18 @@
             {% if errors.confirm_password %}<p class="field-error">{{ errors.confirm_password }}</p>{% endif %}
             <p class="empty-note">Use 8 to 128 characters, with at least one letter and one number.</p>
             <button class="dash-button" type="submit">Update password</button>
+        </form>
+
+        <h2>Login verification (OTP)</h2>
+        <form class="dash-form" method="post" action="{{ url_for('citizen.settings') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="otp_login">
+            <label for="otp_login_enabled">
+                <input id="otp_login_enabled" name="otp_login_enabled" type="checkbox" value="1" {% if current_user.login_otp_enabled %}checked{% endif %}>
+                Require a one-time verification code when logging in
+            </label>
+            <p class="empty-note">When enabled, a 6-digit code will be emailed to you each time you sign in. (OTP is always required when creating a new account.)</p>
+            <button class="dash-button" type="submit">Save login verification setting</button>
         </form>
     </section>
 </div>

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Verify code · OneGov PH{% endblock %}
+{% block content %}
+<section class="login-screen">
+    <div class="login-backdrop" aria-hidden="true"></div>
+    <div class="login-wrap">
+        <div class="login-card otp-card">
+            <p class="kicker">Account verification</p>
+            <h1>Verify your email</h1>
+            <p class="lede">
+                {% if purpose == 'register' %}
+                Enter the 6-digit code sent to <strong>{{ email }}</strong> to complete your account registration.
+                {% else %}
+                Enter the 6-digit code sent to <strong>{{ email }}</strong> to complete your sign-in.
+                {% endif %}
+            </p>
+
+            <div class="otp-timers" aria-live="polite">
+                <div class="otp-timer-item">
+                    <span class="otp-timer-label">Code expires in</span>
+                    <strong id="otp-expiry-countdown" class="otp-timer-value">--:--</strong>
+                </div>
+                <div class="otp-timer-item">
+                    <span class="otp-timer-label">Resend available in</span>
+                    <strong id="otp-resend-countdown" class="otp-timer-value">--</strong>
+                </div>
+            </div>
+
+            <form class="login-form otp-form" method="post" action="{{ url_for('auth.verify_otp') }}" novalidate>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="verify">
+                {% if error %}
+                <p class="form-error" role="alert">{{ error }}</p>
+                {% endif %}
+                <label for="code">Verification code</label>
+                <input
+                    id="code"
+                    name="code"
+                    class="otp-code-input"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    pattern="[0-9]{6}"
+                    maxlength="6"
+                    required
+                    placeholder="000000"
+                    aria-describedby="otp-help"
+                >
+                <p id="otp-help" class="hint otp-hint">Enter the 6-digit code from your email. It expires in 5 minutes.</p>
+                <button class="submit" type="submit">Verify code</button>
+            </form>
+
+            <form class="login-form otp-resend-form" method="post" action="{{ url_for('auth.verify_otp') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="resend">
+                <button id="otp-resend-btn" class="otp-resend-btn" type="submit" disabled>Resend OTP</button>
+            </form>
+
+            <p id="otp-expired-note" class="field-error otp-expired-note" role="alert" hidden>This code has expired. Please request a new code or start again.</p>
+
+            <p class="form-links">
+                {% if purpose == 'register' %}
+                <a href="{{ url_for('auth.register') }}">Back to registration</a>
+                {% else %}
+                <a href="{{ url_for('auth.login') }}">Back to login</a>
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</section>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+(function () {
+    var expirySeconds = {{ expires_in|int }};
+    var resendSeconds = {{ resend_in|int }};
+    var expiryEl = document.getElementById("otp-expiry-countdown");
+    var resendEl = document.getElementById("otp-resend-countdown");
+    var resendBtn = document.getElementById("otp-resend-btn");
+    var expiredNote = document.getElementById("otp-expired-note");
+    var codeInput = document.getElementById("code");
+
+    function pad(n) { return n < 10 ? "0" + n : String(n); }
+    function formatTime(total) {
+        total = Math.max(0, parseInt(total || 0, 10));
+        var m = Math.floor(total / 60);
+        var s = total % 60;
+        return m + ":" + pad(s);
+    }
+
+    function render() {
+        if (expiryEl) expiryEl.textContent = formatTime(expirySeconds);
+        if (resendEl) {
+            resendEl.textContent = resendSeconds > 0 ? (resendSeconds + "s") : "Ready";
+        }
+        if (resendBtn) {
+            resendBtn.disabled = resendSeconds > 0;
+            resendBtn.textContent = resendSeconds > 0 ? ("Resend OTP (" + resendSeconds + "s)") : "Resend OTP";
+        }
+        if (expirySeconds <= 0) {
+            if (expiredNote) expiredNote.hidden = false;
+            if (codeInput) codeInput.disabled = false; // allow view but verify will show expired server-side
+        }
+    }
+
+    render();
+    var timer = setInterval(function () {
+        if (expirySeconds > 0) expirySeconds -= 1;
+        if (resendSeconds > 0) resendSeconds -= 1;
+        render();
+        if (expirySeconds <= 0 && resendSeconds <= 0) {
+            clearInterval(timer);
+        }
+    }, 1000);
+
+    if (codeInput) {
+        codeInput.addEventListener("input", function () {
+            this.value = (this.value || "").replace(/\D/g, "").slice(0, 6);
+        });
+    }
+})();
+</script>
+{% endblock %}

@@ -37,7 +37,11 @@ def create_app():
     def load_user(user_id):
         if user_id is None or not str(user_id).isdigit():
             return None
-        account = db.session.get(User, int(user_id))
+        try:
+            account = db.session.get(User, int(user_id))
+        except SQLAlchemyError:
+            db.session.rollback()
+            return None
         if account is None or account.account_status != "active":
             return None
         return account

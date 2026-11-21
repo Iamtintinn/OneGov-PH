@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
 from app import db
-from app.models.application import Application
+from app.models.application import Application, ApplicationEvent, ApplicationRequirement
 from app.models.department import Department
 from app.models.notification import Notification
 from app.models.payment import Payment
@@ -44,6 +44,22 @@ IN_PROGRESS_STATUSES = frozenset({
     "ready_for_release",
 })
 COMPLETED_STATUSES = frozenset({"completed"})
+READY_FOR_PICKUP_STATUSES = frozenset({"ready_for_release"})
+
+PAYMENT_METHOD_LABELS = {
+    "gcash": "GCash",
+    "maya": "Maya",
+    "bank_transfer": "Bank transfer",
+    "over_the_counter": "Over the counter",
+    "online_banking": "Online banking",
+}
+PAYMENT_STATUS_LABELS = {
+    "pending": "Pending",
+    "paid": "Paid",
+    "failed": "Failed",
+    "refunded": "Refunded",
+    "cancelled": "Cancelled",
+}
 
 PAYMENT_METHOD_LABELS = {
     "gcash": "GCash",
@@ -99,7 +115,13 @@ def _application_counts(user_id):
     else:
         query = query.where(Application.applicant_id == user_id)
     rows = db.session.execute(query).all()
-    summary = {"total": 0, "pending": 0, "in_progress": 0, "completed": 0}
+    summary = {
+        "total": 0,
+        "pending": 0,
+        "in_progress": 0,
+        "completed": 0,
+        "ready_for_pickup": 0,
+    }
     for status, count in rows:
         summary["total"] += count
         if status in PENDING_STATUSES:
@@ -108,7 +130,121 @@ def _application_counts(user_id):
             summary["in_progress"] += count
         elif status in COMPLETED_STATUSES:
             summary["completed"] += count
+        if status in READY_FOR_PICKUP_STATUSES:
+            summary["ready_for_pickup"] += count
     return summary
+
+
+def _confirmation_pdf_route_for(application):
+    kind = ((application.service or None) and getattr(application.service, "service_name", "") or "")
+    # map by spec kind via known service names handled in applications routes
+    name = kind.lower()
+    mapping = [
+        ("passport", "citizen.passport_confirmation_pdf"),
+        ("barangay clearance", "citizen.barangay_confirmation_pdf"),
+        ("certificate of residency", "citizen.barangay_confirmation_pdf"),
+        ("senior citizen", "citizen.senior_confirmation_pdf"),
+        ("nbi clearance", "citizen.nbi_confirmation_pdf"),
+        ("birth certificate", "citizen.birth_confirmation_pdf"),
+        ("cenomar", "citizen.cenomar_confirmation_pdf"),
+        ("philsys", "citizen.philsys_confirmation_pdf"),
+        ("ss number", "citizen.sss_confirmation_pdf"),
+    ]
+    for needle, endpoint in mapping:
+        if needle in name:
+            return endpoint
+    return None
+
+
+def _payment_receipt_route_for(application):
+    # generic recorded-payment receipt not in schema; service confirmation PDFs act as available confirmations/receipts
+    if application.application_status == "draft":
+        return None
+    return _confirmation_pdf_route_for(application)
+
+
+def _profile_completion(user):
+    fields = [
+        ("First name", bool(clean_text(user.first_name))),
+        ("Last name", bool(clean_text(user.last_name))),
+        ("Email", bool(clean_text(user.email))),
+        ("Contact number", bool(clean_text(user.contact_number))),
+        ("Address", bool(clean_text(user.address))),
+        ("Password set", bool(user.password_hash)),
+    ]
+    complete = sum(1 for _, ok in fields if ok)
+    percent = int(round((complete / len(fields)) * 100)) if fields else 0
+    missing = [label for label, ok in fields if not ok]
+    return {"percent": percent, "complete": complete, "total": len(fields), "missing": missing}
+
+
+def _dashboard_service_groups():
+    return [
+        {
+            "key": "dfa",
+            "title": "DFA Passport",
+            "department": "Department of Foreign Affairs",
+            "description": "Apply for or track a passport application.",
+            "url": url_for("citizen.services", q="passport"),
+            "icon": "dfa",
+        },
+        {
+            "key": "psa",
+            "title": "PSA Birth Certificate",
+            "department": "Philippine Statistics Authority",
+            "description": "Request and monitor PSA birth certificate applications.",
+            "url": url_for("citizen.services", q="birth certificate"),
+            "icon": "psa",
+        },
+        {
+            "key": "nbi",
+            "title": "NBI Clearance",
+            "department": "National Bureau of Investigation",
+            "description": "Apply, pay, and track your NBI clearance request.",
+            "url": url_for("citizen.services", q="NBI"),
+            "icon": "nbi",
+        },
+        {
+            "key": "philsys",
+            "title": "PhilSys / National ID",
+            "department": "Philippine Identification System",
+            "description": "View PhilSys-related services and application status.",
+            "url": url_for("citizen.services", q="PhilSys"),
+            "icon": "id",
+        },
+        {
+            "key": "sss",
+            "title": "SSS Services",
+            "department": "Social Security System",
+            "description": "Access SSS number and MySSS application services.",
+            "url": url_for("citizen.services", q="SSS"),
+            "icon": "sss",
+        },
+        {
+            "key": "police",
+            "title": "Police Clearance",
+            "department": "Philippine National Police",
+            "description": "Check available police clearance services in the catalog.",
+            "url": url_for("citizen.services", q="police"),
+            "icon": "shield",
+        },
+        {
+            "key": "lgu",
+            "title": "Barangay / LGU Services",
+            "department": "Local Government Unit",
+            "description": "Barangay clearance, residency, senior ID, and local services.",
+            "url": url_for("citizen.services", q="barangay"),
+            "icon": "lgu",
+        },
+        {
+            "key": "cedula",
+            "title": "Cedula / Local Certificates",
+            "department": "Local Government Unit",
+            "description": "Find cedula and other local certificate services when available.",
+            "url": url_for("citizen.services", q="certificate"),
+            "icon": "cert",
+        },
+    ]
 
 
 def _owned_applications(user_id):
@@ -287,15 +423,265 @@ def citizen_navigation():
 def dashboard():
     service_query = " ".join((request.args.get("q") or "").split())[:80]
     services = _active_services(service_query)
-    applications = _owned_applications(current_user.user_id)[:5]
+    applications_all = _owned_applications(current_user.user_id)
+    applications = applications_all[:5]
+    notices, unread = _citizen_notifications(current_user.user_id)
+    payment_records = db.session.scalars(
+        visible_payment_query(
+            db.select(Payment)
+            .options(joinedload(Payment.application).joinedload(Application.service))
+            .join(Application, Payment.application_id == Application.application_id)
+            .where(Application.applicant_id == current_user.user_id)
+            .order_by(Payment.payment_id.desc())
+        )
+        if _uses_department_scope()
+        else (
+            db.select(Payment)
+            .options(joinedload(Payment.application).joinedload(Application.service))
+            .join(Application, Payment.application_id == Application.application_id)
+            .where(Application.applicant_id == current_user.user_id)
+            .order_by(Payment.payment_id.desc())
+        )
+    ).unique().all()
+
+    from datetime import datetime, timedelta
+    from collections import Counter, OrderedDict
+    from decimal import Decimal
+
+    from app.services.tracking_service import events_by_application as grouped_events
+    from app.services.application_forms import specification_for
+    from app.services.application_service import read_details
+
+    recent_ids = [item.application_id for item in applications]
+    event_map = grouped_events(recent_ids)
+    recent_rows = []
+    for app_item in applications:
+        events = event_map.get(app_item.application_id, [])
+        latest = events[0] if events else None
+        recent_rows.append(
+            {
+                "application": app_item,
+                "latest_event": latest,
+                "progress": _application_progress(app_item),
+                "timeline": events[:4],
+            }
+        )
+
+    def _status_label(app_item):
+        labels = dict(STATUS_LABELS)
+        spec = specification_for(app_item.service, None)
+        if spec and spec.get("status_labels"):
+            labels.update(spec["status_labels"])
+        return labels.get(app_item.application_status, app_item.application_status.replace("_", " ").title())
+
+    documents = []
+    for req in db.session.scalars(
+        db.select(ApplicationRequirement)
+        .join(Application, Application.application_id == ApplicationRequirement.application_id)
+        .where(Application.applicant_id == current_user.user_id)
+        .order_by(ApplicationRequirement.requirement_id.desc())
+    ).all():
+        if req.uploaded_file:
+            documents.append(req)
+    documents = documents[:8]
+
+    payment_rows = []
+    paid_total = Decimal("0.00")
+    pending_payments = 0
+    for pay in payment_records:
+        if pay.payment_status == "paid":
+            try:
+                paid_total += Decimal(str(pay.amount or 0))
+            except Exception:
+                pass
+        if pay.payment_status == "pending":
+            pending_payments += 1
+    for pay in payment_records[:6]:
+        app_item = pay.application
+        receipt_route = _payment_receipt_route_for(app_item) if app_item else None
+        payment_rows.append(
+            {
+                "payment": pay,
+                "application": app_item,
+                "status_label": PAYMENT_STATUS_LABELS.get(pay.payment_status, pay.payment_status),
+                "method_label": PAYMENT_METHOD_LABELS.get(pay.payment_method, (pay.payment_method or "").replace("_", " ").title()),
+                "receipt_route": receipt_route,
+            }
+        )
+
+    my_documents = []
+    for app_item in applications_all:
+        receipt_route = _payment_receipt_route_for(app_item)
+        details = read_details(app_item)
+        delivery = (details.get("delivery") or {}) if isinstance(details, dict) else {}
+        delivery_status = None
+        if isinstance(delivery, dict):
+            delivery_status = delivery.get("delivery_status") or delivery.get("status") or delivery.get("fulfillment_status")
+        my_documents.append(
+            {
+                "application": app_item,
+                "confirmation_route": receipt_route,
+                "delivery_status": delivery_status,
+            }
+        )
+
+    status_palette = {
+        "draft": "#94A3B8",
+        "submitted": "#F59E0B",
+        "under_review": "#F97316",
+        "pending_documents": "#EF4444",
+        "for_payment": "#EAB308",
+        "paid": "#14B8A6",
+        "scheduled": "#06B6D4",
+        "processing": "#6366F1",
+        "ready_for_release": "#8B5CF6",
+        "completed": "#16A34A",
+        "rejected": "#DC2626",
+        "cancelled": "#64748B",
+        "approved": "#0EA5E9",
+        "for_biometrics": "#3B82F6",
+        "with_hit": "#B91C1C",
+    }
+    status_counts = Counter(app.application_status for app in applications_all)
+    total_apps = len(applications_all)
+    status_chart = []
+    for status, count in sorted(status_counts.items(), key=lambda x: (-x[1], x[0])):
+        pct = round((count / total_apps) * 100, 1) if total_apps else 0
+        status_chart.append(
+            {
+                "key": status,
+                "label": STATUS_LABELS.get(status, status.replace("_", " ").title()),
+                "count": count,
+                "percent": pct,
+                "color": status_palette.get(status, "#2563EB"),
+            }
+        )
+    # donut gradient segments
+    donut_segments = []
+    cursor = 0.0
+    for item in status_chart:
+        start = cursor
+        cursor += (item["count"] / total_apps * 100) if total_apps else 0
+        donut_segments.append(f"{item['color']} {start:.2f}% {cursor:.2f}%")
+    donut_gradient = "conic-gradient(" + ", ".join(donut_segments) + ")" if donut_segments else "conic-gradient(#E2E8F0 0% 100%)"
+
+    # monthly submissions (last 6 months) from real submission dates
+    now = datetime.utcnow()
+    months = []
+    for i in range(5, -1, -1):
+        year = (now.year if now.month - i >= 1 else now.year - 1)
+        month = ((now.month - i - 1) % 12) + 1
+        if now.month - i <= 0:
+            year = now.year - 1
+        # simpler: step back by months
+        m_index = now.month - 1 - i
+        y = now.year + (m_index // 12)
+        m = (m_index % 12) + 1
+        months.append((y, m))
+    month_counts = OrderedDict()
+    month_labels = []
+    import calendar
+    for y, m in months:
+        key = f"{y}-{m:02d}"
+        month_labels.append(calendar.month_abbr[m])
+        month_counts[key] = 0
+    for app_item in applications_all:
+        dt = getattr(app_item, "submission_date", None)
+        if not dt:
+            continue
+        key = f"{dt.year}-{dt.month:02d}"
+        if key in month_counts:
+            month_counts[key] += 1
+    monthly_values = list(month_counts.values())
+    monthly_max = max(monthly_values) if monthly_values else 0
+    monthly_chart = []
+    for idx, key in enumerate(month_counts.keys()):
+        val = month_counts[key]
+        height = int((val / monthly_max) * 100) if monthly_max else 0
+        monthly_chart.append({"label": month_labels[idx], "count": val, "height": height})
+
+    summary = _application_counts(current_user.user_id)
+    analytics = {
+        "status_chart": status_chart,
+        "donut_gradient": donut_gradient,
+        "monthly_chart": monthly_chart,
+        "monthly_max": monthly_max,
+        "paid_total": f"{paid_total:.2f}",
+        "pending_payments": pending_payments,
+        "total_payments": len(payment_records),
+        "total_apps": total_apps,
+    }
+
     return render_template(
         "citizen/dashboard.html",
         service_query=service_query,
         services=services,
         applications=applications,
-        summary=_application_counts(current_user.user_id),
+        applications_all=applications_all,
+        summary=summary,
         status_labels=STATUS_LABELS,
+        payment_method_labels=PAYMENT_METHOD_LABELS,
+        payment_status_labels=PAYMENT_STATUS_LABELS,
+        recent_rows=recent_rows,
+        notifications=notices,
+        profile_completion=_profile_completion(current_user),
+        payment_rows=payment_rows,
+        service_groups=_dashboard_service_groups(),
+        uploaded_documents=documents,
+        my_documents=my_documents[:8],
+        status_label_for=_status_label,
+        analytics=analytics,
     )
+
+
+def _application_progress(application):
+    status = application.application_status
+    ordered = ["submitted", "under_review", "pending_documents", "for_payment", "paid", "scheduled", "processing", "ready_for_release", "completed"]
+    if status in {"rejected", "cancelled", "draft"}:
+        return {"percent": 5 if status == "draft" else 100, "label": STATUS_LABELS.get(status, status.title()), "terminal": status}
+    if status in ordered:
+        idx = ordered.index(status)
+        percent = int(((idx + 1) / len(ordered)) * 100)
+    elif status in IN_PROGRESS_STATUSES:
+        percent = 70
+    elif status in PENDING_STATUSES:
+        percent = 35
+    else:
+        percent = 20
+    return {"percent": max(10, min(percent, 100)), "label": STATUS_LABELS.get(status, status.replace("_", " ").title()), "terminal": None}
+
+
+@citizen_bp.route("/citizen/notifications/<int:notification_id>/read", methods=["POST"])
+@citizen_portal_required
+def notification_read(notification_id):
+    notice = db.session.scalar(
+        db.select(Notification).where(
+            Notification.notification_id == notification_id,
+            Notification.user_id == current_user.user_id,
+        )
+    )
+    if notice is None:
+        abort(404)
+    if notice.read_status != "read":
+        notice.read_status = "read"
+        db.session.commit()
+    return redirect(request.form.get("next") or url_for("citizen.notifications"))
+
+
+@citizen_bp.route("/citizen/notifications/read-all", methods=["POST"])
+@citizen_portal_required
+def notifications_read_all():
+    notices = db.session.scalars(
+        db.select(Notification).where(
+            Notification.user_id == current_user.user_id,
+            Notification.read_status == "unread",
+        )
+    ).all()
+    for notice in notices:
+        notice.read_status = "read"
+    if notices:
+        db.session.commit()
+    return redirect(request.form.get("next") or url_for("citizen.notifications"))
 
 
 @citizen_bp.route("/citizen/applications/<int:application_id>")
@@ -316,112 +702,88 @@ def application_detail(application_id):
     application = db.session.scalars(query).unique().first()
     if application is None:
         abort(404)
-    from app.services.application_forms import specification_for
-    from app.services.application_service import document_rules, field_map, read_checklist, read_fields
 
+    from app.routes.admin_portal import tracking_detail_data
+    from app.services.application_forms import specification_for
+    from app.services.application_service import field_map
+
+    applicant = db.session.get(User, application.applicant_id)
+    events = db.session.scalars(
+        db.select(ApplicationEvent)
+        .where(ApplicationEvent.application_id == application.application_id)
+        .order_by(ApplicationEvent.recorded_at.desc(), ApplicationEvent.tracking_id.desc())
+    ).all()
+    tracking = tracking_detail_data(application, applicant)
     answers = field_map(application)
     spec = specification_for(application.service, answers)
-    documents = [] if spec is None or spec.get("checklist") else document_rules(spec, answers)
-    passport_appointment = None
-    passport_summary = None
-    passport_physical = None
-    passport_confirmation_id = None
-    barangay_summary = None
-    barangay_confirmation_id = None
-    senior_delivery = None
-    senior_delivery_address = ""
-    senior_admin_confirmation = None
-    nbi_delivery = None
-    nbi_delivery_address = ""
-    if spec and spec.get("kind") == "passport":
-        from app.services.passport_admin import summary as physical_summary
-        from app.services.passport_confirmation_pdf import confirmation_id_for
-        from app.services.passport_payment import payment_summary
-        from app.services.passport_scheduling import appointment_for
 
-        passport_appointment = appointment_for(application)
-        passport_summary = payment_summary(application)
-        passport_physical = physical_summary(application)
-        if application.application_status != "draft":
-            passport_confirmation_id = confirmation_id_for(application)
-    elif spec and spec.get("kind") in {"barangay", "residency"}:
-        from app.services.barangay_confirmation_pdf import confirmation_id_for
-        from app.services.barangay_payment import payment_summary
+    confirmation_id = None
+    confirmation_pdf_url = None
+    confirmation_label = "Download receipt"
+    if spec and application.application_status != "draft":
+        kind = spec.get("kind")
+        if kind == "passport":
+            from app.services.passport_confirmation_pdf import confirmation_id_for
 
-        barangay_summary = payment_summary(application)
-        if application.application_status != "draft":
-            barangay_confirmation_id = confirmation_id_for(application)
-    elif spec and spec.get("kind") == "senior":
-        from app.services.senior_admin import summary as senior_confirmation_summary
-        from app.services.senior_confirmation_pdf import confirmation_id_for
-        from app.services.senior_delivery import delivery_address, delivery_for
-        from app.services.senior_payment import payment_summary
+            confirmation_id = confirmation_id_for(application)
+            if confirmation_id:
+                confirmation_pdf_url = url_for("citizen.passport_confirmation_pdf", application_id=application.application_id)
+                confirmation_label = "Download PDF confirmation"
+        elif kind in {"barangay", "residency"}:
+            from app.services.barangay_confirmation_pdf import confirmation_id_for
 
-        barangay_summary = payment_summary(application)
-        senior_delivery = delivery_for(application)
-        senior_delivery_address = delivery_address(senior_delivery) if senior_delivery else ""
-        senior_admin_confirmation = senior_confirmation_summary(application)
-        if application.application_status != "draft":
-            barangay_confirmation_id = confirmation_id_for(application)
-    elif spec and spec.get("kind") == "nbi":
-        from app.services.nbi_confirmation_pdf import confirmation_id_for
-        from app.services.nbi_delivery import delivery_address, delivery_for
-        from app.services.nbi_payment import payment_summary
+            confirmation_id = confirmation_id_for(application)
+            if confirmation_id:
+                confirmation_pdf_url = url_for("citizen.barangay_confirmation_pdf", application_id=application.application_id)
+        elif kind == "senior":
+            from app.services.senior_confirmation_pdf import confirmation_id_for
 
-        barangay_summary = payment_summary(application)
-        nbi_delivery = delivery_for(application)
-        nbi_delivery_address = delivery_address(nbi_delivery) if nbi_delivery else ""
-        if application.application_status != "draft":
-            barangay_confirmation_id = confirmation_id_for(application)
-    elif spec and spec.get("kind") == "birth":
-        from app.services.birth_confirmation_pdf import confirmation_id_for
-        from app.services.birth_payment import payment_summary
+            confirmation_id = confirmation_id_for(application)
+            if confirmation_id:
+                confirmation_pdf_url = url_for("citizen.senior_confirmation_pdf", application_id=application.application_id)
+        elif kind == "nbi":
+            from app.services.nbi_confirmation_pdf import confirmation_id_for
 
-        barangay_summary = payment_summary(application)
-        if application.application_status != "draft":
-            barangay_confirmation_id = confirmation_id_for(application)
-    elif spec and spec.get("kind") == "cenomar":
-        from app.services.cenomar_confirmation_pdf import confirmation_id_for
-        from app.services.cenomar_payment import payment_summary
+            confirmation_id = confirmation_id_for(application)
+            if confirmation_id:
+                confirmation_pdf_url = url_for("citizen.nbi_confirmation_pdf", application_id=application.application_id)
+        elif kind == "birth":
+            from app.services.birth_confirmation_pdf import confirmation_id_for
 
-        barangay_summary = payment_summary(application)
-        if application.application_status != "draft":
-            barangay_confirmation_id = confirmation_id_for(application)
-    elif spec and spec.get("kind") == "philsys":
-        from app.services.philsys_confirmation_pdf import confirmation_id_for
-        from app.services.philsys_payment import payment_summary
+            confirmation_id = confirmation_id_for(application)
+            if confirmation_id:
+                confirmation_pdf_url = url_for("citizen.birth_confirmation_pdf", application_id=application.application_id)
+        elif kind == "cenomar":
+            from app.services.cenomar_confirmation_pdf import confirmation_id_for
 
-        barangay_summary = payment_summary(application)
-        if application.application_status != "draft":
-            barangay_confirmation_id = confirmation_id_for(application)
-    elif spec and spec.get("kind") == "sss":
-        from app.services.sss_confirmation_pdf import confirmation_id_for
-        from app.services.sss_payment import payment_summary
+            confirmation_id = confirmation_id_for(application)
+            if confirmation_id:
+                confirmation_pdf_url = url_for("citizen.cenomar_confirmation_pdf", application_id=application.application_id)
+        elif kind == "philsys":
+            from app.services.philsys_confirmation_pdf import confirmation_id_for
 
-        barangay_summary = payment_summary(application)
-        if application.application_status != "draft":
-            barangay_confirmation_id = confirmation_id_for(application)
+            confirmation_id = confirmation_id_for(application)
+            if confirmation_id:
+                confirmation_pdf_url = url_for("citizen.philsys_confirmation_pdf", application_id=application.application_id)
+        elif kind == "sss":
+            from app.services.sss_confirmation_pdf import confirmation_id_for
+
+            confirmation_id = confirmation_id_for(application)
+            if confirmation_id:
+                confirmation_pdf_url = url_for("citizen.sss_confirmation_pdf", application_id=application.application_id)
+
     return render_template(
-        "applications/application_details.html",
+        "applications/citizen_application_detail.html",
         application=application,
+        applicant=applicant,
+        fields=answers,
+        events=events,
         status_labels=STATUS_LABELS,
-        payment_status_labels=PAYMENT_STATUS_LABELS,
+        tracking=tracking,
         spec=spec,
-        detail_fields=read_fields(application),
-        detail_documents=documents,
-        detail_checklist=read_checklist(application) if spec and (spec.get("checklist") or spec.get("kind") in ("philsys", "passport")) else [],
-        requirements={item.requirement_name: item for item in application.requirements},
-        passport_appointment=passport_appointment,
-        passport_summary=passport_summary,
-        passport_physical=passport_physical,
-        passport_confirmation_id=passport_confirmation_id,
-        barangay_summary=barangay_summary,
-        barangay_confirmation_id=barangay_confirmation_id,
-        senior_delivery=senior_delivery,
-        senior_delivery_address=senior_delivery_address,
-        senior_admin_confirmation=senior_admin_confirmation,
-        nbi_delivery=nbi_delivery,
-        nbi_delivery_address=nbi_delivery_address,
+        confirmation_id=confirmation_id,
+        confirmation_pdf_url=confirmation_pdf_url,
+        confirmation_label=confirmation_label,
     )
 
 
@@ -550,6 +912,13 @@ def profile():
 def settings():
     errors = {}
     if request.method == "POST":
+        action = clean_text(request.form.get("action")) or "password"
+        if action == "otp_login":
+            current_user.login_otp_enabled = request.form.get("otp_login_enabled") == "1"
+            db.session.commit()
+            flash("Login verification setting updated.", "success")
+            return redirect(url_for("citizen.settings"))
+
         current_password = request.form.get("current_password") or ""
         password = request.form.get("password") or ""
         confirm_password = request.form.get("confirm_password") or ""

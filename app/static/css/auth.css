@@ -346,3 +346,63 @@ body:has(.register-screen) .header-row {
 }
 
 .login-card .form-error { font-size: 0.88rem; }
+
+/* OTP verification */
+.otp-card { max-width: 100%; }
+.otp-timers {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 0.25rem 0 1rem;
+}
+.otp-timer-item {
+    background: #f6f8fa;
+    border: 1px solid #d7dee6;
+    border-radius: 10px;
+    padding: 0.55rem 0.7rem;
+    text-align: center;
+}
+.otp-timer-label {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-bottom: 0.15rem;
+}
+.otp-timer-value {
+    font-size: 1rem;
+    color: var(--navy);
+}
+.otp-code-input {
+    letter-spacing: 0.35em;
+    font-size: 1.15rem;
+    text-align: center;
+    font-weight: 650;
+}
+.otp-hint { margin: 0.45rem 0 0; }
+.otp-resend-form { margin-top: 0.65rem; }
+.otp-resend-btn {
+    width: 100%;
+    margin-top: 0;
+    padding: 0.65rem 0.9rem;
+    font: inherit;
+    font-weight: 650;
+    color: var(--navy);
+    background: #fff;
+    border: 1px solid #b9c5d1;
+    border-radius: 10px;
+    cursor: pointer;
+}
+.otp-resend-btn:hover:not(:disabled) {
+    background: #f3f6f9;
+}
+.otp-resend-btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+.otp-expired-note { margin-top: 0.75rem; }
+
+@media (max-width: 520px) {
+    .otp-timers {
+        grid-template-columns: 1fr;
+    }
+}

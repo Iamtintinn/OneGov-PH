@@ -179,12 +179,21 @@ body.admin-review-page .admin-breadcrumb {
     background: #eef4f8;
 }
 
-body.admin-review-page .review-map {
+body.admin-review-page .review-map,
+body.admin-review-page .review-map-frame .admin-track-map {
     width: 100%;
     height: clamp(320px, 42vh, 460px);
     border: 0;
     border-radius: 0;
+    background: transparent;
     z-index: 0;
+}
+
+body.admin-review-page .review-map-frame .leaflet-container {
+    border: 0 !important;
+    border-radius: 0;
+    background: #eef4f8;
+    box-shadow: none;
 }
 
 .review-map-dates {

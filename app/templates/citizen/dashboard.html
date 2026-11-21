@@ -3,168 +3,348 @@
 {% block body_class %}citizen-dashboard{% endblock %}
 {% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
 {% block content %}
-<div class="dash-page site-width">
-    <section class="welcome-card" aria-labelledby="welcome-heading">
-        <div>
-            <p class="dash-kicker">Citizen dashboard</p>
-            <h1 id="welcome-heading">Hello, {{ current_user.first_name }}</h1>
-            <p class="welcome-text">See your applications and the government services currently available through OneGov PH.</p>
-        </div>
+{% set ready_count = summary.ready_for_pickup if summary.ready_for_pickup is defined else 0 %}
+{% set completion = profile_completion.percent if profile_completion else 0 %}
+<div class="dash-page dash-pro site-width">
+  <section class="pro-hero" aria-labelledby="welcome-heading">
+    <div class="pro-hero-main">
+      <p class="pro-kicker">Citizen Workspace</p>
+      <h1 id="welcome-heading">Welcome back, {{ current_user.first_name or current_user.full_name or "Citizen" }}</h1>
+      <p class="pro-subtitle">Manage applications, track progress, review payments, and access your government documents in one secure dashboard.</p>
+      <div class="pro-hero-actions">
         <a class="dash-button dash-button-apply" href="{{ url_for('citizen.services') }}">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-            Apply for a Government Service
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          Apply for a service
         </a>
-    </section>
-    <form class="dash-search dash-search-below" method="get" action="{{ url_for('citizen.services') }}" role="search">
-        <label class="visually-hidden" for="service-query">Search government services</label>
-        <input id="service-query" name="q" type="search" value="{{ service_query|default('') }}" placeholder="Search government services" maxlength="80" autocomplete="off">
-        <button class="dash-button" type="submit">Search</button>
-    </form>
-
-    <section class="dash-section" aria-labelledby="summary-heading">
-        <h2 id="summary-heading">Application summary</h2>
-        <div class="stat-grid">
-            <article class="stat-card stat-total">
-                <h3>Total applications</h3>
-                <p class="stat-value">{{ summary.total }}</p>
-                <p class="stat-note">Every application on your account, including rejected and cancelled.</p>
-            </article>
-            <article class="stat-card stat-pending">
-                <h3>Pending applications</h3>
-                <p class="stat-value">{{ summary.pending }}</p>
-                <p class="stat-note">Pending, under review, documents required, or waiting for payment.</p>
-            </article>
-            <article class="stat-card stat-progress">
-                <h3>Applications in progress</h3>
-                <p class="stat-value">{{ summary.in_progress }}</p>
-                <p class="stat-note">Approved, paid, scheduled, processing, or ready for release.</p>
-            </article>
-            <article class="stat-card stat-done">
-                <h3>Completed applications</h3>
-                <p class="stat-value">{{ summary.completed }}</p>
-                <p class="stat-note">Applications marked completed.</p>
-            </article>
+        <a class="dash-button pro-btn-soft" href="{{ url_for('citizen.tracking') }}">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          Track applications
+        </a>
+        <a class="dash-button pro-btn-soft" href="{{ url_for('citizen.profile') }}">Complete profile</a>
+      </div>
+    </div>
+    <div class="pro-hero-side">
+      <div class="pro-profile-card">
+        <div class="pro-profile-head">
+          <span class="pro-avatar" aria-hidden="true">{{ (current_user.first_name or 'C')[:1]|upper }}</span>
+          <div>
+            <p class="pro-profile-name">{{ current_user.full_name or (current_user.first_name ~ ' ' ~ current_user.last_name) }}</p>
+            <p class="pro-profile-meta">{{ current_user.email }}</p>
+          </div>
         </div>
-    </section>
-
-    <section class="dash-section" aria-labelledby="quick-heading">
-        <h2 id="quick-heading">Quick access</h2>
-        <div class="shortcut-grid">
-            <a class="shortcut" href="{{ url_for('citizen.services') }}">
-                <span class="shortcut-title">Browse Government Services</span>
-                <span class="shortcut-text">Open the services in the current catalog.</span>
-            </a>
-            <a class="shortcut" href="{{ url_for('citizen.applications') }}">
-                <span class="shortcut-title">My Applications</span>
-                <span class="shortcut-text">Review the applications on your account.</span>
-            </a>
-            <a class="shortcut" href="{{ url_for('citizen.tracking') }}">
-                <span class="shortcut-title">Track Applications</span>
-                <span class="shortcut-text">Check the current status of a recent application.</span>
-            </a>
-            <a class="shortcut" href="{{ url_for('citizen.notifications') }}">
-                <span class="shortcut-title">Notifications</span>
-                <span class="shortcut-text">
-                    {% if unread_notification_count %}
-                    {{ unread_notification_count }} unread
-                    {% else %}
-                    No unread notifications
-                    {% endif %}
-                </span>
-            </a>
+        <div class="pro-completion">
+          <div class="pro-completion-top"><span>Profile completion</span><strong>{{ completion }}%</strong></div>
+          <div class="pro-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ completion }}" aria-label="Profile completion {{ completion }} percent"><span style="width: {{ completion }}%"></span></div>
+          <p class="pro-muted">{% if profile_completion.missing %}Missing: {{ profile_completion.missing|join(', ') }}{% else %}Your basic account details are complete.{% endif %}</p>
         </div>
-    </section>
-
-    <section class="dash-section" id="government-services" aria-labelledby="services-heading">
-        <div class="section-heading">
-            <h2 id="services-heading">Featured government services</h2>
-            <a href="{{ url_for('citizen.services') }}">View all services</a>
+        <div class="pro-hero-badges">
+          <span class="pro-badge pro-badge-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>{{ current_user.email_verification_status|replace('_',' ')|title }}</span>
+          <span class="pro-badge pro-badge-violet"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>OTP {{ "On" if current_user.login_otp_enabled else "Off" }}</span>
+          <span class="pro-badge pro-badge-teal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>{{ unread_notification_count }} unread</span>
         </div>
-        {% if service_query %}
-        <p class="search-result" role="status">Showing services matching “{{ service_query }}”.</p>
-        {% endif %}
-        {% if services %}
-        <div class="service-grid">
-            {% for service in services %}
-            <article class="service-card">
-                <p class="dash-kicker">{{ service.department.department_name }}</p>
-                <h3>{{ service.service_name }}</h3>
-                <p>{{ service.description or "No description is listed for this service." }}</p>
-                <div class="service-actions">
-                    <details class="service-details">
-                        <summary>View details</summary>
-                        <dl>
-                            <div>
-                                <dt>Department</dt>
-                                <dd>{{ service.department.department_name }}{% if service.department.department_description %} — {{ service.department.department_description }}{% endif %}</dd>
-                            </div>
-                            <div>
-                                <dt>Processing fee</dt>
-                                <dd>{% if service.service_name == "Barangay Clearance" %}Depends on your local barangay. OneGov PH does not collect this payment.{% elif service.service_name == "Certificate of Residency" %}Depends on the issuing barangay or city. OneGov PH does not collect this payment.{% elif service.service_name == "Senior Citizen ID" %}No processing fee is listed for standard new issuance. Confirm any fee with your OSCA office.{% elif service.service_name == "NBI Clearance Application Monitoring" %}Listed Clearance Fee: ₱130.00. Additional electronic payment service charges may apply. Payment must be completed through official NBI payment channels. OneGov PH does not collect this payment.{% elif service.service_name == "CENOMAR" %}The PSA charges the official fee. Confirm the current amount and pay through an authorized PSA channel. OneGov PH does not collect this payment.{% elif service.service_name.startswith("SS Number") %}No SSS registration processing fee. OneGov PH does not collect a payment.{% else %}₱{{ "%.2f"|format(service.processing_fee) }}{% endif %}</dd>
-                            </div>
-                            <div>
-                                <dt>Estimated time</dt>
-                                <dd>{{ service.estimated_processing_time or "Not listed" }}</dd>
-                            </div>
-                            <div>
-                                <dt>Requirements</dt>
-                                <dd>{{ service.service_requirements or "No requirements are listed for this service." }}</dd>
-                            </div>
-                        </dl>
-                    </details>
-                    {% if service.service_name in applicable_service_names %}
-                    <a class="dash-button dash-button-apply" href="{{ url_for('citizen.apply_details', service_id=service.service_id) }}">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-                        Apply now
-                    </a>
-                    {% else %}
-                    <button class="dash-button dash-button-secondary" type="button" disabled>Apply now</button>
-                    {% endif %}
-                </div>
-                {% if service.service_name not in applicable_service_names %}
-                <p class="unavailable">Applications for this service cannot be submitted on the website yet.</p>
-                {% endif %}
-            </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="dash-section" aria-labelledby="summary-heading">
+    <div class="section-heading pro-section-head">
+      <div><p class="pro-kicker">Overview</p><h2 id="summary-heading">Application summary</h2></div>
+      <a href="{{ url_for('citizen.applications') }}" class="pro-link">View all applications</a>
+    </div>
+    <div class="pro-stats-grid">
+      <article class="pro-stat pro-stat-blue">
+        <div class="pro-stat-top"><span class="pro-stat-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h6"/></svg></span><span class="pro-stat-tag">All records</span></div>
+        <p class="pro-stat-value">{{ summary.total }}</p>
+        <h3>Total applications</h3>
+        <p class="pro-stat-note">Every application on your account</p>
+      </article>
+      <article class="pro-stat pro-stat-amber">
+        <div class="pro-stat-top"><span class="pro-stat-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span><span class="pro-stat-tag">Action needed</span></div>
+        <p class="pro-stat-value">{{ summary.pending }}</p>
+        <h3>Pending review</h3>
+        <p class="pro-stat-note">Submitted, review, documents, or payment</p>
+      </article>
+      <article class="pro-stat pro-stat-indigo">
+        <div class="pro-stat-top"><span class="pro-stat-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span><span class="pro-stat-tag">Active</span></div>
+        <p class="pro-stat-value">{{ summary.in_progress }}</p>
+        <h3>In progress</h3>
+        <p class="pro-stat-note">Approved, paid, scheduled, or processing</p>
+      </article>
+      <article class="pro-stat pro-stat-violet">
+        <div class="pro-stat-top"><span class="pro-stat-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"/><path d="M12 22V12"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="m16 19 2 2 4-4"/></svg></span><span class="pro-stat-tag">Release</span></div>
+        <p class="pro-stat-value">{{ ready_count }}</p>
+        <h3>Ready for pickup</h3>
+        <p class="pro-stat-note">Applications ready for release/pickup</p>
+      </article>
+      <article class="pro-stat pro-stat-green">
+        <div class="pro-stat-top"><span class="pro-stat-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg></span><span class="pro-stat-tag">Finished</span></div>
+        <p class="pro-stat-value">{{ summary.completed }}</p>
+        <h3>Completed</h3>
+        <p class="pro-stat-note">Successfully completed applications</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="dash-section" aria-labelledby="insights-heading">
+    <div class="section-heading pro-section-head">
+      <div><p class="pro-kicker">Insights</p><h2 id="insights-heading">Activity & status analytics</h2></div>
+    </div>
+    <div class="pro-insights-grid">
+      <article class="pro-panel">
+        <div class="pro-panel-head"><span class="pro-panel-icon pro-icon-indigo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span><div><h3>Status distribution</h3><p>Based on your {{ analytics.total_apps }} application{{ '' if analytics.total_apps == 1 else 's' }}</p></div></div>
+        {% if analytics.status_chart %}
+        <div class="pro-donut-wrap">
+          <div class="pro-donut" style="background: {{ analytics.donut_gradient }};" aria-hidden="true"><div class="pro-donut-hole"><strong>{{ analytics.total_apps }}</strong><span>Total</span></div></div>
+          <ul class="pro-legend" aria-label="Application status distribution">
+            {% for item in analytics.status_chart %}
+            <li><span class="pro-dot" style="background: {{ item.color }}"></span><span class="pro-legend-label">{{ item.label }}</span><span class="pro-legend-val">{{ item.count }} <small>({{ item.percent }}%)</small></span></li>
             {% endfor %}
+          </ul>
         </div>
         {% else %}
-        <p class="empty-state" role="status">No services in the catalog match that search.</p>
+        <div class="pro-empty-chart">
+          <div class="pro-donut pro-donut-empty" aria-hidden="true"><div class="pro-donut-hole"><strong>0</strong><span>No data</span></div></div>
+          <p>No application status data yet. Start by applying for a service.</p>
+        </div>
         {% endif %}
+      </article>
+
+      <article class="pro-panel">
+        <div class="pro-panel-head"><span class="pro-panel-icon pro-icon-cyan"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="9" width="3" height="9" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/></svg></span><div><h3>Submissions (last 6 months)</h3><p>Applications submitted from your account</p></div></div>
+        <div class="pro-bars" role="img" aria-label="Monthly application submissions for the last six months">
+          {% for bar in analytics.monthly_chart %}
+          <div class="pro-bar-col">
+            <span class="pro-bar-count">{{ bar.count }}</span>
+            <div class="pro-bar-track"><span class="pro-bar-fill" style="height: {{ bar.height if bar.count else 4 }}%;{% if not bar.count %} opacity:.25;{% endif %}"></span></div>
+            <span class="pro-bar-label">{{ bar.label }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% if analytics.monthly_max == 0 %}<p class="pro-muted pro-center">No submissions in the last 6 months.</p>{% endif %}
+      </article>
+
+      <article class="pro-panel">
+        <div class="pro-panel-head"><span class="pro-panel-icon pro-icon-emerald"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg></span><div><h3>Payments snapshot</h3><p>Recorded payment activity</p></div></div>
+        <div class="pro-kpi-list">
+          <div class="pro-kpi pro-kpi-emerald"><span class="pro-kpi-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><div><p class="pro-kpi-label">Total paid</p><p class="pro-kpi-value">₱{{ analytics.paid_total }}</p></div></div>
+          <div class="pro-kpi pro-kpi-amber"><span class="pro-kpi-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span><div><p class="pro-kpi-label">Pending payments</p><p class="pro-kpi-value">{{ analytics.pending_payments }}</p></div></div>
+          <div class="pro-kpi pro-kpi-blue"><span class="pro-kpi-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span><div><p class="pro-kpi-label">Payment records</p><p class="pro-kpi-value">{{ analytics.total_payments }}</p></div></div>
+        </div>
+        <div class="pro-progress-stack">
+          {% set total = summary.total if summary.total else 1 %}
+          <div class="pro-meter"><div class="pro-meter-top"><span>Pending review</span><span>{{ summary.pending }}</span></div><div class="pro-meter-track"><span style="width: {{ (summary.pending / total * 100) if summary.total else 0 }}%; background:#F59E0B"></span></div></div>
+          <div class="pro-meter"><div class="pro-meter-top"><span>In progress</span><span>{{ summary.in_progress }}</span></div><div class="pro-meter-track"><span style="width: {{ (summary.in_progress / total * 100) if summary.total else 0 }}%; background:#6366F1"></span></div></div>
+          <div class="pro-meter"><div class="pro-meter-top"><span>Completed</span><span>{{ summary.completed }}</span></div><div class="pro-meter-track"><span style="width: {{ (summary.completed / total * 100) if summary.total else 0 }}%; background:#16A34A"></span></div></div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="dash-section" aria-labelledby="quick-heading">
+    <div class="section-heading pro-section-head"><div><p class="pro-kicker">Shortcuts</p><h2 id="quick-heading">Quick actions</h2></div></div>
+    <div class="pro-quick-grid">
+      <a class="pro-quick pro-q-blue" href="{{ url_for('citizen.services') }}"><span class="pro-quick-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></span><span class="pro-quick-body"><span class="pro-quick-title">Apply for a Service</span><span class="pro-quick-text">Browse the catalog and start a new application.</span></span><span class="pro-quick-arrow">→</span></a>
+      <a class="pro-quick pro-q-indigo" href="{{ url_for('citizen.tracking') }}"><span class="pro-quick-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/><path d="m16.5 17.5 2 2"/></svg></span><span class="pro-quick-body"><span class="pro-quick-title">Track My Application</span><span class="pro-quick-text">Monitor timelines, status updates, and progress.</span></span><span class="pro-quick-arrow">→</span></a>
+      <a class="pro-quick pro-q-teal" href="{{ url_for('citizen.payments') }}"><span class="pro-quick-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></span><span class="pro-quick-body"><span class="pro-quick-title">View Payments</span><span class="pro-quick-text">Check payment status and available confirmations.</span></span><span class="pro-quick-arrow">→</span></a>
+      <a class="pro-quick pro-q-rose" href="#notifications"><span class="pro-quick-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span><span class="pro-quick-body"><span class="pro-quick-title">Notifications</span><span class="pro-quick-text">{% if unread_notification_count %}{{ unread_notification_count }} unread update{{ '' if unread_notification_count == 1 else 's' }}{% else %}You’re all caught up{% endif %}</span></span><span class="pro-quick-arrow">→</span></a>
+      <a class="pro-quick pro-q-emerald" href="#my-documents"><span class="pro-quick-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg></span><span class="pro-quick-body"><span class="pro-quick-title">My Documents</span><span class="pro-quick-text">Access uploaded files and available confirmations.</span></span><span class="pro-quick-arrow">→</span></a>
+      <a class="pro-quick pro-q-violet" href="{{ url_for('citizen.profile') }}"><span class="pro-quick-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.8-3.5 4.8-5 8-5s6.2 1.5 8 5"/></svg></span><span class="pro-quick-body"><span class="pro-quick-title">Profile & Security</span><span class="pro-quick-text">Update your details, password, and OTP settings.</span></span><span class="pro-quick-arrow">→</span></a>
+    </div>
+  </section>
+
+  <section class="dash-section" id="my-applications" aria-labelledby="applications-heading">
+    <div class="section-heading pro-section-head"><div><p class="pro-kicker">Applications</p><h2 id="applications-heading">Recent applications</h2></div><a href="{{ url_for('citizen.applications') }}" class="pro-link">View all</a></div>
+    {% if recent_rows %}
+    <div class="pro-panel pro-table-panel">
+      <div class="table-wrap">
+        <table class="app-table pro-table">
+          <thead><tr><th scope="col">Application</th><th scope="col">Service</th><th scope="col">Submitted</th><th scope="col">Status</th><th scope="col">Progress</th><th scope="col">Last update</th><th scope="col">Action</th></tr></thead>
+          <tbody>
+            {% for row in recent_rows %}
+            {% set application = row.application %}
+            <tr>
+              <td data-label="Application"><strong class="pro-mono">{{ application.tracking_number }}</strong></td>
+              <td data-label="Service">{{ application.service.service_name }}<br><small class="pro-muted">{{ application.department.department_name }}</small></td>
+              <td data-label="Submitted">{{ application.submission_date.strftime("%d %b %Y") if application.submission_date else "—" }}</td>
+              <td data-label="Status">{% with status=application.application_status, labels=status_labels_for(application.service, application) %}{% include "applications/_status.html" %}{% endwith %}</td>
+              <td data-label="Progress">
+                <div class="pro-progress-inline"><div class="pro-bar pro-bar-sm"><span style="width: {{ row.progress.percent }}%"></span></div><small>{{ row.progress.percent }}%</small></div>
+              </td>
+              <td data-label="Last update">{% if row.latest_event %}{{ row.latest_event.recorded_at.strftime("%d %b %Y") if row.latest_event.recorded_at else "—" }}<br><small class="pro-muted">{{ row.latest_event.update_description[:70] }}{% if row.latest_event.update_description|length > 70 %}…{% endif %}</small>{% elif application.last_updated %}{{ application.last_updated.strftime("%d %b %Y") }}{% else %}—{% endif %}</td>
+              <td data-label="Action" class="pro-actions-cell">
+                {% if application.application_status == 'draft' %}
+                <a class="pro-chip-btn pro-chip-blue" href="{{ url_for('citizen.application_continue', application_id=application.application_id) }}">Continue</a>
+                {% else %}
+                <a class="pro-chip-btn pro-chip-blue" href="{{ url_for('citizen.application_detail', application_id=application.application_id) }}">Details</a>
+                <a class="pro-chip-btn pro-chip-soft" href="{{ url_for('citizen.tracking') }}#app-{{ application.application_id }}">Track</a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% else %}
+    <div class="pro-panel pro-empty-panel"><div class="pro-empty-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div><h3>No applications yet</h3><p>When you apply for a service, your recent applications and progress will appear here.</p><a class="dash-button dash-button-apply" href="{{ url_for('citizen.services') }}">Browse services</a></div>
+    {% endif %}
+  </section>
+
+  <section class="dash-section" aria-labelledby="timeline-heading">
+    <div class="section-heading pro-section-head"><div><p class="pro-kicker">Tracking</p><h2 id="timeline-heading">Timeline highlights</h2></div><a href="{{ url_for('citizen.tracking') }}" class="pro-link">Open full tracking</a></div>
+    {% if recent_rows %}
+    <div class="pro-timeline-grid">
+      {% for row in recent_rows %}
+      {% set application = row.application %}
+      <article class="pro-panel pro-timeline-card">
+        <div class="pro-timeline-head"><div><h3>{{ application.service.service_name }}</h3><p class="pro-muted pro-mono">{{ application.tracking_number }}</p></div>{% with status=application.application_status, labels=status_labels_for(application.service, application) %}{% include "applications/_status.html" %}{% endwith %}</div>
+        <ol class="pro-timeline">
+          <li class="is-done"><span class="pro-tl-dot"></span><div><strong>Submitted</strong><p>{{ application.submission_date.strftime("%d %b %Y, %H:%M") if application.submission_date else "Not yet submitted" }}</p></div></li>
+          {% for event in row.timeline %}
+          <li><span class="pro-tl-dot"></span><div><strong>{{ status_labels_for(application.service, application).get(event.new_status, event.new_status|replace('_',' ')|title) }}</strong><p>{{ event.recorded_at.strftime("%d %b %Y, %H:%M") if event.recorded_at else "" }} · {{ event.update_description }}</p></div></li>
+          {% endfor %}
+          {% if not row.timeline %}<li><span class="pro-tl-dot"></span><div><p class="pro-muted">No status history recorded yet.</p></div></li>{% endif %}
+        </ol>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="pro-panel pro-muted">Timeline details will appear after you submit an application.</p>
+    {% endif %}
+  </section>
+
+  <div class="pro-two-col">
+    <section class="dash-section pro-col" id="notifications" aria-labelledby="notifications-heading">
+      <div class="section-heading pro-section-head"><div><p class="pro-kicker">Updates</p><h2 id="notifications-heading">Notifications</h2></div>
+        <div class="pro-head-actions">{% if unread_notification_count %}<form method="post" action="{{ url_for('citizen.notifications_read_all') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ url_for('citizen.dashboard') }}"><button class="pro-chip-btn pro-chip-soft" type="submit">Mark all read</button></form>{% endif %}<a href="{{ url_for('citizen.notifications') }}" class="pro-link">View all</a></div>
+      </div>
+      <div class="pro-panel">
+        {% if notifications %}
+        <ul class="pro-notice-list">
+          {% for notice in notifications %}
+          <li class="pro-notice{% if notice.read_status == 'unread' %} is-unread{% endif %}">
+            <span class="pro-notice-icon type-{{ notice.notification_type or 'system' }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
+            <div class="pro-notice-body">
+              <p class="pro-notice-title">{{ notice.notification_title }}</p>
+              <p class="pro-muted">{{ notice.notification_message }}</p>
+              <p class="pro-notice-meta">{{ notice.created_date.strftime("%d %b %Y, %H:%M") if notice.created_date else "" }} · {{ notice.notification_type|replace('_',' ')|title }}</p>
+            </div>
+            {% if notice.read_status == 'unread' %}
+            <form method="post" action="{{ url_for('citizen.notification_read', notification_id=notice.notification_id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ url_for('citizen.dashboard') }}"><button class="pro-chip-btn pro-chip-soft" type="submit">Read</button></form>
+            {% else %}<span class="pro-badge pro-badge-muted">Read</span>{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="pro-muted">No notifications yet. Status, payment, and appointment updates will appear here.</p>
+        {% endif %}
+      </div>
     </section>
 
-    <section class="dash-section" id="my-applications" aria-labelledby="applications-heading">
-        <h2 id="applications-heading">Recent applications</h2>
-        {% if applications %}
-        <div class="table-wrap">
-            <table class="app-table">
-                <caption class="visually-hidden">Your five most recent applications</caption>
-                <thead>
-                    <tr>
-                        <th scope="col">Application ID</th>
-                        <th scope="col">Service name</th>
-                        <th scope="col">Department</th>
-                        <th scope="col">Date submitted</th>
-                        <th scope="col">Current status</th>
-                        <th scope="col">Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for application in applications %}
-                    <tr>
-                        <td data-label="Application ID">{{ application.tracking_number }}</td>
-                        <td data-label="Service name">{{ application.service.service_name }}</td>
-                        <td data-label="Department">{{ application.department.department_name }}</td>
-                        <td data-label="Date submitted">{{ application.submission_date.strftime("%d %b %Y") }}</td>
-                        <td data-label="Current status">{% set labels = status_labels_for(application.service, application) %}{% with status=application.application_status, labels=labels %}{% include "applications/_status.html" %}{% endwith %}</td>
-                        <td data-label="Action">{% if application.application_status == 'draft' %}<a href="{{ url_for('citizen.application_continue', application_id=application.application_id) }}">Continue</a>{% else %}<a href="{{ url_for('citizen.application_detail', application_id=application.application_id) }}">View details</a>{% endif %}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+    <section class="dash-section pro-col" id="payments" aria-labelledby="payments-heading">
+      <div class="section-heading pro-section-head"><div><p class="pro-kicker">Finance</p><h2 id="payments-heading">Payment overview</h2></div><a href="{{ url_for('citizen.payments') }}" class="pro-link">History</a></div>
+      <div class="pro-panel">
+        {% if payment_rows %}
+        <ul class="pro-pay-list">
+          {% for row in payment_rows %}
+          {% set p = row.payment %}
+          <li class="pro-pay-item">
+            <span class="pro-pay-icon status-{{ p.payment_status }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></span>
+            <div class="pro-pay-body">
+              <p class="pro-pay-title">₱{{ "%.2f"|format(p.amount) }} <span class="pro-badge pro-badge-{{ 'green' if p.payment_status=='paid' else 'amber' if p.payment_status=='pending' else 'muted' }}">{{ row.status_label }}</span></p>
+              <p class="pro-muted">{{ row.application.tracking_number if row.application else "—" }}{% if row.application %} · {{ row.application.service.service_name }}{% endif %}</p>
+              <p class="pro-notice-meta">{{ row.method_label }}{% if p.transaction_date %} · {{ p.transaction_date.strftime("%d %b %Y") }}{% endif %} · Ref: {{ p.payment_reference }}</p>
+            </div>
+            {% if row.receipt_route and row.application %}<a class="pro-chip-btn pro-chip-blue" href="{{ url_for(row.receipt_route, application_id=row.application.application_id) }}">Receipt</a>{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
         {% else %}
-        <p class="empty-state" role="status">You have not submitted any applications yet.</p>
+        <p class="pro-muted">No payment records found for your applications.</p>
         {% endif %}
+      </div>
     </section>
+  </div>
+
+  <section class="dash-section" id="government-services" aria-labelledby="services-heading">
+    <div class="section-heading pro-section-head"><div><p class="pro-kicker">Catalog</p><h2 id="services-heading">Available services</h2></div><a href="{{ url_for('citizen.services') }}" class="pro-link">Browse all services</a></div>
+    <div class="pro-services-grid">
+      {% for group in service_groups %}
+      <article class="pro-service-card tone-{{ group.icon }}">
+        <div class="pro-service-icon" aria-hidden="true">
+          {% if group.icon == 'dfa' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          {% elif group.icon in ['psa','cert'] %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h4"/></svg>
+          {% elif group.icon in ['nbi','shield'] %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+          {% elif group.icon == 'sss' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>
+          {% elif group.icon == 'lgu' %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg>
+          {% else %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M15 8h2"/><path d="M15 12h2"/></svg>{% endif %}
+        </div>
+        <p class="pro-kicker">{{ group.department }}</p>
+        <h3>{{ group.title }}</h3>
+        <p class="pro-muted">{{ group.description }}</p>
+        <a class="pro-chip-btn pro-chip-blue pro-service-cta" href="{{ group.url }}">Open service</a>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="dash-section" id="my-documents" aria-labelledby="documents-heading">
+    <div class="section-heading pro-section-head"><div><p class="pro-kicker">Records</p><h2 id="documents-heading">Documents & releases</h2></div></div>
+    <div class="pro-two-col pro-two-equal">
+      <article class="pro-panel">
+        <div class="pro-panel-head"><span class="pro-panel-icon pro-icon-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg></span><div><h3>Uploaded documents</h3><p>Files submitted with your applications</p></div></div>
+        {% if uploaded_documents %}
+        <ul class="pro-doc-list">
+          {% for req in uploaded_documents %}
+          <li><span class="pro-doc-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span><div><p class="pro-doc-title">{{ req.requirement_name }}</p><p class="pro-muted">Verification: {{ req.verification_status|replace('_',' ')|title }}</p></div>{% if req.application_id and req.requirement_id %}<a class="pro-chip-btn pro-chip-soft" href="{{ url_for('citizen.application_document', application_id=req.application_id, requirement_id=req.requirement_id) }}">Open</a>{% endif %}</li>
+          {% endfor %}
+        </ul>
+        {% else %}<p class="pro-muted">No uploaded application documents on record.</p>{% endif %}
+      </article>
+      <article class="pro-panel">
+        <div class="pro-panel-head"><span class="pro-panel-icon pro-icon-violet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span><div><h3>Confirmations & delivery</h3><p>Available confirmations and fulfillment status</p></div></div>
+        {% if my_documents %}
+        <ul class="pro-doc-list">
+          {% for item in my_documents %}
+          {% set app = item.application %}
+          <li><span class="pro-doc-icon alt"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg></span><div><p class="pro-doc-title">{{ app.service.service_name }}</p><p class="pro-muted pro-mono">{{ app.tracking_number }}</p><p class="pro-muted">{{ status_label_for(app) }}{% if item.delivery_status %} · Delivery: {{ item.delivery_status|replace('_',' ')|title }}{% endif %}</p></div>{% if item.confirmation_route %}<a class="pro-chip-btn pro-chip-blue" href="{{ url_for(item.confirmation_route, application_id=app.application_id) }}">Download</a>{% endif %}</li>
+          {% endfor %}
+        </ul>
+        {% else %}<p class="pro-muted">No application documents available yet.</p>{% endif %}
+      </article>
+    </div>
+  </section>
+
+  <section class="dash-section" id="account-help" aria-labelledby="account-help-heading">
+    <div class="section-heading pro-section-head"><div><p class="pro-kicker">Account</p><h2 id="account-help-heading">Profile, security & support</h2></div></div>
+    <div class="pro-two-col pro-two-equal">
+      <article class="pro-panel">
+        <div class="pro-panel-head"><span class="pro-panel-icon pro-icon-teal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span><div><h3>Profile & security</h3><p>Account details from your records</p></div></div>
+        <ul class="pro-info-list">
+          <li><span>Name</span><strong>{{ current_user.full_name or (current_user.first_name ~ ' ' ~ current_user.last_name) }}</strong></li>
+          <li><span>Email</span><strong>{{ current_user.email }}</strong></li>
+          <li><span>Verification</span><strong>{{ current_user.email_verification_status|replace('_',' ')|title }}</strong></li>
+          <li><span>Contact</span><strong>{{ current_user.contact_number or "Not provided" }}</strong></li>
+          <li><span>Address</span><strong>{{ current_user.address or "Not provided" }}</strong></li>
+          <li><span>Login OTP</span><strong>{{ "Enabled" if current_user.login_otp_enabled else "Disabled" }}</strong></li>
+        </ul>
+        <div class="pro-action-row">
+          <a class="dash-button pro-btn-soft" href="{{ url_for('citizen.profile') }}">Edit profile</a>
+          <a class="dash-button pro-btn-soft" href="{{ url_for('citizen.settings') }}">Settings</a>
+          <a class="dash-button pro-btn-soft" href="{{ url_for('citizen.settings') }}">Change password</a>
+        </div>
+        <p class="pro-muted" style="margin-top:.75rem">Profile photo upload is not yet available in the current account schema.</p>
+      </article>
+      <article class="pro-panel">
+        <div class="pro-panel-head"><span class="pro-panel-icon pro-icon-rose"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span><div><h3>Help & support</h3><p>Guidance based on available records</p></div></div>
+        <div class="pro-help-list">
+          <a class="pro-help-item" href="{{ url_for('citizen.tracking') }}"><span class="pro-help-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span><div><strong>Track applications</strong><p>View status history, progress, and transparency details.</p></div></a>
+          <a class="pro-help-item" href="{{ url_for('citizen.notifications') }}"><span class="pro-help-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/></svg></span><div><strong>Notification center</strong><p>Review status, payment, and appointment updates.</p></div></a>
+          <a class="pro-help-item" href="{{ url_for('citizen.applications') }}"><span class="pro-help-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span><div><strong>My applications</strong><p>Continue drafts, view details, and manage requests.</p></div></a>
+        </div>
+        <p class="pro-muted" style="margin-top:.75rem">Online support ticket/issue-report submission is not available in the current schema. For record-specific concerns, contact the responsible office shown on the application/service details.</p>
+      </article>
+    </div>
+  </section>
 </div>
 {% endblock %}

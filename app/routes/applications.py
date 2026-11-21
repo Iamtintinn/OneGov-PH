@@ -1517,7 +1517,14 @@ def apply_delivery(application_id):
             else:
                 initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
 
-    delivery_region_val = REGION
+    if kind == "passport":
+        delivery_region_val = values.get("region") or ""
+        delivery_province_val = values.get("province") or ""
+        delivery_city_val = values.get("city") or ""
+    else:
+        delivery_region_val = REGION
+        delivery_province_val = PROVINCE
+        delivery_city_val = CITY
     context = _common(application, delivery_step)
     delivery_address_preview = ""
     if kind in {"birth", "cenomar", "passport", "senior", "nbi", "philsys", "sss"}:
@@ -1527,9 +1534,9 @@ def apply_delivery(application_id):
                 "street": values.get("street"),
                 "subdivision": values.get("subdivision"),
                 "barangay": values.get("barangay"),
-                "city": CITY,
-                "province": PROVINCE,
-                "region": REGION,
+                "city": values.get("city") or delivery_city_val,
+                "province": values.get("province") or delivery_province_val,
+                "region": values.get("region") or delivery_region_val,
             }
         )
     initial_origin_lat = values.get("origin_latitude") or initial_lat
@@ -1568,8 +1575,8 @@ def apply_delivery(application_id):
             "delivery_address_preview": delivery_address_preview,
             "barangay_options": DEMO_BARANGAYS,
             "delivery_region": delivery_region_val,
-            "delivery_province": PROVINCE,
-            "delivery_city": CITY,
+            "delivery_province": delivery_province_val,
+            "delivery_city": delivery_city_val,
             "delivery_fee": DELIVERY_FEE,
             "delivery_saved": delivery_ready(application),
             "initial_lat": initial_lat,

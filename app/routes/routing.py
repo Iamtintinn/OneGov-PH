@@ -11,6 +11,8 @@ _ROUTE_CACHE = {}
 _ADDRESS_CACHE = {}
 _ADDRESS_LOCK = threading.Lock()
 _LAST_ADDRESS_SEARCH = 0.0
+_REVERSE_CACHE = {}
+
 
 
 def _parse_coordinate(value, minimum, maximum):
@@ -146,6 +148,105 @@ def _short_address_label(item, fallback):
         if value and value.casefold() not in {part.casefold() for part in parts}:
             parts.append(value)
     return ", ".join(parts) or str(item.get("display_name") or fallback).strip()
+
+
+def _reverse_base_url(base_url):
+    url = str(base_url or "").strip().rstrip("/")
+    if url.endswith("/search"):
+        return url[: -len("/search")] + "/reverse"
+    if url.endswith("/reverse"):
+        return url
+    return url + "/reverse"
+
+
+@routing_bp.get("/api/reverse-geocode")
+@login_required
+def reverse_geocode():
+    global _LAST_ADDRESS_SEARCH
+    lat = _parse_coordinate(request.args.get("lat"), -90, 90)
+    lng = _parse_coordinate(request.args.get("lon") or request.args.get("lng"), -180, 180)
+    if lat is None or lng is None:
+        return jsonify({"error": "Invalid coordinates."}), 400
+
+    base_url = str(current_app.config.get("NOMINATIM_API") or "").strip().rstrip("/")
+    if not base_url:
+        return jsonify({"error": "Address lookup is not configured."}), 503
+
+    cache_key = (base_url, round(lat, 6), round(lng, 6))
+    cached = _REVERSE_CACHE.get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
+
+    try:
+        with _ADDRESS_LOCK:
+            wait = 1.0 - (time.monotonic() - _LAST_ADDRESS_SEARCH)
+            if wait > 0:
+                time.sleep(wait)
+            _LAST_ADDRESS_SEARCH = time.monotonic()
+        response = requests.get(
+            _reverse_base_url(base_url),
+            params={
+                "lat": f"{lat:.7f}",
+                "lon": f"{lng:.7f}",
+                "format": "jsonv2",
+                "addressdetails": 1,
+                "accept-language": "en",
+            },
+            headers={"User-Agent": "OneGov-PH/1.0 (reverse geocode prototype)"},
+            timeout=8,
+        )
+        response.raise_for_status()
+        item = response.json() or {}
+        if not isinstance(item, dict):
+            return jsonify({"error": "Address lookup returned invalid data."}), 502
+        address = item.get("address") if isinstance(item.get("address"), dict) else {}
+        output = {
+            "display_name": str(item.get("display_name") or "").strip(),
+            "address": {
+                "house_number": str(address.get("house_number") or "").strip(),
+                "road": str(
+                    address.get("road")
+                    or address.get("pedestrian")
+                    or address.get("footway")
+                    or address.get("residential")
+                    or ""
+                ).strip(),
+                "suburb": str(
+                    address.get("suburb")
+                    or address.get("quarter")
+                    or address.get("neighbourhood")
+                    or address.get("village")
+                    or address.get("hamlet")
+                    or address.get("barangay")
+                    or ""
+                ).strip(),
+                "city": str(
+                    address.get("city")
+                    or address.get("town")
+                    or address.get("municipality")
+                    or address.get("city_district")
+                    or ""
+                ).strip(),
+                "province": str(
+                    address.get("state_district")
+                    or address.get("county")
+                    or address.get("province")
+                    or ""
+                ).strip(),
+                "region": str(address.get("state") or address.get("region") or "").strip(),
+                "postcode": str(address.get("postcode") or "").strip(),
+            },
+        }
+        if len(_REVERSE_CACHE) > 200:
+            _REVERSE_CACHE.clear()
+        _REVERSE_CACHE[cache_key] = output
+        return jsonify(output)
+    except requests.RequestException as exc:
+        current_app.logger.warning("Nominatim reverse geocode failed: %s", exc)
+        return jsonify({"error": "Address lookup is unavailable."}), 502
+    except (ValueError, TypeError, KeyError) as exc:
+        current_app.logger.warning("Nominatim reverse geocode response could not be read: %s", exc)
+        return jsonify({"error": "Address lookup returned invalid data."}), 502
 
 
 @routing_bp.get("/api/address-search")

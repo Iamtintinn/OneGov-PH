@@ -219,7 +219,7 @@
                         <div class="apply-field">
                             <label for="delivery_region">Region</label>
                             <div class="text-input">
-                                <input id="delivery_region" name="region" type="text" value="{{ delivery_region }}" readonly>
+                                <input id="delivery_region" name="region" type="text" value="{{ delivery_region }}"{% if spec.kind != 'passport' %} readonly{% endif %} placeholder="{% if spec.kind == 'passport' %}Set by pinned location{% endif %}">
                             </div>
                             {% if errors.get('region') %}<p class="field-error">{{ errors.region }}</p>{% endif %}
                         </div>
@@ -227,7 +227,7 @@
                         <div class="apply-field">
                             <label for="delivery_province">Province</label>
                             <div class="text-input">
-                                <input id="delivery_province" name="province" type="text" value="{{ delivery_province }}" readonly>
+                                <input id="delivery_province" name="province" type="text" value="{{ delivery_province }}"{% if spec.kind != 'passport' %} readonly{% endif %} placeholder="{% if spec.kind == 'passport' %}Set by pinned location{% endif %}">
                             </div>
                             {% if errors.get('province') %}<p class="field-error">{{ errors.province }}</p>{% endif %}
                         </div>
@@ -235,7 +235,7 @@
                         <div class="apply-field">
                             <label for="delivery_city">City / municipality</label>
                             <div class="text-input">
-                                <input id="delivery_city" name="city" type="text" value="{{ delivery_city }}" readonly>
+                                <input id="delivery_city" name="city" type="text" value="{{ delivery_city }}"{% if spec.kind != 'passport' %} readonly{% endif %} placeholder="{% if spec.kind == 'passport' %}Set by pinned location{% endif %}">
                             </div>
                             {% if errors.get('city') %}<p class="field-error">{{ errors.city }}</p>{% endif %}
                         </div>
@@ -448,6 +448,7 @@
 {% block scripts %}
 <script>
 window.ONE_GOV_DELIVERY = {
+    kind: {{ spec.kind|tojson }},
     initialLat: {{ initial_lat|tojson }},
     initialLng: {{ initial_lng|tojson }},
     savedLat: {{ values.latitude|tojson }},
@@ -463,6 +464,7 @@ window.ONE_GOV_DELIVERY = {
     originConfirmed: {{ 'true' if origin_confirmed else 'false' }},
     routeUrl: {{ url_for('routing.delivery_route')|tojson }},
     addressSearchUrl: {{ url_for('routing.address_search')|tojson }},
+    reverseGeocodeUrl: {{ url_for('routing.reverse_geocode')|tojson }},
     barangayCenters: {{ barangay_options|tojson }}
 };
 </script>
@@ -483,6 +485,9 @@ window.ONE_GOV_DELIVERY = {
     if (!mapElement || !window.L) {
         return;
     }
+
+    var shouldAutofillAddress = config.kind === "passport";
+    var reverseRequestId = 0;
 
     var activePinKind = config.showOrigin ? "origin" : "delivery";
     var fixedOriginFlow = Boolean(config.fixedOriginFlow);
@@ -624,6 +629,53 @@ window.ONE_GOV_DELIVERY = {
         preview.value = parts.join(", ");
     }
 
+    function setFieldValue(id, value) {
+        var element = document.getElementById(id);
+        if (!element) {
+            return;
+        }
+        element.value = String(value || "").trim();
+    }
+
+    function applyDeliveryAddress(address) {
+        if (!shouldAutofillAddress || !address) {
+            return;
+        }
+        setFieldValue("delivery_region", address.region || "");
+        setFieldValue("delivery_province", address.province || "");
+        setFieldValue("delivery_city", address.city || "");
+        setFieldValue("delivery_barangay", address.suburb || address.barangay || "");
+        setFieldValue("street", address.road || "");
+        if (address.house_number) {
+            setFieldValue("house_number", address.house_number);
+        }
+        refreshDeliveryAddressPreview();
+    }
+
+    function reverseGeocodeDelivery(lat, lng) {
+        if (!shouldAutofillAddress || !config.reverseGeocodeUrl || !window.fetch) {
+            return;
+        }
+        var requestId = ++reverseRequestId;
+        var params = new URLSearchParams({ lat: String(lat), lon: String(lng) });
+        fetch(config.reverseGeocodeUrl + "?" + params.toString(), { credentials: "same-origin" })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("reverse geocode unavailable");
+                }
+                return response.json();
+            })
+            .then(function (data) {
+                if (requestId !== reverseRequestId) {
+                    return;
+                }
+                applyDeliveryAddress(data && data.address ? data.address : null);
+            })
+            .catch(function () {
+                // Keep any existing/manual address values if lookup fails.
+            });
+    }
+
     function setAddressSearchStatus(message) {
         if (addressSearchStatus) {
             addressSearchStatus.textContent = message || "";
@@ -676,6 +728,19 @@ window.ONE_GOV_DELIVERY = {
             setAddressSearchStatus("Pinned as the starting location.");
             return;
         }
+
+        if (shouldAutofillAddress) {
+            var addr = result.address || {};
+            applyDeliveryAddress({
+                region: addr.state || addr.region || "",
+                province: addr.state_district || addr.county || addr.province || "",
+                city: addr.city || addr.town || addr.municipality || addr.city_district || "",
+                suburb: addr.suburb || addr.quarter || addr.neighbourhood || addr.village || addr.barangay || "",
+                road: addr.road || addr.pedestrian || addr.footway || addr.residential || "",
+                house_number: addr.house_number || ""
+            });
+        }
+
         var autoLandmark = document.getElementById("landmark");
         if (autoPinFlow) {
             if (autoLandmark && !autoLandmark.value.trim() && result.name) {
@@ -862,6 +927,9 @@ window.ONE_GOV_DELIVERY = {
             markers[kind].on("dragend", function () {
                 var point = markers[kind].getLatLng();
                 placePin(kind, point.lat, point.lng, false);
+                if (kind === "delivery") {
+                    reverseGeocodeDelivery(point.lat, point.lng);
+                }
                 if (autoPinFlow) {
                     syncAutoPinState();
                     return;
@@ -962,7 +1030,11 @@ window.ONE_GOV_DELIVERY = {
 
     map.on("click", function (event) {
         if (autoPinFlow) {
-            placePin(nextAutoPinKind(), event.latlng.lat, event.latlng.lng, true);
+            var pinKind = nextAutoPinKind();
+            placePin(pinKind, event.latlng.lat, event.latlng.lng, true);
+            if (pinKind === "delivery") {
+                reverseGeocodeDelivery(event.latlng.lat, event.latlng.lng);
+            }
             syncAutoPinState();
             return;
         }
@@ -971,6 +1043,7 @@ window.ONE_GOV_DELIVERY = {
             setStatus("origin", "Starting pin placed. Press Confirm start, then pin the destination.");
             setActivePin("delivery");
         } else {
+            reverseGeocodeDelivery(event.latlng.lat, event.latlng.lng);
             setStatus(
                 "delivery",
                 config.showOrigin
@@ -1106,7 +1179,11 @@ window.ONE_GOV_DELIVERY = {
                 var lng = position.coords.longitude;
                 map.setView([lat, lng], 16);
                 if (autoPinFlow) {
-                    placePin(nextAutoPinKind(), lat, lng, true);
+                    var pinKind = nextAutoPinKind();
+                    placePin(pinKind, lat, lng, true);
+                    if (pinKind === "delivery") {
+                        reverseGeocodeDelivery(lat, lng);
+                    }
                     syncAutoPinState();
                     return;
                 }
@@ -1115,6 +1192,7 @@ window.ONE_GOV_DELIVERY = {
                     setStatus("origin", "Starting location pinned from your device. Press Confirm start.");
                     setActivePin("delivery");
                 } else {
+                    reverseGeocodeDelivery(lat, lng);
                     setStatus("delivery", "Current location pinned. Press Confirm destination to save it.");
                 }
             }, function () {

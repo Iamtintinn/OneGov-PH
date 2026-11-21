@@ -1,5 +1,6 @@
 from app.models.application import Application, ApplicationEvent, ApplicationRequirement
 from app.models.department import Department
+from app.models.email_otp import EmailOtp
 from app.models.nbi_appointment import NbiAppointment
 from app.models.notification import Notification
 from app.models.passport_appointment import PassportAppointment
@@ -13,6 +14,7 @@ __all__ = [
     "ApplicationRequirement",
     "AccountActivityLog",
     "Department",
+    "EmailOtp",
     "NbiAppointment",
     "Notification",
     "PassportAppointment",
