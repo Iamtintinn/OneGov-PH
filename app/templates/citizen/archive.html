@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Archive · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard{% endblock %}
+{% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
+{% block content %}
+<div class="dash-page site-width">
+    <section class="dash-section citizen-list-page" aria-labelledby="archive-heading">
+        <div class="citizen-list-head">
+            <div>
+                <p class="dash-kicker">Archived requests</p>
+                <h1 id="archive-heading">Archive</h1>
+                <p class="citizen-list-sub">Deleted applications are stored here. Restore them or delete permanently.</p>
+            </div>
+            <div class="citizen-list-count"><strong>{{ filtered_count }}</strong><span>{{ 'result' if filtered_count == 1 else 'results' }}</span></div>
+        </div>
+
+        <form class="citizen-filter-bar" method="get" role="search" aria-label="Filter archived applications">
+            <label class="citizen-filter-search">
+                <span class="visually-hidden">Search archived applications</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>
+                <input type="search" name="q" value="{{ q }}" placeholder="Search by tracking number, service, or department">
+            </label>
+            <label class="citizen-filter-select">
+                <span class="visually-hidden">Filter by status</span>
+                <select name="status">
+                    <option value="">All statuses</option>
+                    {% for key, label in status_options %}<option value="{{ key }}" {% if selected_status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+            </label>
+            <button class="citizen-filter-btn" type="submit">Search</button>
+            {% if q or selected_status %}<a class="citizen-filter-clear" href="{{ url_for('citizen.archive') }}">Clear</a>{% endif %}
+        </form>
+
+        {% if applications %}
+        <div class="table-wrap citizen-table-wrap">
+            <table class="app-table citizen-app-table">
+                <caption class="visually-hidden">Archived applications</caption>
+                <thead>
+                    <tr><th scope="col">Application ID</th><th scope="col">Service</th><th scope="col">Department</th><th scope="col">Date submitted</th><th scope="col">Status</th><th scope="col">Payment</th><th scope="col">Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for application in applications %}
+                    <tr>
+                        <td data-label="Application ID"><span class="citizen-mono">{{ application.tracking_number }}</span></td>
+                        <td data-label="Service"><strong>{{ application.service.service_name }}</strong></td>
+                        <td data-label="Department">{{ application.department.department_name }}</td>
+                        <td data-label="Date submitted">{{ application.submission_date.strftime("%d %b %Y") }}</td>
+                        <td data-label="Status">{% set labels = status_labels_for(application.service, application) %}{% with status=application.application_status, labels=labels %}{% include "applications/_status.html" %}{% endwith %}</td>
+                        <td data-label="Payment">{% if application.payment_status %}{% with status=application.payment_status, labels=payment_status_labels %}{% include "applications/_status.html" %}{% endwith %}{% else %}<span class="citizen-muted">No payment</span>{% endif %}</td>
+                        <td data-label="Actions">
+                            <div class="admin-row-actions">
+                                <form method="post" action="{{ url_for('citizen.restore_application', application_id=application.application_id) }}" class="admin-inline-form">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="citizen-row-action" style="background:none;border:0;padding:0;cursor:pointer;font:inherit;">Restore</button>
+                                </form>
+                                <form method="post" action="{{ url_for('citizen.delete_application_permanent', application_id=application.application_id) }}" class="admin-inline-form" onsubmit="return confirm('Permanently delete {{ application.tracking_number }}? This cannot be undone.');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="admin-row-action admin-row-action--danger">Delete permanently</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% elif total_count > 0 %}
+        <div class="citizen-empty-state"><h2>No archived applications found</h2><p>Try adjusting your search or status filter.</p><a class="citizen-filter-clear" href="{{ url_for('citizen.archive') }}">Clear filters</a></div>
+        {% else %}
+        <div class="citizen-empty-state"><h2>Archive is empty</h2><p>Applications you delete will appear here.</p><a class="citizen-filter-btn" href="{{ url_for('citizen.applications') }}">Go to My Applications</a></div>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

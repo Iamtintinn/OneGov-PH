@@ -1,0 +1,6 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Audit Trail Export</title>
+<style>body{font-family:Arial,sans-serif;margin:24px;color:#172033}h1{margin:0 0 4px}p{color:#64748b}table{width:100%;border-collapse:collapse;margin-top:16px;font-size:12px}th,td{border:1px solid #dce5f1;padding:8px;vertical-align:top;text-align:left}th{background:#173B72;color:#fff}</style></head>
+<body><h1>OneGov PH Audit Trail Report</h1><p>Generated: {{ generated.strftime('%Y-%m-%d %H:%M:%S PHT') }}</p>
+<table><thead><tr><th>Date/Time (PHT)</th><th>Activity ID</th><th>User</th><th>Role</th><th>Activity</th><th>Module</th><th>Record ID</th><th>IP</th><th>Status</th><th>Description</th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ to_pht(r.created_at).strftime('%Y-%m-%d %H:%M:%S') if r.created_at else '' }}</td><td>{{ r.activity_id }}</td><td>{{ r.user_name_snapshot }}</td><td>{{ r.user_role }}</td><td>{{ r.activity_type }}</td><td>{{ r.module }}</td><td>{{ r.record_id or '' }}</td><td>{{ r.ip_address or '' }}</td><td>{{ r.activity_status }}</td><td>{{ r.description }}</td></tr>{% endfor %}
+</tbody></table></body></html>

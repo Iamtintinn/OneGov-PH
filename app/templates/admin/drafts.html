@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Drafts · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard admin-dashboard{% endblock %}
+{% block site_header %}{% include "admin/_header.html" %}{% endblock %}
+{% block content %}
+<div class="admin-main">
+  <header class="admin-page-heading"><div><p class="admin-eyebrow">WORKSPACE / DRAFTS</p><h1>Draft Applications</h1><p>View draft applications saved in the system.</p></div></header>
+  <section class="admin-panel admin-filter-panel">
+    <form class="admin-filter-form" method="get">
+      <label class="admin-search-field"><span class="visually-hidden">Search drafts</span><input type="search" name="q" value="{{ search }}" placeholder="Tracking number or citizen name"></label>
+      <button class="admin-button admin-button--primary" type="submit">Search</button>
+      {% if search %}<a class="admin-button admin-button--quiet" href="{{ url_for('admin.drafts') }}">Clear</a>{% endif %}
+    </form>
+  </section>
+  <section class="admin-panel admin-table-panel">
+    <div class="admin-panel-heading"><div><p class="admin-eyebrow">SAVED DRAFTS</p><h2>Draft requests</h2></div><span class="admin-count-chip">{{ applications|length }} shown</span></div>
+    {% if applications %}
+    <div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Tracking number</th><th>Citizen</th><th>Service</th><th>Last updated</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+      {% for application in applications %}{% set applicant = applicants.get(application.applicant_id) %}
+      <tr>
+        <td><strong class="admin-mono">{{ application.tracking_number }}</strong></td>
+        <td>{{ applicant.full_name if applicant else 'Unknown account' }}<small>{{ applicant.email if applicant else '' }}</small></td>
+        <td>{{ application.service.service_name }}</td>
+        <td>{{ application.last_updated.strftime('%d %b %Y') if application.last_updated else '—' }}</td>
+        <td><span class="admin-status-pill admin-status-pill--{{ application.application_status }}">{{ status_labels.get(application.application_status, application.application_status) }}</span></td>
+        <td><div class="admin-row-actions">
+          <a class="admin-row-action" href="{{ url_for('admin.application_detail', application_id=application.application_id) }}">Review <span aria-hidden="true">→</span></a>
+          {% if current_user.role in ['system_admin','department_supervisor'] %}
+          <form method="post" action="{{ url_for('admin.delete_application', application_id=application.application_id) }}" class="admin-inline-form" onsubmit="return confirm('Move {{ application.tracking_number }} to Archive?');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="admin-row-action admin-row-action--danger">Delete</button></form>
+          {% endif %}
+        </div></td>
+      </tr>
+      {% endfor %}
+    </tbody></table></div>
+    {% else %}
+    <p class="admin-empty">No draft applications found.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

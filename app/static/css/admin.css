@@ -385,3 +385,9 @@
     .admin-track-map { height: 300px; }
     .admin-tracking-page { padding-right: .9rem; }
 }
+
+
+.admin-row-actions{display:inline-flex;align-items:center;gap:.5rem;flex-wrap:wrap;}
+.admin-inline-form{display:inline;margin:0;}
+.admin-row-action--danger{color:#b91c1c;background:none;border:0;padding:0;font:inherit;cursor:pointer;}
+.admin-row-action--danger:hover{text-decoration:underline;}

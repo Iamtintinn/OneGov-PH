@@ -88,6 +88,8 @@ def read_details(application):
         details["confirmation"] = raw["confirmation"]
     if raw.get("payment"):
         details["payment"] = raw["payment"]
+    if raw.get("archived"):
+        details["archived"] = raw["archived"]
     return details
 
 
@@ -142,6 +144,8 @@ def write_details(application, details, commit=True):
         payload["confirmation"] = details["confirmation"]
     if details.get("payment"):
         payload["payment"] = details["payment"]
+    if details.get("archived"):
+        payload["archived"] = details["archived"]
     application.application_details = payload
     application.last_updated = _now()
     if commit:

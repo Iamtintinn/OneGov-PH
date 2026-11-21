@@ -43,6 +43,18 @@
                 </a>
             </li>
             <li>
+                <a class="sidebar-link{% if page == 'citizen.drafts' %} is-active{% endif %}" href="{{ url_for('citizen.drafts') }}" title="Drafts"{% if page == 'citizen.drafts' %} aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16"></path><path d="M6 16l9-9 3 3-9 9H6z"></path><path d="M13 5l3 3"></path></svg>
+                    <span>Drafts</span>
+                </a>
+            </li>
+            <li>
+                <a class="sidebar-link{% if page == 'citizen.archive' %} is-active{% endif %}" href="{{ url_for('citizen.archive') }}" title="Archive"{% if page == 'citizen.archive' %} aria-current="page"{% endif %}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7.5h15v11a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z"></path><path d="M3.5 5.5h17v2h-17z"></path><path d="M9 11.5h6"></path></svg>
+                    <span>Archive</span>
+                </a>
+            </li>
+            <li>
                 <a class="sidebar-link{% if page == 'citizen.tracking' %} is-active{% endif %}" href="{{ url_for('citizen.tracking') }}" title="Application Tracking"{% if page == 'citizen.tracking' %} aria-current="page"{% endif %}>
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v5l3 2"></path></svg>
                     <span>Application Tracking</span>

@@ -247,7 +247,17 @@ def _dashboard_service_groups():
     ]
 
 
-def _owned_applications(user_id):
+def _is_archived(application):
+    try:
+        details = application.application_details or {}
+        if isinstance(details, str):
+            import json as _json; details = _json.loads(details)
+        return bool((details or {}).get("archived"))
+    except Exception:
+        return False
+
+
+def _owned_applications(user_id, include_archived=False, archived_only=False):
     query = (
         db.select(Application)
         .options(
@@ -261,7 +271,33 @@ def _owned_applications(user_id):
         query = visible_application_query(query)
     else:
         query = query.where(Application.applicant_id == user_id)
-    return db.session.scalars(query).unique().all()
+    rows = db.session.scalars(query).unique().all()
+    if archived_only:
+        return [r for r in rows if _is_archived(r)]
+    if include_archived:
+        return rows
+    return [r for r in rows if not _is_archived(r)]
+
+
+def _owned_application_or_404(application_id, user_id, include_archived=True):
+    query = db.select(Application).options(
+        joinedload(Application.service).joinedload(Service.department),
+        joinedload(Application.department),
+        joinedload(Application.payments),
+        joinedload(Application.requirements),
+    ).where(Application.application_id == application_id)
+    if _uses_department_scope():
+        query = visible_application_query(query)
+    else:
+        query = query.where(Application.applicant_id == user_id)
+    app_obj = db.session.scalar(query)
+    if not app_obj:
+        from flask import abort
+        abort(404)
+    if not include_archived and _is_archived(app_obj):
+        from flask import abort
+        abort(404)
+    return app_obj
 
 
 def _service_category(value):
@@ -894,6 +930,94 @@ def _filter_applications(applications, term="", status=""):
         filtered.append(application)
     return filtered
 
+
+
+@citizen_bp.route("/citizen/applications/<int:application_id>/delete", methods=["POST"])
+@citizen_portal_required
+def delete_application(application_id):
+    application = _owned_application_or_404(application_id, current_user.user_id)
+    from datetime import datetime as _dt
+    details = application.application_details if isinstance(application.application_details, dict) else read_details(application)
+    now = _dt.now().replace(microsecond=0).isoformat()
+    details["archived"] = {"archived_at": now, "archived_by": current_user.user_id, "previous_status": application.application_status}
+    write_details(application, details, commit=False)
+    try:
+        from app.services.audit_service import log_activity
+        log_activity(activity_type="Application Archived", module="Applications", description=f"Citizen archived application {application.tracking_number}", record_id=application.tracking_number, previous_value={"status": application.application_status}, new_value={"archived": True}, status="Success", user=current_user)
+    except Exception:
+        pass
+    db.session.commit()
+    flash(f"Application {application.tracking_number} was moved to Archive.", "success")
+    return redirect(request.referrer or url_for("citizen.applications"))
+
+
+@citizen_bp.route("/citizen/drafts")
+@citizen_portal_required
+def drafts():
+    rows = db.session.scalars(
+        db.select(Application)
+        .options(joinedload(Application.service).joinedload(Service.department), joinedload(Application.department), joinedload(Application.payments))
+        .where(Application.applicant_id == current_user.user_id, Application.application_status == "draft")
+        .order_by(Application.last_updated.desc(), Application.application_id.desc())
+    ).unique().all()
+    rows = [r for r in rows if not _is_archived(r)]
+    q = (request.args.get("q") or "")[:80]
+    filtered = _filter_applications(rows, q, "")
+    return render_template("citizen/drafts.html", applications=filtered, total_count=len(rows), filtered_count=len(filtered), q=q, status_labels=STATUS_LABELS, payment_status_labels=PAYMENT_STATUS_LABELS)
+
+
+@citizen_bp.route("/citizen/archive")
+@citizen_portal_required
+def archive():
+    all_apps = _owned_applications(current_user.user_id, archived_only=True)
+    q = (request.args.get("q") or "")[:80]
+    status = clean_text(request.args.get("status"))
+    filtered = _filter_applications(all_apps, q, status)
+    status_options = [(key, label) for key, label in STATUS_LABELS.items() if key != "draft"]
+    return render_template("citizen/archive.html", applications=filtered, total_count=len(all_apps), filtered_count=len(filtered), q=q, selected_status=status, status_options=status_options, status_labels=STATUS_LABELS, payment_status_labels=PAYMENT_STATUS_LABELS)
+
+
+@citizen_bp.route("/citizen/applications/<int:application_id>/restore", methods=["POST"])
+@citizen_portal_required
+def restore_application(application_id):
+    application = _owned_application_or_404(application_id, current_user.user_id)
+    details = application.application_details if isinstance(application.application_details, dict) else read_details(application)
+    if details.get("archived"):
+        details.pop("archived", None)
+        write_details(application, details, commit=False)
+        try:
+            from app.services.audit_service import log_activity
+            log_activity(activity_type="Application Restored", module="Applications", description=f"Citizen restored application {application.tracking_number}", record_id=application.tracking_number, new_value={"archived": False}, status="Success", user=current_user)
+        except Exception:
+            pass
+        db.session.commit()
+        flash(f"Application {application.tracking_number} was restored.", "success")
+    return redirect(request.referrer or url_for("citizen.archive"))
+
+
+@citizen_bp.route("/citizen/applications/<int:application_id>/delete-permanent", methods=["POST"])
+@citizen_portal_required
+def delete_application_permanent(application_id):
+    application = _owned_application_or_404(application_id, current_user.user_id)
+    details = application.application_details if isinstance(application.application_details, dict) else read_details(application)
+    if not details.get("archived"):
+        flash("Only archived applications can be permanently deleted.", "warning")
+        return redirect(request.referrer or url_for("citizen.archive"))
+    tracking = application.tracking_number
+    for table in ["application_tracking", "application_requirements", "payments"]:
+        try:
+            db.session.execute(db.text(f"DELETE FROM {table} WHERE application_id=:id"), {"id": application_id})
+        except Exception:
+            db.session.rollback()
+    try:
+        from app.services.audit_service import log_activity
+        log_activity(activity_type="Application Deleted Permanently", module="Applications", description=f"Citizen permanently deleted application {tracking}", record_id=tracking, previous_value={"application_id": application_id}, status="Success", user=current_user)
+    except Exception:
+        pass
+    db.session.delete(application)
+    db.session.commit()
+    flash(f"Application {tracking} was permanently deleted.", "success")
+    return redirect(request.referrer or url_for("citizen.archive"))
 
 @citizen_bp.route("/citizen/applications")
 @citizen_portal_required

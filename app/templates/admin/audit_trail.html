@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Audit Trail · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard admin-dashboard{% endblock %}
+{% block site_header %}{% include "admin/_header.html" %}{% endblock %}
+{% block content %}
+<div class="admin-main">
+  <section class="dash-section" aria-labelledby="audit-heading">
+    <div class="audit-hero">
+      <div>
+        <p class="dash-kicker">Security & Accountability</p>
+        <h1 id="audit-heading">Audit Trail</h1>
+        <p class="citizen-list-sub">Track administrative and staff actions across the OneGov PH platform. Records are immutable and automatically captured.</p>
+      </div>
+      <div class="audit-hero-actions">
+        <a class="cset-btn cset-btn-ghost" href="{{ url_for('admin_audit.export_csv', **request.args) }}">Export CSV</a>
+        <a class="cset-btn cset-btn-primary" href="{{ url_for('admin_audit.export_pdf', **request.args) }}">Export PDF</a>
+      </div>
+    </div>
+
+    <div class="audit-stats">
+      <article class="audit-stat"><span>Total Activities</span><strong>{{ stats.total }}</strong></article>
+      <article class="audit-stat"><span>Today’s Activities</span><strong>{{ stats.today }}</strong></article>
+      <article class="audit-stat"><span>Admin Actions</span><strong>{{ stats.admin_actions }}</strong></article>
+      <article class="audit-stat"><span>Staff Actions</span><strong>{{ stats.staff_actions }}</strong></article>
+      <article class="audit-stat"><span>Failed Actions</span><strong>{{ stats.failed }}</strong></article>
+      <article class="audit-stat"><span>Security Events</span><strong>{{ stats.security }}</strong></article>
+    </div>
+
+    <form class="audit-filters" method="get" action="{{ url_for('admin_audit.index') }}">
+      <div class="audit-filter-grid">
+        <label><span>Admin/Staff Name</span><input name="q_name" value="{{ filters.q_name }}" placeholder="Search name"></label>
+        <label><span>Activity ID</span><input name="q_activity_id" value="{{ filters.q_activity_id }}" placeholder="AUD-..."></label>
+        <label><span>Record ID</span><input name="q_record_id" value="{{ filters.q_record_id }}" placeholder="Application/Record ID"></label>
+        <label><span>Role</span><select name="role"><option value="">All roles</option>{% for r in roles %}<option value="{{ r }}" {% if filters.role==r %}selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
+        <label><span>Module</span><select name="module"><option value="">All modules</option>{% for m in modules %}<option value="{{ m }}" {% if filters.module==m %}selected{% endif %}>{{ m }}</option>{% endfor %}</select></label>
+        <label><span>Activity Type</span><input name="activity_type" value="{{ filters.activity_type }}" list="audit-types" placeholder="Search or select"><datalist id="audit-types">{% for t in activity_types %}<option value="{{ t }}">{% endfor %}</datalist></label>
+        <label><span>Status</span><select name="status"><option value="">All statuses</option>{% for s in statuses %}<option value="{{ s }}" {% if filters.status==s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></label>
+        <label><span>IP Address</span><input name="ip_address" value="{{ filters.ip_address }}" placeholder="Search IP"></label>
+        <label><span>Date Preset</span><select name="preset"><option value="">Custom/All</option><option value="today" {% if filters.preset=='today' %}selected{% endif %}>Today</option><option value="yesterday" {% if filters.preset=='yesterday' %}selected{% endif %}>Yesterday</option><option value="7d" {% if filters.preset=='7d' %}selected{% endif %}>Last 7 Days</option><option value="30d" {% if filters.preset=='30d' %}selected{% endif %}>Last 30 Days</option></select></label>
+        <label><span>From</span><input type="date" name="date_from" value="{{ filters.date_from }}"></label>
+        <label><span>To</span><input type="date" name="date_to" value="{{ filters.date_to }}"></label>
+      </div>
+      <div class="audit-filter-actions">
+        <button class="cset-btn cset-btn-primary" type="submit">Apply Filters</button>
+        <a class="cset-btn cset-btn-ghost" href="{{ url_for('admin_audit.index') }}">Clear Filters</a>
+      </div>
+    </form>
+
+    <div class="pay-table-card audit-table-card">
+      <div class="pay-table-wrap">
+        <table class="pay-table audit-table">
+          <thead><tr><th>Date & Time (PHT)</th><th>Admin/Staff Name</th><th>Role</th><th>Activity</th><th>Module</th><th>Record ID</th><th>IP Address</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+          {% for log in logs %}
+            <tr>
+              <td>{{ to_pht(log.created_at).strftime('%d %b %Y, %I:%M:%S %p') if log.created_at else '—' }}</td>
+              <td>{{ log.user_name_snapshot }}</td>
+              <td>{{ log.user_role }}</td>
+              <td><div class="audit-activity-cell"><strong>{{ log.activity_type }}</strong><small>{{ log.description }}</small></div></td>
+              <td>{{ log.module }}</td>
+              <td>{{ log.record_id or '—' }}</td>
+              <td><span class="pay-ref">{{ log.ip_address or '—' }}</span></td>
+              <td><span class="audit-badge audit-badge--{{ log.activity_status|lower }}">{{ log.activity_status }}</span></td>
+              <td><button type="button" class="cset-btn cset-btn-ghost audit-view-btn" data-id="{{ log.id }}">View Details</button></td>
+            </tr>
+          {% else %}
+            {% set has_filters = filters.q_name or filters.q_activity_id or filters.q_record_id or filters.role or filters.module or filters.activity_type or filters.status or filters.ip_address or filters.date_from or filters.date_to or filters.preset %}
+            <tr><td colspan="9" class="cset-empty-cell">{% if has_filters %}No audit records found for the selected filters.{% else %}No audit records yet. Activities will appear here automatically as users and admins perform actions.{% endif %}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if pagination.pages > 1 %}
+      <div class="audit-pagination">
+        <span>Page {{ pagination.page }} of {{ pagination.pages }} · {{ pagination.total }} records</span>
+        <div class="audit-page-links">
+          {% if pagination.has_prev %}<a class="cset-btn cset-btn-ghost" href="{{ url_for('admin_audit.index', page=pagination.prev_num, **filters) }}">Previous</a>{% endif %}
+          {% if pagination.has_next %}<a class="cset-btn cset-btn-ghost" href="{{ url_for('admin_audit.index', page=pagination.next_num, **filters) }}">Next</a>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+<div class="audit-modal" id="audit-modal" hidden>
+  <div class="audit-modal-backdrop" data-close-audit></div>
+  <div class="audit-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="audit-modal-title">
+    <div class="audit-modal-head"><div><p class="cset-kicker">Audit Detail</p><h2 id="audit-modal-title">Activity Details</h2></div><button type="button" class="audit-modal-close" data-close-audit>&times;</button></div>
+    <div class="audit-modal-body" id="audit-modal-body"><p class="cset-empty">Loading...</p></div>
+  </div>
+</div>
+<script>
+(function(){
+  const modal=document.getElementById('audit-modal'); const body=document.getElementById('audit-modal-body');
+  function close(){ modal.hidden=true; document.body.style.overflow=''; }
+  modal.querySelectorAll('[data-close-audit]').forEach(el=>el.addEventListener('click',close));
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!modal.hidden) close(); });
+  function fmtVal(v){ if(v===null||v===undefined||v==='') return '—'; if(typeof v==='object') return '<pre class="audit-json">'+JSON.stringify(v,null,2).replace(/</g,'&lt;')+'</pre>'; return String(v).replace(/</g,'&lt;'); }
+  document.querySelectorAll('.audit-view-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      modal.hidden=false; document.body.style.overflow='hidden'; body.innerHTML='<p class="cset-empty">Loading...</p>';
+      const res=await fetch(`{{ url_for('admin_audit.detail', log_id=0) }}`.replace('/0','/'+btn.dataset.id));
+      const d=await res.json();
+      body.innerHTML=`<div class="audit-detail-grid">
+        <div><span>Activity ID</span><strong>${fmtVal(d.activity_id)}</strong></div>
+        <div><span>Admin/Staff Name</span><strong>${fmtVal(d.user_name)}</strong></div>
+        <div><span>Account ID</span><strong>${fmtVal(d.account_id)}</strong></div>
+        <div><span>Assigned Role</span><strong>${fmtVal(d.role)}</strong></div>
+        <div><span>Activity Type</span><strong>${fmtVal(d.activity_type)}</strong></div>
+        <div><span>Module</span><strong>${fmtVal(d.module)}</strong></div>
+        <div><span>Related Record ID</span><strong>${fmtVal(d.record_id)}</strong></div>
+        <div><span>Date and Time</span><strong>${fmtVal(d.created_at)}</strong></div>
+        <div><span>IP Address</span><strong>${fmtVal(d.ip_address)}</strong></div>
+        <div class="audit-detail-full"><span>Device/Browser</span><strong>${fmtVal(d.user_agent)}</strong></div>
+        <div class="audit-detail-full"><span>Action Description</span><strong>${fmtVal(d.description)}</strong></div>
+        <div class="audit-detail-full"><span>Previous Value</span>${fmtVal(d.previous_value)}</div>
+        <div class="audit-detail-full"><span>New Value</span>${fmtVal(d.new_value)}</div>
+        <div><span>Activity Result</span><strong><span class="audit-badge audit-badge--${String(d.status).toLowerCase()}">${fmtVal(d.status)}</span></strong></div>
+      </div>`;
+    });
+  });
+})();
+</script>
+{% endblock %}

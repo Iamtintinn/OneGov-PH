@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Drafts · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard{% endblock %}
+{% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
+{% block content %}
+<div class="dash-page site-width">
+    <section class="dash-section citizen-list-page" aria-labelledby="drafts-heading">
+        <div class="citizen-list-head">
+            <div>
+                <p class="dash-kicker">Saved requests</p>
+                <h1 id="drafts-heading">Drafts</h1>
+                <p class="citizen-list-sub">Continue applications you saved before submission.</p>
+            </div>
+            <div class="citizen-list-count"><strong>{{ filtered_count }}</strong><span>{{ 'draft' if filtered_count == 1 else 'drafts' }}</span></div>
+        </div>
+
+        <form class="citizen-filter-bar" method="get" role="search" aria-label="Filter drafts">
+            <label class="citizen-filter-search">
+                <span class="visually-hidden">Search drafts</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>
+                <input type="search" name="q" value="{{ q }}" placeholder="Search by tracking number, service, or department">
+            </label>
+            <button class="citizen-filter-btn" type="submit">Search</button>
+            {% if q %}<a class="citizen-filter-clear" href="{{ url_for('citizen.drafts') }}">Clear</a>{% endif %}
+        </form>
+
+        {% if applications %}
+        <div class="table-wrap citizen-table-wrap">
+            <table class="app-table citizen-app-table">
+                <caption class="visually-hidden">Draft applications</caption>
+                <thead><tr><th scope="col">Application ID</th><th scope="col">Service</th><th scope="col">Department</th><th scope="col">Last updated</th><th scope="col">Status</th><th scope="col">Action</th></tr></thead>
+                <tbody>
+                    {% for application in applications %}
+                    <tr>
+                        <td data-label="Application ID"><span class="citizen-mono">{{ application.tracking_number }}</span></td>
+                        <td data-label="Service"><strong>{{ application.service.service_name }}</strong></td>
+                        <td data-label="Department">{{ application.department.department_name }}</td>
+                        <td data-label="Last updated">{{ application.last_updated.strftime("%d %b %Y") }}</td>
+                        <td data-label="Status">{% set labels = status_labels_for(application.service, application) %}{% with status=application.application_status, labels=labels %}{% include "applications/_status.html" %}{% endwith %}</td>
+                        <td data-label="Action">
+                            <div class="admin-row-actions">
+                                <a class="citizen-row-action" href="{{ url_for('citizen.application_continue', application_id=application.application_id) }}">Continue</a>
+                                <form method="post" action="{{ url_for('citizen.delete_application', application_id=application.application_id) }}" class="admin-inline-form" onsubmit="return confirm('Move draft {{ application.tracking_number }} to Archive?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="admin-row-action admin-row-action--danger">Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% elif total_count > 0 %}
+        <div class="citizen-empty-state"><h2>No drafts found</h2><p>Try adjusting your search.</p><a class="citizen-filter-clear" href="{{ url_for('citizen.drafts') }}">Clear search</a></div>
+        {% else %}
+        <div class="citizen-empty-state"><h2>No drafts yet</h2><p>Saved application drafts will appear here.</p><a class="citizen-filter-btn" href="{{ url_for('citizen.services') }}">Browse services</a></div>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

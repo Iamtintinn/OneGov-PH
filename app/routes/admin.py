@@ -31,6 +31,8 @@ from app.utils.access import (
     visible_service_query,
 )
 from app.utils.decorators import admin_console_required, role_required
+from app.services.audit_service import log_activity
+from app.services.application_service import read_details, write_details
 from app.utils.validators import (
     clean_text,
     normalize_contact_number,
@@ -90,6 +92,17 @@ def _record_account_activity(target, action, description):
             description=description[:500],
         )
     )
+    try:
+        log_activity(
+            activity_type=str(action).replace("_"," ").title(),
+            module="Accounts",
+            description=description[:600],
+            record_id=target.user_id,
+            status="Success",
+            department_id=getattr(target, "department_id", None),
+        )
+    except Exception:
+        pass
 
 
 def _log_application_event(application, previous_status, description):
@@ -126,6 +139,16 @@ def _require_permission(permission):
         or not current_user.department_id
     ):
         abort(403)
+
+
+def _is_archived_application(application):
+    try:
+        details = application.application_details or {}
+        if isinstance(details, str):
+            import json as _json; details = _json.loads(details)
+        return bool((details or {}).get("archived"))
+    except Exception:
+        return False
 
 
 def _application_query_for_current_admin():
@@ -495,6 +518,113 @@ def service_status(service_id):
     return redirect(url_for("admin.services"))
 
 
+
+
+@admin_bp.route("/admin/applications/<int:application_id>/delete", methods=["POST"])
+@role_required(User.ROLE_SYSTEM_ADMIN, User.ROLE_DEPARTMENT_SUPERVISOR)
+def delete_application(application_id):
+    application = _application_or_404(application_id)
+    details = application.application_details if isinstance(application.application_details, dict) else read_details(application)
+    from datetime import datetime as _dt
+    details["archived"] = {"archived_at": _dt.now().replace(microsecond=0).isoformat(), "archived_by": current_user.user_id, "previous_status": application.application_status}
+    write_details(application, details, commit=False)
+    try:
+        log_activity(activity_type="Application Archived", module="Applications", description=f"Admin archived application {application.tracking_number}", record_id=application.tracking_number, previous_value={"status": application.application_status}, new_value={"archived": True}, status="Success", department_id=application.assigned_department_id)
+    except Exception:
+        pass
+    db.session.commit()
+    flash(f"Application {application.tracking_number} was moved to Archive.", "success")
+    next_url = request.referrer
+    if next_url and "/admin/" in next_url:
+        return redirect(next_url)
+    return redirect(url_for("admin.applications"))
+
+
+@admin_bp.route("/admin/applications/<int:application_id>/delete-permanent", methods=["POST"])
+@role_required(User.ROLE_SYSTEM_ADMIN, User.ROLE_DEPARTMENT_SUPERVISOR)
+def delete_application_permanent(application_id):
+    application = _application_or_404(application_id)
+    details = application.application_details if isinstance(application.application_details, dict) else read_details(application)
+    if not details.get("archived"):
+        flash("Only archived applications can be permanently deleted.", "warning")
+        return redirect(request.referrer or url_for("admin.archive"))
+    tracking = application.tracking_number
+    dept_id = application.assigned_department_id
+    for table in ["application_tracking", "application_requirements", "payments"]:
+        try:
+            db.session.execute(db.text(f"DELETE FROM {table} WHERE application_id=:id"), {"id": application_id})
+        except Exception:
+            db.session.rollback()
+    try:
+        log_activity(activity_type="Application Deleted Permanently", module="Applications", description=f"Admin permanently deleted application {tracking}", record_id=tracking, previous_value={"application_id": application_id}, status="Success", department_id=dept_id)
+    except Exception:
+        pass
+    db.session.delete(application)
+    db.session.commit()
+    flash(f"Application {tracking} was permanently deleted.", "success")
+    return redirect(request.referrer or url_for("admin.archive"))
+
+@admin_bp.route("/admin/drafts")
+@role_required(User.ROLE_SYSTEM_ADMIN, User.ROLE_DEPARTMENT_STAFF, User.ROLE_DEPARTMENT_SUPERVISOR)
+def drafts():
+    q = clean_text(request.args.get("q"))
+    query = _application_query_for_current_admin().where(Application.application_status == "draft")
+    if q:
+        pattern = f"%{q}%"
+        query = query.join(User, User.user_id == Application.applicant_id).where(or_(Application.tracking_number.ilike(pattern), User.full_name.ilike(pattern)))
+    rows = [r for r in db.session.scalars(query.order_by(Application.last_updated.desc()).limit(200)).unique().all() if not _is_archived_application(r)]
+    applicants = {u.user_id: u for u in db.session.scalars(db.select(User).where(User.user_id.in_({i.applicant_id for i in rows}))).all()} if rows else {}
+    return render_template("admin/drafts.html", applications=rows, applicants=applicants, search=q or "", status_labels=STATUS_LABELS)
+
+
+@admin_bp.route("/admin/archive")
+@role_required(User.ROLE_SYSTEM_ADMIN, User.ROLE_DEPARTMENT_STAFF, User.ROLE_DEPARTMENT_SUPERVISOR)
+def archive():
+    q = clean_text(request.args.get("q"))
+    status = clean_text(request.args.get("status"))
+    query = _application_query_for_current_admin()
+    if q:
+        pattern = f"%{q}%"
+        query = query.join(User, User.user_id == Application.applicant_id).where(or_(Application.tracking_number.ilike(pattern), User.full_name.ilike(pattern)))
+    if status in APPLICATION_STATUSES:
+        query = query.where(Application.application_status == status)
+    rows = [r for r in db.session.scalars(query.order_by(Application.submission_date.desc()).limit(300)).unique().all() if _is_archived_application(r)]
+    applicants = {u.user_id: u for u in db.session.scalars(db.select(User).where(User.user_id.in_({i.applicant_id for i in rows}))).all()} if rows else {}
+    return render_template("admin/archive.html", applications=rows, applicants=applicants, search=q or "", selected_status=status, statuses=APPLICATION_STATUSES, status_labels=STATUS_LABELS)
+
+
+@admin_bp.route("/admin/applications/<int:application_id>/archive", methods=["POST"])
+@role_required(User.ROLE_SYSTEM_ADMIN, User.ROLE_DEPARTMENT_SUPERVISOR)
+def archive_application(application_id):
+    application = _application_or_404(application_id)
+    details = application.application_details if isinstance(application.application_details, dict) else read_details(application)
+    from datetime import datetime as _dt
+    details["archived"] = {"archived_at": _dt.now().replace(microsecond=0).isoformat(), "archived_by": current_user.user_id, "previous_status": application.application_status}
+    write_details(application, details, commit=False)
+    try:
+        log_activity(activity_type="Application Archived", module="Applications", description=f"Admin archived application {application.tracking_number}", record_id=application.tracking_number, new_value={"archived": True}, status="Success", department_id=application.assigned_department_id)
+    except Exception:
+        pass
+    db.session.commit()
+    flash(f"Application {application.tracking_number} moved to Archive.", "success")
+    return redirect(request.referrer or url_for("admin.applications"))
+
+
+@admin_bp.route("/admin/applications/<int:application_id>/restore", methods=["POST"])
+@role_required(User.ROLE_SYSTEM_ADMIN, User.ROLE_DEPARTMENT_SUPERVISOR)
+def restore_application(application_id):
+    application = _application_or_404(application_id)
+    details = application.application_details if isinstance(application.application_details, dict) else read_details(application)
+    if details.get("archived"):
+        details.pop("archived", None)
+        write_details(application, details, commit=False)
+        try:
+            log_activity(activity_type="Application Restored", module="Applications", description=f"Admin restored application {application.tracking_number}", record_id=application.tracking_number, new_value={"archived": False}, status="Success", department_id=application.assigned_department_id)
+        except Exception:
+            pass
+        db.session.commit()
+        flash(f"Application {application.tracking_number} restored.", "success")
+    return redirect(request.referrer or url_for("admin.archive"))
 @admin_bp.route("/admin/applications")
 @role_required(User.ROLE_SYSTEM_ADMIN, User.ROLE_DEPARTMENT_STAFF, User.ROLE_DEPARTMENT_SUPERVISOR)
 def applications():
@@ -514,7 +644,7 @@ def applications():
     service_id = int(service_raw) if service_raw.isdigit() else None
     if service_id:
         query = query.where(Application.service_id == service_id)
-    rows = db.session.scalars(query.order_by(Application.submission_date.desc()).limit(200)).unique().all()
+    rows = [r for r in db.session.scalars(query.order_by(Application.submission_date.desc()).limit(200)).unique().all() if not _is_archived_application(r)]
     applicants = {
         user.user_id: user
         for user in db.session.scalars(
@@ -775,7 +905,6 @@ def update_application(application_id):
     application = _application_or_404(application_id)
     target_key = clean_text(request.form.get("application_status"))
     remarks = clean_text(request.form.get("remarks"))
-    from app.services.application_service import read_details, write_details
     from app.services.nbi_admin import gate_message as nbi_gate_message
     from app.services.passport_admin import (
         gate_message,
@@ -842,6 +971,10 @@ def update_application(application_id):
     if remarks:
         description += f" Remarks: {remarks}"
     _log_application_event(application, previous_status, description)
+    try:
+        log_activity(activity_type="Application Status Updated", module="Applications", description=f"{application.tracking_number}: {STATUS_LABELS.get(previous_status, previous_status)} -> {display_label}", record_id=application.tracking_number, previous_value={"status": STATUS_LABELS.get(previous_status, previous_status)}, new_value={"status": display_label, "remarks": remarks}, status="Success", department_id=application.assigned_department_id)
+    except Exception:
+        pass
     db.session.commit()
     flash("Application status and remarks were saved.", "success")
     return redirect(url_for("admin.application_detail", application_id=application_id))

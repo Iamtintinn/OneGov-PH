@@ -36,7 +36,17 @@
                             {% if row_status and row_status.courier_name %}<small>{{ row_status.courier_name }}</small>{% endif %}
                         </td>
                         <td>{{ application.payment_status|replace("_", " ")|title if application.payment_status else "—" }}</td>
-                        <td><a class="admin-row-action" href="{{ url_for('admin.application_detail', application_id=application.application_id) }}">Review <span aria-hidden="true">→</span></a></td>
+                        <td>
+                            <div class="admin-row-actions">
+                                <a class="admin-row-action" href="{{ url_for('admin.application_detail', application_id=application.application_id) }}">Review <span aria-hidden="true">→</span></a>
+                                {% if current_user.role in ['system_admin','department_supervisor'] %}
+                                <form method="post" action="{{ url_for('admin.delete_application', application_id=application.application_id) }}" class="admin-inline-form" onsubmit="return confirm('Delete application {{ application.tracking_number }}? This action cannot be undone.');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="admin-row-action admin-row-action--danger">Delete</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

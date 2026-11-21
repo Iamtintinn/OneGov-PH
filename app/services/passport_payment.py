@@ -1,3 +1,4 @@
+from app.services.audit_service import log_activity
 """Passport payment: Maya Checkout sandbox for online Maya, demo onsite/other methods."""
 
 import secrets
@@ -381,7 +382,12 @@ def _apply_verified_status(payment, application, local_status, maya_status, sour
         return payment.payment_status, None
 
     if local_status == "paid":
+        old_pay_status = payment.payment_status
         payment.payment_status = "paid"
+        try:
+            log_activity(activity_type="Payment Verified", module="Payments", description=f"Payment marked paid for application {getattr(payment,'application_id',None)}", record_id=getattr(payment,'payment_id',None), previous_value={"status": old_pay_status}, new_value={"status":"paid","amount":str(getattr(payment,'amount',''))}, status="Success")
+        except Exception:
+            pass
         payment.transaction_date = now
         user_id = application.applicant_id
         _n_user = db.session.get(__import__('app.models.user',fromlist=['User']).User, user_id) if not isinstance(user_id, __import__('app.models.user',fromlist=['User']).User) else user_id

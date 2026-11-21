@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Archive · OneGov PH{% endblock %}
+{% block body_class %}citizen-dashboard admin-dashboard{% endblock %}
+{% block site_header %}{% include "admin/_header.html" %}{% endblock %}
+{% block content %}
+<div class="admin-main">
+  <header class="admin-page-heading"><div><p class="admin-eyebrow">WORKSPACE / ARCHIVE</p><h1>Archived Applications</h1><p>Deleted applications are stored here. Restore or permanently delete them.</p></div></header>
+  <section class="admin-panel admin-filter-panel">
+    <form class="admin-filter-form" method="get">
+      <label class="admin-search-field"><span class="visually-hidden">Search archive</span><input type="search" name="q" value="{{ search }}" placeholder="Tracking number or citizen name"></label>
+      <label><span class="visually-hidden">Status</span><select name="status"><option value="">All statuses</option>{% for s in statuses %}<option value="{{ s }}" {% if selected_status==s %}selected{% endif %}>{{ status_labels.get(s,s) }}</option>{% endfor %}</select></label>
+      <button class="admin-button admin-button--primary" type="submit">Filter</button>
+      {% if search or selected_status %}<a class="admin-button admin-button--quiet" href="{{ url_for('admin.archive') }}">Clear</a>{% endif %}
+    </form>
+  </section>
+  <section class="admin-panel admin-table-panel">
+    <div class="admin-panel-heading"><div><p class="admin-eyebrow">ARCHIVED RECORDS</p><h2>Archived requests</h2></div><span class="admin-count-chip">{{ applications|length }} shown</span></div>
+    {% if applications %}
+    <div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Tracking number</th><th>Citizen</th><th>Service</th><th>Submitted</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+      {% for application in applications %}{% set applicant = applicants.get(application.applicant_id) %}
+      <tr>
+        <td><strong class="admin-mono">{{ application.tracking_number }}</strong></td>
+        <td>{{ applicant.full_name if applicant else 'Unknown account' }}<small>{{ applicant.email if applicant else '' }}</small></td>
+        <td>{{ application.service.service_name }}</td>
+        <td>{{ application.submission_date.strftime('%d %b %Y') }}</td>
+        <td><span class="admin-status-pill admin-status-pill--{{ application.application_status }}">{{ status_labels.get(application.application_status, application.application_status) }}</span></td>
+        <td><div class="admin-row-actions">
+          {% if current_user.role in ['system_admin','department_supervisor'] %}
+          <form method="post" action="{{ url_for('admin.restore_application', application_id=application.application_id) }}" class="admin-inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="admin-row-action">Restore</button></form>
+          <form method="post" action="{{ url_for('admin.delete_application_permanent', application_id=application.application_id) }}" class="admin-inline-form" onsubmit="return confirm('Permanently delete {{ application.tracking_number }}? This cannot be undone.');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="admin-row-action admin-row-action--danger">Delete permanently</button></form>
+          {% else %}
+          <span class="citizen-muted">No actions</span>
+          {% endif %}
+        </div></td>
+      </tr>
+      {% endfor %}
+    </tbody></table></div>
+    {% else %}
+    <p class="admin-empty">No archived applications found.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

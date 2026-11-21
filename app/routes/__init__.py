@@ -5,6 +5,7 @@ from app.routes.citizen_settings import settings_bp
 from app.routes.admin_portal import admin_portal_bp
 from app.routes.routing import routing_bp
 from app.routes.webhooks import webhooks_bp
+from app.routes.audit import audit_bp
 
 
 def register_blueprints(application):
@@ -15,3 +16,4 @@ def register_blueprints(application):
     application.register_blueprint(admin_portal_bp)
     application.register_blueprint(routing_bp)
     application.register_blueprint(webhooks_bp)
+    application.register_blueprint(audit_bp)

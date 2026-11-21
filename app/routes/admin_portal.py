@@ -556,6 +556,10 @@ def _update_processing_status(application):
     if remarks:
         description += f" Remarks: {remarks}"
     _log_admin_status_event(application, previous_status, description)
+    try:
+        log_activity(activity_type="Application Status Updated", module="Applications", description=f"{application.tracking_number}: {STATUS_LABELS.get(previous_status, previous_status)} -> {target_label}", record_id=application.tracking_number, previous_value={"status": STATUS_LABELS.get(previous_status, previous_status)}, new_value={"status": target_label, "note": remarks}, status="Success", department_id=application.assigned_department_id)
+    except Exception:
+        pass
     db.session.commit()
     flash(f"{application.tracking_number} is now marked {target_label}.", "success")
     return _tracking_redirect(application.application_id)
@@ -616,6 +620,10 @@ def _assign_courier(application):
         }
     )
     _save_admin_tracking(application, state)
+    try:
+        log_activity(activity_type="Courier Assigned", module="Delivery", description=f"{application.tracking_number}: courier saved {courier_name}", record_id=application.tracking_number, new_value={"courier_name": courier_name, "courier_contact": courier_contact}, status="Success", department_id=application.assigned_department_id)
+    except Exception:
+        pass
     db.session.commit()
     flash(f"Courier {courier_name} was saved for {application.tracking_number}.", "success")
     return _tracking_redirect(application.application_id)
@@ -698,6 +706,10 @@ def _update_delivery_status(application):
             db.session.get(User, application.applicant_id),
         )
     _save_admin_tracking(application, state)
+    try:
+        log_activity(activity_type="Delivery Status Updated", module="Delivery", description=f"{application.tracking_number}: delivery set to {target['label']}", record_id=application.tracking_number, previous_value={"delivery_status": delivery.get('label')}, new_value={"delivery_status": target['label'], "courier_name": delivery.get('courier_name'), "note": delivery.get('note')}, status="Success", department_id=application.assigned_department_id)
+    except Exception:
+        pass
     db.session.commit()
     flash(f"Delivery status for {application.tracking_number} is now {target['label']}.", "success")
     return _tracking_redirect(application.application_id)

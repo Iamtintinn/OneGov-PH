@@ -73,10 +73,25 @@ def login():
             user = db.session.scalar(db.select(User).where(User.email == email))
             if user is None or not user.check_password(password):
                 error = "Invalid email or password."
+                try:
+                    log_activity(activity_type="Failed Login", module="Authentication", description=f"Failed login attempt for {email}", record_id=getattr(user,'user_id',None), status="Failed", user=user)
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
             elif not user.is_active:
                 error = "This account is disabled. Contact OneGov PH support."
+                try:
+                    log_activity(activity_type="Login Denied", module="Authentication", description=f"Login denied for disabled account {email}", record_id=user.user_id, status="Denied", user=user)
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
             elif email in {"admin@0negov.ph", "admin@onegov.ph"} or not getattr(user, "login_otp_enabled", True):
                 establish_session(user)
+                try:
+                    log_activity(activity_type="Login", module="Authentication", description=f"User signed in: {user.email}", record_id=user.user_id, status="Success", user=user)
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
                 return redirect(next_url or url_for(home_endpoint_for_role(user.role)))
             else:
                 _clear_otp_session()
@@ -213,6 +228,11 @@ def verify_otp():
             next_url = _safe_next_url(session.get("otp_next"))
             _clear_otp_session()
             establish_session(user)
+            try:
+                log_activity(activity_type="Login", module="Authentication", description=f"User signed in via OTP: {user.email}", record_id=user.user_id, status="Success", user=user)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
             return redirect(next_url or url_for(home_endpoint_for_role(user.role)))
 
         # Registration: create account only after successful verification.
@@ -284,6 +304,12 @@ def change_password():
 
 @auth_bp.route("/logout", methods=["POST"])
 def logout():
+    try:
+        if current_user.is_authenticated:
+            log_activity(activity_type="Logout", module="Authentication", description=f"User signed out: {current_user.email}", record_id=current_user.user_id, status="Success", user=current_user)
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
     _clear_otp_session()
     logout_user()
     flash("You have been logged out.", "success")
