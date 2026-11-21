@@ -7,7 +7,6 @@ from app import db
 from app.models.notification import Notification
 from app.services.application_forms import SSS_MYSSS_TYPE_NEW, normalize_sss_mysss_type
 from app.services.application_service import field_map, read_details, write_details
-from app.services.sss_scheduling import appointment_for, location_by_code
 from app.utils.validators import clean_text, normalize_contact_number
 
 REGION = "National Capital Region"
@@ -24,10 +23,12 @@ LNG_MIN, LNG_MAX = 116.0, 127.0
 
 DEFAULT_LAT = 14.5995
 DEFAULT_LNG = 120.9842
-DEFAULT_ORIGIN_LAT = 14.5995
-DEFAULT_ORIGIN_LNG = 120.9842
+DEFAULT_ORIGIN_LAT = 14.58163
+DEFAULT_ORIGIN_LNG = 120.98369
 DEFAULT_ORIGIN_NAME = "SSS Office"
-DEFAULT_ORIGIN_ADDRESS = "SSS Office, Manila"
+DEFAULT_ORIGIN_ADDRESS = (
+    "Ground Floor, NBI Clearance Annex Building, U.N. Avenue, Ermita, Manila, Philippines"
+)
 
 DEMO_BARANGAYS = (
     {"name": "Commonwealth", "latitude": 14.6986, "longitude": 121.0850},
@@ -106,13 +107,11 @@ def sss_center(name):
 
 
 def _origin(application):
-    appointment = appointment_for(application) or {}
-    location = location_by_code(appointment.get("location_code")) or {}
     return {
-        "name": location.get("label") or appointment.get("location_label") or DEFAULT_ORIGIN_NAME,
-        "address": location.get("address") or appointment.get("address") or DEFAULT_ORIGIN_ADDRESS,
-        "latitude": location.get("latitude") or DEFAULT_ORIGIN_LAT,
-        "longitude": location.get("longitude") or DEFAULT_ORIGIN_LNG,
+        "name": DEFAULT_ORIGIN_NAME,
+        "address": DEFAULT_ORIGIN_ADDRESS,
+        "latitude": DEFAULT_ORIGIN_LAT,
+        "longitude": DEFAULT_ORIGIN_LNG,
     }
 
 
@@ -230,15 +229,10 @@ def validate_delivery_form(form, application):
 def save_pickup(application, user):
     if not pickup_allowed(application):
         return "Pickup is not available for this application type. Choose home delivery."
-    appointment = appointment_for(application) or {}
     details = read_details(application)
     details["delivery"] = {
         "method": PICKUP,
-        "pickup_location": (
-            appointment.get("location_label")
-            or appointment.get("location_code")
-            or "SSS Office (Demonstration)"
-        ),
+        "pickup_location": f"{DEFAULT_ORIGIN_NAME} — {DEFAULT_ORIGIN_ADDRESS}",
         "saved_at": _now().isoformat(),
     }
     write_details(application, details, commit=False)

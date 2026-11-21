@@ -81,12 +81,14 @@ def delivery_values(application):
     delivery = delivery_for(application) or {}
     latitude = delivery.get("latitude") or ""
     longitude = delivery.get("longitude") or ""
+    origin_lat = delivery.get("origin_latitude") or ""
+    origin_lng = delivery.get("origin_longitude") or ""
     return {
         "recipient_name": delivery.get("recipient_name") or "",
         "contact_number": delivery.get("contact_number") or "",
-        "region": delivery.get("region") or REGION,
-        "province": delivery.get("province") or PROVINCE,
-        "city": delivery.get("city") or CITY,
+        "region": delivery.get("region") or "",
+        "province": delivery.get("province") or "",
+        "city": delivery.get("city") or "",
         "barangay": delivery.get("barangay") or "",
         "house_number": delivery.get("house_number") or "",
         "street": delivery.get("street") or "",
@@ -96,12 +98,10 @@ def delivery_values(application):
         "longitude": longitude,
         "location_confirmed": bool(latitude and longitude),
         "origin_barangay": delivery.get("origin_barangay") or "",
-        "origin_address": delivery.get("origin_address") or "",
-        "origin_latitude": delivery.get("origin_latitude") or "",
-        "origin_longitude": delivery.get("origin_longitude") or "",
-        "origin_location_confirmed": bool(
-            delivery.get("origin_latitude") and delivery.get("origin_longitude")
-        ),
+        "origin_address": delivery.get("origin_address") or delivery_address(delivery),
+        "origin_latitude": origin_lat or latitude,
+        "origin_longitude": origin_lng or longitude,
+        "origin_location_confirmed": bool((origin_lat and origin_lng) or (latitude and longitude)),
     }
 
 
@@ -149,24 +149,14 @@ def validate_delivery_form(form):
     subdivision = clean_text(form.get("subdivision"))[:200]
     landmark = clean_text(form.get("landmark"))[:200]
 
+    region = clean_text(form.get("region"))[:200]
+    province = clean_text(form.get("province"))[:200]
+    city = clean_text(form.get("city"))[:200]
+
     origin_barangay = clean_text(form.get("origin_barangay"))[:200]
-    if not origin_barangay:
-        errors["origin_barangay"] = "Enter the barangay where the clearance is being requested."
-
     origin_address = clean_text(form.get("origin_address"))[:300]
-    if not origin_address:
-        errors["origin_address"] = "Enter the starting address."
-
     origin_latitude = _as_float(form.get("origin_latitude"))
     origin_longitude = _as_float(form.get("origin_longitude"))
-    if origin_latitude is None or origin_longitude is None:
-        errors["origin_latitude"] = "Pin the starting location on the map."
-    elif not LAT_MIN <= origin_latitude <= LAT_MAX:
-        errors["origin_latitude"] = "The pinned latitude is outside the supported area."
-    elif not LNG_MIN <= origin_longitude <= LNG_MAX:
-        errors["origin_longitude"] = "The pinned longitude is outside the supported area."
-
-    origin_confirmed = origin_latitude is not None and origin_longitude is not None
 
     latitude = _as_float(form.get("latitude"))
     longitude = _as_float(form.get("longitude"))
@@ -177,14 +167,31 @@ def validate_delivery_form(form):
     elif not LNG_MIN <= longitude <= LNG_MAX:
         errors["longitude"] = "The pinned longitude is outside the supported area."
 
-    confirmed = latitude is not None and longitude is not None
+    confirmed = str(form.get("delivery_location_confirmed") or "").strip() == "yes"
+    if not confirmed:
+        errors["location_confirmed"] = "Confirm the pinned delivery location before continuing."
+
+    if origin_latitude is None or origin_longitude is None:
+        origin_latitude, origin_longitude = latitude, longitude
+
+    address_value = delivery_address(
+        {
+            "house_number": house_number,
+            "street": street,
+            "subdivision": subdivision,
+            "barangay": barangay,
+            "city": city,
+            "province": province,
+            "region": region,
+        }
+    )
 
     values = {
         "recipient_name": recipient,
         "contact_number": contact,
-        "region": REGION,
-        "province": PROVINCE,
-        "city": CITY,
+        "region": region,
+        "province": province,
+        "city": city,
         "barangay": barangay,
         "house_number": house_number,
         "street": street,
@@ -194,10 +201,10 @@ def validate_delivery_form(form):
         "longitude": f"{longitude:.7f}" if longitude is not None else "",
         "location_confirmed": confirmed,
         "origin_barangay": origin_barangay,
-        "origin_address": origin_address,
+        "origin_address": origin_address or address_value,
         "origin_latitude": f"{origin_latitude:.7f}" if origin_latitude is not None else "",
         "origin_longitude": f"{origin_longitude:.7f}" if origin_longitude is not None else "",
-        "origin_location_confirmed": origin_confirmed,
+        "origin_location_confirmed": bool(origin_latitude is not None and origin_longitude is not None),
     }
     return values, errors
 
@@ -205,15 +212,13 @@ def validate_delivery_form(form):
 def save_delivery(application, user, values):
     if not values.get("latitude") or not values.get("longitude"):
         return "Pin the delivery location on the map."
-    if not values.get("origin_latitude") or not values.get("origin_longitude"):
-        return "Pin the starting location on the map."
 
     payload = {
         "recipient_name": values.get("recipient_name") or "",
         "contact_number": values.get("contact_number") or "",
-        "region": values.get("region") or REGION,
-        "province": values.get("province") or PROVINCE,
-        "city": values.get("city") or CITY,
+        "region": values.get("region") or "",
+        "province": values.get("province") or "",
+        "city": values.get("city") or "",
         "barangay": values.get("barangay") or "",
         "house_number": values.get("house_number") or "",
         "street": values.get("street") or "",
@@ -223,8 +228,8 @@ def save_delivery(application, user, values):
         "longitude": str(values.get("longitude") or ""),
         "origin_barangay": values.get("origin_barangay") or "",
         "origin_address": values.get("origin_address") or "",
-        "origin_latitude": str(values.get("origin_latitude") or ""),
-        "origin_longitude": str(values.get("origin_longitude") or ""),
+        "origin_latitude": str(values.get("origin_latitude") or values.get("latitude") or ""),
+        "origin_longitude": str(values.get("origin_longitude") or values.get("longitude") or ""),
         "saved_at": _now().isoformat(),
     }
     payload["address"] = delivery_address(payload)

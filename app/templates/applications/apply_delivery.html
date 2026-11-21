@@ -34,7 +34,7 @@
             <input type="hidden" name="origin_latitude" id="origin-latitude" value="{{ values.origin_latitude }}">
             <input type="hidden" name="origin_longitude" id="origin-longitude" value="{{ values.origin_longitude }}">
             <input type="hidden" name="origin_location_confirmed" id="origin-location-confirmed" value="{{ 'yes' if values.origin_location_confirmed else '' }}">
-            {% if fixed_origin_map %}
+            {% if fixed_origin_map and spec.kind not in ['barangay', 'residency'] %}
             <input type="hidden" name="origin_address" id="origin-address" value="{{ values.origin_address }}">
             {% endif %}
             {% endif %}
@@ -60,18 +60,22 @@
                 {% if fixed_origin_map %}
                 <div class="passport-details-fields delivery-fields delivery-origin-fields">
                     <div class="apply-field">
-                        <label for="origin_barangay">Starting office</label>
-                        <p class="field-help" id="origin_barangay-help">Fixed pickup location for this document.</p>
+                        <label for="origin_barangay">{{ 'Starting barangay' if spec.kind in ['barangay', 'residency'] else 'Starting office' }}</label>
+                        <p class="field-help" id="origin_barangay-help">{{ 'Enter the barangay where the document is coming from.' if spec.kind in ['barangay', 'residency'] else 'Fixed pickup location for this document.' }}</p>
                         <div class="text-input">
-                            <input id="origin_barangay" name="origin_barangay" type="text" value="{{ values.origin_barangay }}" readonly aria-describedby="origin_barangay-help">
+                            <input id="origin_barangay" name="origin_barangay" type="text" maxlength="200" value="{{ values.origin_barangay }}{% if spec.kind not in ['barangay', 'residency'] and values.origin_address %} — {{ values.origin_address }}{% endif %}" {% if spec.kind not in ['barangay', 'residency'] %}readonly{% endif %} aria-describedby="origin_barangay-help">
                         </div>
                     </div>
 
                     <div class="apply-field">
-                        <label for="delivery_address_display">Delivery address</label>
-                        <p class="field-help" id="delivery_address_display-help">This is the destination where the document will be delivered.</p>
+                        <label for="{{ 'origin_address' if spec.kind in ['barangay', 'residency'] else 'delivery_address_display' }}">Delivery address</label>
+                        <p class="field-help" id="{{ 'origin_address-help' if spec.kind in ['barangay', 'residency'] else 'delivery_address_display-help' }}">{{ 'Starting address for this document. Pin the destination on the map to fill this field.' if spec.kind in ['barangay', 'residency'] else 'Pin the delivery location on the map to fill this field.' }}</p>
                         <div class="text-input">
+                            {% if spec.kind in ['barangay', 'residency'] %}
+                            <input id="origin_address" name="origin_address" type="text" value="{{ values.origin_address or delivery_address_preview }}" readonly aria-describedby="origin_address-help">
+                            {% else %}
                             <input id="delivery_address_display" type="text" value="{{ delivery_address_preview }}" readonly aria-describedby="delivery_address_display-help">
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -130,7 +134,7 @@
                     {% if show_origin_map %}
                     <p class="delivery-map-status{% if values.origin_location_confirmed %} is-confirmed{% endif %}" id="origin-location-status" role="status">
                         {% if fixed_origin_map %}
-                        {{ values.origin_barangay }} start pin fixed.
+                        {{ 'Starting address set from pinned location.' if spec.kind == 'barangay' else (values.origin_barangay ~ ' start pin fixed.') }}
                         {% elif spec.kind in ['barangay', 'residency'] %}
                             {% if values.origin_location_confirmed %}Starting pin placed.{% else %}No starting pin yet.{% endif %}
                         {% elif values.origin_location_confirmed %}
@@ -219,7 +223,7 @@
                         <div class="apply-field">
                             <label for="delivery_region">Region</label>
                             <div class="text-input">
-                                <input id="delivery_region" name="region" type="text" value="{{ delivery_region }}"{% if spec.kind != 'passport' %} readonly{% endif %} placeholder="{% if spec.kind == 'passport' %}Set by pinned location{% endif %}">
+                                <input id="delivery_region" name="region" type="text" value="{{ delivery_region }}"{% if spec.kind not in ['passport', 'barangay', 'residency'] %} readonly{% endif %} placeholder="{% if spec.kind in ['passport', 'barangay', 'residency'] %}Set by pinned location{% endif %}">
                             </div>
                             {% if errors.get('region') %}<p class="field-error">{{ errors.region }}</p>{% endif %}
                         </div>
@@ -227,7 +231,7 @@
                         <div class="apply-field">
                             <label for="delivery_province">Province</label>
                             <div class="text-input">
-                                <input id="delivery_province" name="province" type="text" value="{{ delivery_province }}"{% if spec.kind != 'passport' %} readonly{% endif %} placeholder="{% if spec.kind == 'passport' %}Set by pinned location{% endif %}">
+                                <input id="delivery_province" name="province" type="text" value="{{ delivery_province }}"{% if spec.kind not in ['passport', 'barangay', 'residency'] %} readonly{% endif %} placeholder="{% if spec.kind in ['passport', 'barangay', 'residency'] %}Set by pinned location{% endif %}">
                             </div>
                             {% if errors.get('province') %}<p class="field-error">{{ errors.province }}</p>{% endif %}
                         </div>
@@ -235,7 +239,7 @@
                         <div class="apply-field">
                             <label for="delivery_city">City / municipality</label>
                             <div class="text-input">
-                                <input id="delivery_city" name="city" type="text" value="{{ delivery_city }}"{% if spec.kind != 'passport' %} readonly{% endif %} placeholder="{% if spec.kind == 'passport' %}Set by pinned location{% endif %}">
+                                <input id="delivery_city" name="city" type="text" value="{{ delivery_city }}"{% if spec.kind not in ['passport', 'barangay', 'residency'] %} readonly{% endif %} placeholder="{% if spec.kind in ['passport', 'barangay', 'residency'] %}Set by pinned location{% endif %}">
                             </div>
                             {% if errors.get('city') %}<p class="field-error">{{ errors.city }}</p>{% endif %}
                         </div>
@@ -486,7 +490,8 @@ window.ONE_GOV_DELIVERY = {
         return;
     }
 
-    var shouldAutofillAddress = config.kind === "passport";
+    var shouldAutofillAddress = ["passport", "barangay", "residency", "birth", "cenomar", "senior", "nbi", "philsys", "sss"].indexOf(config.kind) !== -1;
+    var originFollowsDelivery = false;
     var reverseRequestId = 0;
 
     var activePinKind = config.showOrigin ? "origin" : "delivery";
@@ -582,6 +587,9 @@ window.ONE_GOV_DELIVERY = {
     }
 
     function nextAutoPinKind() {
+        if (fixedOriginFlow) {
+            return "delivery";
+        }
         return getPoint("origin") ? "delivery" : "origin";
     }
 
@@ -591,13 +599,20 @@ window.ONE_GOV_DELIVERY = {
         }
         if (fixedOriginFlow) {
             activePinKind = "delivery";
-            setStatus("origin", {{ values.origin_barangay|tojson }} + " start pin fixed.");
-            setStatus(
-                "delivery",
-                getPoint("delivery")
-                    ? "Delivery pin placed. Click the map to move it, or clear the pin to start over."
-                    : "Click the map to pin the delivery destination."
-            );
+            var deliveryPoint = getPoint("delivery");
+            if (!deliveryPoint) {
+                if (originFollowsDelivery) {
+                    clearPin("origin");
+                }
+                setStatus("origin", originFollowsDelivery ? "No starting pin yet." : ({{ values.origin_barangay|tojson }} + " start pin fixed."));
+                setStatus("delivery", "Click the map to pin the delivery destination.");
+            } else {
+                if (originFollowsDelivery && !getPoint("origin")) {
+                    placePin("origin", deliveryPoint.lat, deliveryPoint.lng, true);
+                }
+                setStatus("origin", originFollowsDelivery ? "Starting address set from pinned location." : ({{ values.origin_barangay|tojson }} + " start pin fixed."));
+                setStatus("delivery", "Delivery pin placed. Click the map to move it, or clear the pin to start over.");
+            }
             return;
         }
         activePinKind = nextAutoPinKind();
@@ -614,10 +629,6 @@ window.ONE_GOV_DELIVERY = {
     }
 
     function refreshDeliveryAddressPreview() {
-        var preview = document.getElementById("delivery_address_display");
-        if (!preview) {
-            return;
-        }
         var parts = ["house_number", "street", "subdivision", "delivery_barangay", "delivery_city", "delivery_province", "delivery_region"]
             .map(function (id) {
                 var element = document.getElementById(id);
@@ -626,7 +637,16 @@ window.ONE_GOV_DELIVERY = {
             .filter(function (value) {
                 return Boolean(value);
             });
-        preview.value = parts.join(", ");
+        var preview = document.getElementById("delivery_address_display");
+        if (preview) {
+            preview.value = parts.join(", ");
+        }
+        if (config.kind === "barangay" || config.kind === "residency") {
+            var originAddress = document.getElementById("origin_address");
+            if (originAddress) {
+                originAddress.value = parts.join(", ");
+            }
+        }
     }
 
     function setFieldValue(id, value) {
@@ -928,6 +948,9 @@ window.ONE_GOV_DELIVERY = {
                 var point = markers[kind].getLatLng();
                 placePin(kind, point.lat, point.lng, false);
                 if (kind === "delivery") {
+                    if (originFollowsDelivery) {
+                        placePin("origin", point.lat, point.lng, true);
+                    }
                     reverseGeocodeDelivery(point.lat, point.lng);
                 }
                 if (autoPinFlow) {
@@ -1033,6 +1056,9 @@ window.ONE_GOV_DELIVERY = {
             var pinKind = nextAutoPinKind();
             placePin(pinKind, event.latlng.lat, event.latlng.lng, true);
             if (pinKind === "delivery") {
+                if (originFollowsDelivery) {
+                    placePin("origin", event.latlng.lat, event.latlng.lng, true);
+                }
                 reverseGeocodeDelivery(event.latlng.lat, event.latlng.lng);
             }
             syncAutoPinState();
@@ -1162,6 +1188,9 @@ window.ONE_GOV_DELIVERY = {
     if (clearDestinationButton) {
         clearDestinationButton.addEventListener("click", function () {
             clearPin("delivery");
+            if (fixedOriginFlow) {
+                clearPin("origin");
+            }
             syncAutoPinState();
         });
     }
@@ -1182,6 +1211,9 @@ window.ONE_GOV_DELIVERY = {
                     var pinKind = nextAutoPinKind();
                     placePin(pinKind, lat, lng, true);
                     if (pinKind === "delivery") {
+                        if (originFollowsDelivery) {
+                            placePin("origin", lat, lng, true);
+                        }
                         reverseGeocodeDelivery(lat, lng);
                     }
                     syncAutoPinState();

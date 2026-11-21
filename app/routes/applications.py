@@ -875,6 +875,7 @@ def apply_delivery(application_id):
             PROVINCE,
             REGION,
             barangay_center,
+            delivery_address,
             delivery_ready,
             delivery_values,
             save_delivery,
@@ -1136,9 +1137,6 @@ def apply_delivery(application_id):
         from app.services.nbi_scheduling import appointment_for
 
         appointment = appointment_for(application)
-        if appointment is None:
-            flash("Select a demonstration appointment before choosing delivery.", "warning")
-            return redirect(url_for("citizen.apply_schedule", application_id=application.application_id))
         delivery_step = 6
 
         if request.method == "POST":
@@ -1517,7 +1515,7 @@ def apply_delivery(application_id):
             else:
                 initial_lat, initial_lng = DEFAULT_LAT, DEFAULT_LNG
 
-    if kind == "passport":
+    if kind in {"passport", "barangay", "residency"}:
         delivery_region_val = values.get("region") or ""
         delivery_province_val = values.get("province") or ""
         delivery_city_val = values.get("city") or ""
@@ -1527,7 +1525,7 @@ def apply_delivery(application_id):
         delivery_city_val = CITY
     context = _common(application, delivery_step)
     delivery_address_preview = ""
-    if kind in {"birth", "cenomar", "passport", "senior", "nbi", "philsys", "sss"}:
+    if kind in {"barangay", "birth", "cenomar", "passport", "senior", "nbi", "philsys", "sss"}:
         delivery_address_preview = delivery_address(
             {
                 "house_number": values.get("house_number"),
