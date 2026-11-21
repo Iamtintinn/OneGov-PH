@@ -978,39 +978,58 @@ def notifications():
     return render_template("citizen/notifications.html", notifications=notices)
 
 
-@citizen_bp.route("/citizen/profile", methods=["GET", "POST"])
+@citizen_bp.route("/citizen/profile", methods=["GET"])
 @citizen_portal_required
 def profile():
-    errors = {}
-    if request.method == "POST":
-        first_name, first_error = validate_name(request.form.get("first_name"), "First name")
-        middle_name, middle_error = validate_name(
-            request.form.get("middle_name"), "Middle name", required=False
-        )
-        last_name, last_error = validate_name(request.form.get("last_name"), "Last name")
-        contact_number = normalize_contact_number(request.form.get("contact_number"))
-        contact_digits = contact_number[1:] if contact_number.startswith("+") else contact_number
-        address = clean_text(request.form.get("address"))
-        if first_error:
-            errors["first_name"] = first_error
-        if middle_error:
-            errors["middle_name"] = middle_error
-        if last_error:
-            errors["last_name"] = last_error
-        if not contact_number:
-            errors["contact_number"] = "Contact number is required."
-        elif not contact_digits.isdigit() or not 10 <= len(contact_digits) <= 15:
-            errors["contact_number"] = "Enter a valid contact number."
-        if len(address) > 500:
-            errors["address"] = "Address must be 500 characters or fewer."
-        if not errors:
-            current_user.set_name(first_name, last_name, middle_name or None)
-            current_user.contact_number = contact_number
-            current_user.address = address or None
-            db.session.commit()
-            flash("Your profile has been updated.", "success")
-            return redirect(url_for("citizen.profile"))
-    return render_template("citizen/profile.html", errors=errors)
+    from sqlalchemy import desc
+    from app.services.citizen_settings_service import profile_picture_url
+    apps = _owned_applications(current_user.user_id)
+    stats = {
+        "total": len(apps),
+        "pending": sum(1 for a in apps if a.application_status in PENDING_STATUSES),
+        "processing": sum(1 for a in apps if a.application_status in IN_PROGRESS_STATUSES),
+        "completed": sum(1 for a in apps if a.application_status in COMPLETED_STATUSES),
+    }
+    docs = []
+    seen = set()
+    for a in apps:
+        name = (a.service.service_name if a.service else "Government service")
+        if name in seen:
+            continue
+        seen.add(name)
+        docs.append({
+            "name": name,
+            "department": a.service.department.department_name if a.service and a.service.department else "—",
+            "status": STATUS_LABELS.get(a.application_status, a.application_status),
+            "date": a.submission_date or a.last_updated,
+        })
+    events = db.session.scalars(
+        db.select(ApplicationEvent)
+        .options(joinedload(ApplicationEvent.application).joinedload(Application.service))
+        .join(Application, ApplicationEvent.application_id == Application.application_id)
+        .where(Application.applicant_id == current_user.user_id)
+        .order_by(desc(ApplicationEvent.recorded_at))
+        .limit(10)
+    ).unique().all()
+    activities = []
+    for ev in events:
+        app_obj = ev.application
+        svc = app_obj.service.service_name if app_obj and app_obj.service else "Application"
+        status_key = ev.new_status or ev.previous_status or "activity"
+        label = STATUS_LABELS.get(status_key, str(status_key).replace("_", " ").title())
+        activities.append({
+            "label": label,
+            "description": ev.update_description or svc,
+            "service": svc,
+            "date": ev.recorded_at,
+        })
+    return render_template(
+        "citizen/profile.html",
+        profile_picture_url=profile_picture_url(current_user),
+        stats=stats,
+        documents=docs[:8],
+        activities=activities,
+    )
 
 
 @citizen_bp.route("/citizen/settings", methods=["GET", "POST"])

@@ -1,34 +1,87 @@
 {% extends "base.html" %}
-{% block title %}My profile · OneGov PH{% endblock %}
+{% block title %}My Profile · OneGov PH{% endblock %}
 {% block body_class %}citizen-dashboard{% endblock %}
 {% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
 {% block content %}
 <div class="dash-page site-width">
-    <section class="detail-card profile-card" aria-labelledby="profile-heading">
-        <p class="dash-kicker">Account</p>
-        <h1 id="profile-heading">My profile</h1>
-        <form class="dash-form" method="post" action="{{ url_for('citizen.profile') }}" novalidate>
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <label for="first_name">First name</label>
-            <input id="first_name" name="first_name" value="{{ request.form.get('first_name', current_user.first_name) }}" required autocomplete="given-name" aria-invalid="{{ 'true' if errors.first_name else 'false' }}">
-            {% if errors.first_name %}<p class="field-error">{{ errors.first_name }}</p>{% endif %}
-            <label for="middle_name">Middle name <span class="optional">(optional)</span></label>
-            <input id="middle_name" name="middle_name" value="{{ request.form.get('middle_name', current_user.middle_name or '') }}" autocomplete="additional-name" aria-invalid="{{ 'true' if errors.middle_name else 'false' }}">
-            {% if errors.middle_name %}<p class="field-error">{{ errors.middle_name }}</p>{% endif %}
-            <label for="last_name">Last name</label>
-            <input id="last_name" name="last_name" value="{{ request.form.get('last_name', current_user.last_name) }}" required autocomplete="family-name" aria-invalid="{{ 'true' if errors.last_name else 'false' }}">
-            {% if errors.last_name %}<p class="field-error">{{ errors.last_name }}</p>{% endif %}
-            <label for="email">Email address</label>
-            <input id="email" value="{{ current_user.email }}" readonly>
-            <p class="empty-note">Email is used to sign in and cannot be changed here.</p>
-            <label for="contact_number">Contact number</label>
-            <input id="contact_number" name="contact_number" value="{{ request.form.get('contact_number', current_user.contact_number or '') }}" required autocomplete="tel" aria-invalid="{{ 'true' if errors.contact_number else 'false' }}">
-            {% if errors.contact_number %}<p class="field-error">{{ errors.contact_number }}</p>{% endif %}
-            <label for="address">Address <span class="optional">(optional)</span></label>
-            <input id="address" name="address" value="{{ request.form.get('address', current_user.address or '') }}" autocomplete="street-address" aria-invalid="{{ 'true' if errors.address else 'false' }}">
-            {% if errors.address %}<p class="field-error">{{ errors.address }}</p>{% endif %}
-            <button class="dash-button" type="submit">Save profile</button>
-        </form>
-    </section>
+  <section class="citizen-profile-page" aria-labelledby="profile-heading">
+    <div class="citizen-settings-hero">
+      <div>
+        <p class="dash-kicker">Citizen Identity</p>
+        <h1 id="profile-heading">My Profile</h1>
+        <p class="citizen-list-sub">Your account overview, application activity, and government document history.</p>
+      </div>
+    </div>
+
+    <div class="cprof-hero-card">
+      <div class="cprof-identity">
+        <div class="cset-avatar-wrap cprof-avatar" aria-hidden="true">
+          {% if profile_picture_url %}
+          <img src="{{ profile_picture_url }}" alt="Profile picture" class="cset-avatar-img" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"><div class="cset-avatar-fallback" style="display:none">{{ ((current_user.first_name or '')[:1] ~ (current_user.last_name or '')[:1])|upper or 'U' }}</div>
+          {% else %}
+          <div class="cset-avatar-fallback">{{ ((current_user.first_name or '')[:1] ~ (current_user.last_name or '')[:1])|upper or 'U' }}</div>
+          {% endif %}
+        </div>
+        <div class="cprof-identity-main">
+          <div class="cprof-name-row">
+            <h2 class="cprof-name">{{ current_user.full_name }}</h2>
+            <span class="cset-badge {{ 'cset-badge-ok' if current_user.email_verification_status == 'verified' else 'cset-badge-warn' }}">{{ 'Verified' if current_user.email_verification_status == 'verified' else 'Unverified' }}</span>
+            <span class="cset-badge {{ 'cset-badge-ok' if current_user.account_status == 'active' else 'cset-badge-warn' }}">{{ current_user.account_status|replace('_',' ')|title }}</span>
+          </div>
+          <p class="cprof-sub">Citizen account overview and activity summary.</p>
+        </div>
+      </div>
+      <div class="cprof-meta-grid">
+        <div class="cprof-meta"><span class="cprof-meta-label">Citizen Account ID</span><strong>#{{ '%06d'|format(current_user.user_id) }}</strong></div>
+        <div class="cprof-meta"><span class="cprof-meta-label">Account Type</span><strong>Citizen</strong></div>
+        <div class="cprof-meta"><span class="cprof-meta-label">Member Since</span><strong>{{ current_user.date_registered.strftime('%d %b %Y') if current_user.date_registered else '—' }}</strong></div>
+        <div class="cprof-meta"><span class="cprof-meta-label">Email</span><strong>{{ current_user.email }}</strong></div>
+      </div>
+    </div>
+
+    <div class="cprof-stats">
+      <article class="cprof-stat"><span class="cprof-stat-label">Total Applications</span><strong>{{ stats.total }}</strong><small>All submitted applications</small></article>
+      <article class="cprof-stat"><span class="cprof-stat-label">Pending</span><strong>{{ stats.pending }}</strong><small>Awaiting review or action</small></article>
+      <article class="cprof-stat"><span class="cprof-stat-label">Processing</span><strong>{{ stats.processing }}</strong><small>In progress or for release</small></article>
+      <article class="cprof-stat"><span class="cprof-stat-label">Completed</span><strong>{{ stats.completed }}</strong><small>Successfully completed</small></article>
+    </div>
+
+    <div class="cprof-grid">
+      <section class="cset-card">
+        <div class="cset-card-head"><div><p class="cset-kicker">Documents</p><h3>Government Documents</h3><p class="cset-help" style="margin-top:.45rem">Previously applied government services and documents.</p></div></div>
+        <div class="cprof-doc-list">
+          {% for d in documents %}
+          <div class="cprof-doc-item">
+            <div>
+              <p class="cprof-doc-name">{{ d.name }}</p>
+              <p class="cprof-doc-meta">{{ d.department }}{% if d.date %} · {{ d.date.strftime('%d %b %Y') }}{% endif %}</p>
+            </div>
+            <span class="cset-badge cset-badge-muted">{{ d.status }}</span>
+          </div>
+          {% else %}
+          <p class="cset-empty">No government documents applied yet.</p>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="cset-card">
+        <div class="cset-card-head"><div><p class="cset-kicker">Activity</p><h3>Recent Activities</h3><p class="cset-help" style="margin-top:.45rem">Recent application submissions, payments, approvals, and delivery updates.</p></div></div>
+        <div class="cprof-activity-list">
+          {% for a in activities %}
+          <div class="cprof-activity-item">
+            <div class="cprof-activity-dot"></div>
+            <div class="cprof-activity-body">
+              <p class="cprof-activity-title">{{ a.label }}</p>
+              <p class="cprof-activity-desc">{{ a.description }}</p>
+              <p class="cprof-activity-meta">{{ a.service }}{% if a.date %} · {{ a.date.strftime('%d %b %Y, %I:%M %p') }}{% endif %}</p>
+            </div>
+          </div>
+          {% else %}
+          <p class="cset-empty">No recent activity yet.</p>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+  </section>
 </div>
 {% endblock %}

@@ -94,12 +94,26 @@ def _log(action, description):
         pass
 
 
+def _settings_redirect(section):
+    if request.form.get("admin_mode") == "1" or request.args.get("admin_mode") == "1":
+        try:
+            from app.utils.portal import in_admin_portal
+            # admin portal settings page uses admin_portal.settings
+            return redirect(url_for("admin_portal.settings", section=section))
+        except Exception:
+            pass
+    ref = request.referrer or ""
+    if "/admin/portal/settings" in ref:
+        return redirect(url_for("admin_portal.settings", section=section))
+    return redirect(url_for("citizen_settings.index", section=section))
+
+
 def _json_or_redirect(ok, message, section, category="success"):
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         status = 200 if ok else 400
         return jsonify({"ok": ok, "message": message, "category": category}), status
     flash(message, category)
-    return redirect(url_for("citizen_settings.index", section=section))
+    return _settings_redirect(section)
 
 
 @settings_bp.route("/", methods=["GET"])

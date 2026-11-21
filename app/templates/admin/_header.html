@@ -77,12 +77,6 @@
                 </a>
             </li>
             <li>
-                <a class="sidebar-link{% if page == 'admin_portal.notifications' %} is-active{% endif %}" href="{{ url_for('admin_portal.notifications') }}" title="Notifications">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 1 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg>
-                    <span>Notifications</span>
-                </a>
-            </li>
-            <li>
                 <a class="sidebar-link{% if page == 'admin_portal.profile' %} is-active{% endif %}" href="{{ url_for('admin_portal.profile') }}" title="My Profile">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3"></circle><path d="M5 19c1.5-3 4-4.5 7-4.5S17.5 16 19 19"></path></svg>
                     <span>My Profile</span>
@@ -131,12 +125,52 @@
         </span>
     </div>
     <div class="shell-topbar-right">
-        <a class="shell-icon-button" href="{{ url_for('admin_portal.notifications') }}" title="Notifications" aria-label="Notifications">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 1 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg>
-            {% if unread_notification_count %}
-            <span class="notice-count">{{ unread_notification_count }}</span>
-            {% endif %}
-        </a>
+        {% set notify_next = request.full_path.rstrip('?') if request.query_string else request.path %}
+        <div class="shell-notify" data-notify-root>
+            <button class="shell-icon-button shell-notify-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="notify-panel" title="Notifications" aria-label="Notifications{% if unread_notification_count %}, {{ unread_notification_count }} unread{% endif %}">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 1 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg>
+                {% if unread_notification_count %}
+                <span class="notice-count" aria-hidden="true">{{ unread_notification_count }}</span>
+                {% endif %}
+            </button>
+            <div id="notify-panel" class="notify-dropdown" role="region" aria-label="Recent notifications" hidden>
+                <div class="notify-head">
+                    <p class="notify-title">Notifications{% if unread_notification_count %} <span class="notify-unread-label">{{ unread_notification_count }} unread</span>{% endif %}</p>
+                    {% if unread_notification_count %}
+                    <form method="post" action="{{ url_for('citizen.notifications_read_all') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="next" value="{{ notify_next }}">
+                        <button type="submit" class="notify-action">Mark all as read</button>
+                    </form>
+                    {% endif %}
+                </div>
+                <div class="notify-list">
+                    {% if nav_notifications %}
+                    {% for notice in nav_notifications %}
+                    <article class="notify-item{% if notice.read_status == 'unread' %} is-unread{% endif %}">
+                        <div class="notify-item-main">
+                            <p class="notify-item-title">{{ notice.notification_title }}</p>
+                            <p class="notify-item-message">{{ notice.notification_message }}</p>
+                            <p class="notify-item-meta">{{ notice.created_date.strftime("%d %b %Y, %H:%M") if notice.created_date else "" }} · <span class="notify-status">{{ 'Unread' if notice.read_status == 'unread' else 'Read' }}</span></p>
+                        </div>
+                        {% if notice.read_status == 'unread' %}
+                        <form method="post" action="{{ url_for('citizen.notification_read', notification_id=notice.notification_id) }}" class="notify-item-action">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="next" value="{{ notify_next }}">
+                            <button type="submit" class="notify-read-btn">Mark read</button>
+                        </form>
+                        {% endif %}
+                    </article>
+                    {% endfor %}
+                    {% else %}
+                    <p class="notify-empty">No notifications yet.</p>
+                    {% endif %}
+                </div>
+                <div class="notify-foot">
+                    <a href="{{ url_for('admin_portal.notifications') }}">View all notifications</a>
+                </div>
+            </div>
+        </div>
         <button class="shell-icon-button" type="button" data-theme-toggle aria-pressed="false" aria-label="Switch to dark mode" title="Switch to dark mode">
             <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
             <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>

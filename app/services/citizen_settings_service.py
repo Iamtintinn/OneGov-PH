@@ -45,10 +45,19 @@ def _perm_dict(user):
     return dict(p) if isinstance(p, dict) else {}
 
 
+def _mark_perm_dirty(user):
+    try:
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(user, "admin_permissions")
+    except Exception:
+        pass
+
+
 def _save_perm(user, key, value):
     p = _perm_dict(user)
     p[key] = value
     user.admin_permissions = p
+    _mark_perm_dirty(user)
 
 
 def get_extended(user):
@@ -61,6 +70,7 @@ def set_extended(user, ext):
     p = _perm_dict(user)
     p["citizen_settings"] = ext
     user.admin_permissions = p
+    _mark_perm_dirty(user)
 
 
 def get_notification_prefs(user):
@@ -209,7 +219,19 @@ def profile_picture_url(user):
     pic = extra.get("profile_picture")
     if not pic:
         return None
-    return f"/static/uploads/profile_pictures/{pic}"
+    import os
+    from flask import url_for
+    static_root = current_app.static_folder or os.path.join(current_app.root_path, "static")
+    candidates = [
+        os.path.join(static_root, "uploads", "profile_pictures", pic),
+        os.path.join(current_app.root_path, "..", "static", "uploads", "profile_pictures", pic),
+    ]
+    file_path = next((p for p in candidates if os.path.exists(p)), candidates[0])
+    ver = int(os.path.getmtime(file_path)) if os.path.exists(file_path) else 0
+    try:
+        return url_for("static", filename=f"uploads/profile_pictures/{pic}", v=ver)
+    except Exception:
+        return f"/static/uploads/profile_pictures/{pic}?v={ver}"
 
 
 def save_profile_picture(user, file_storage):
@@ -225,17 +247,29 @@ def save_profile_picture(user, file_storage):
     if size > PROFILE_PIC_MAX:
         return None, "Profile picture must be 2MB or smaller."
     import os, secrets
-    upload_dir = os.path.join(current_app.root_path, "static", "uploads", "profile_pictures")
+    static_root = current_app.static_folder or os.path.join(current_app.root_path, "static")
+    upload_dir = os.path.join(static_root, "uploads", "profile_pictures")
     os.makedirs(upload_dir, exist_ok=True)
     stored = f"user_{user.user_id}_{secrets.token_hex(8)}{ext}"
-    file_storage.save(os.path.join(upload_dir, stored))
+    dest = os.path.join(upload_dir, stored)
+    file_storage.save(dest)
+    # also place in BASE_DIR/static for safety if app serves from different root
+    alt_static = os.path.join(os.path.dirname(current_app.root_path), "static", "uploads", "profile_pictures")
+    if os.path.abspath(alt_static) != os.path.abspath(upload_dir):
+        try:
+            os.makedirs(alt_static, exist_ok=True)
+            import shutil
+            shutil.copy2(dest, os.path.join(alt_static, stored))
+        except Exception:
+            pass
     # remove old
     old = get_profile_extra(user).get("profile_picture")
     if old and old != stored:
-        try:
-            os.remove(os.path.join(upload_dir, old))
-        except OSError:
-            pass
+        for d in [upload_dir, alt_static]:
+            try:
+                os.remove(os.path.join(d, old))
+            except OSError:
+                pass
     return stored, None
 
 
