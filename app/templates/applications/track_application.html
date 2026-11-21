@@ -4,76 +4,103 @@
 {% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
 {% block content %}
 <div class="dash-page site-width">
-    <section class="dash-section" aria-labelledby="tracking-heading">
-        <p class="dash-kicker">Progress</p>
-        <h1 id="tracking-heading">Application tracking</h1>
+    <section class="dash-section citizen-list-page" aria-labelledby="tracking-heading">
+        <div class="citizen-list-head">
+            <div>
+                <p class="dash-kicker">Progress</p>
+                <h1 id="tracking-heading">Application tracking</h1>
+                <p class="citizen-list-sub">Monitor status updates and progress for your submitted applications.</p>
+            </div>
+            <div class="citizen-list-count"><strong>{{ filtered_count }}</strong><span>{{ 'result' if filtered_count == 1 else 'results' }}</span></div>
+        </div>
+
+        <form class="citizen-filter-bar" method="get" role="search" aria-label="Filter tracked applications">
+            <label class="citizen-filter-search">
+                <span class="visually-hidden">Search applications</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>
+                <input type="search" name="q" value="{{ q }}" placeholder="Search by tracking number, service, or department">
+            </label>
+            <label class="citizen-filter-select">
+                <span class="visually-hidden">Filter by status</span>
+                <select name="status">
+                    <option value="">All statuses</option>
+                    {% for key, label in status_options %}<option value="{{ key }}" {% if selected_status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+            </label>
+            <button class="citizen-filter-btn" type="submit">Search</button>
+            {% if q or selected_status %}<a class="citizen-filter-clear" href="{{ url_for('citizen.tracking') }}">Clear</a>{% endif %}
+        </form>
+
         {% if applications %}
-        <div class="track-list">
+        <div class="track-list citizen-track-list">
             {% for application in applications %}
-            <article class="detail-card">
-                <h2>{{ application.service.service_name }}</h2>
+            {% set labels = status_labels_for(application.service, application) %}
+            {% set events = events_by_application.get(application.application_id, []) %}
+            <article class="detail-card citizen-track-card">
+                <div class="citizen-track-card-head">
+                    <div>
+                        <p class="citizen-mono citizen-track-ref">{{ application.tracking_number }}</p>
+                        <h2>{{ application.service.service_name }}</h2>
+                        <p class="citizen-track-dept">{{ application.department.department_name }}</p>
+                    </div>
+                    <div class="citizen-track-status">{% with status=application.application_status, labels=labels %}{% include "applications/_status.html" %}{% endwith %}</div>
+                </div>
+
                 {% if application.service.service_name == "NBI Clearance Application Monitoring" %}
-                <p class="field-help">These statuses are monitoring notes in OneGov PH. They are not a live update from NBI. Only authorized personnel can change a status after submission.</p>
+                <p class="field-help citizen-track-note">These statuses are monitoring notes in OneGov PH. They are not a live update from NBI.</p>
                 {% elif application.service.service_name in ["PhilSys National ID Registration Assistance", "National ID Tracking and Concern Management"] %}
-                <p class="field-help">These statuses monitor registration preparation in OneGov PH. They are not a live update from PhilSys. Only authorized personnel can mark a request Registered, and submitting does not do that.</p>
+                <p class="field-help citizen-track-note">These statuses monitor registration preparation in OneGov PH. They are not a live update from PhilSys.</p>
                 {% elif application.service.service_name.startswith("SS Number") %}
                 {% set recorded = namespace(status='') %}
-                {% for field in (application.application_details.fields if application.application_details else []) %}
-                {% if field.key == 'sss_recorded_status' and field.value %}{% set recorded.status = field.value %}{% endif %}
-                {% endfor %}
-                <p class="field-help">The status below is the OneGov PH record. It is not a live update from SSS, and opening the SSS website does not change it.</p>
-                <p>SSS status you recorded: {{ recorded.status or "Not recorded" }}</p>
+                {% for field in (application.application_details.fields if application.application_details else []) %}{% if field.key == 'sss_recorded_status' and field.value %}{% set recorded.status = field.value %}{% endif %}{% endfor %}
+                <p class="field-help citizen-track-note">OneGov PH record only, not a live SSS update. SSS status recorded: {{ recorded.status or "Not recorded" }}.</p>
                 {% elif application.service.service_name == "CENOMAR" %}
                 {% set recorded = namespace(status='') %}
-                {% for field in (application.application_details.fields if application.application_details else []) %}
-                {% if field.key == 'psa_recorded_status' and field.value %}{% set recorded.status = field.value %}{% endif %}
-                {% endfor %}
-                <p class="field-help">The status below is the OneGov PH record. It is not a live update from PSA.</p>
-                <p>PSA status you recorded: {{ recorded.status or "Not recorded" }}</p>
+                {% for field in (application.application_details.fields if application.application_details else []) %}{% if field.key == 'psa_recorded_status' and field.value %}{% set recorded.status = field.value %}{% endif %}{% endfor %}
+                <p class="field-help citizen-track-note">OneGov PH record only, not a live PSA update. PSA status recorded: {{ recorded.status or "Not recorded" }}.</p>
                 {% endif %}
-                <dl class="detail-list">
-                    <div>
-                        <dt>{% if application.service.service_name in ["NBI Clearance Application Monitoring", "PhilSys National ID Registration Assistance", "National ID Tracking and Concern Management", "CENOMAR"] or application.service.service_name.startswith("SS Number") %}OneGov PH reference number{% else %}Application ID{% endif %}</dt>
-                        <dd>{{ application.tracking_number }}</dd>
-                    </div>
-                    <div>
-                        <dt>Department</dt>
-                        <dd>{{ application.department.department_name }}</dd>
-                    </div>
-                    <div>
-                        <dt>Current status</dt>
-                        <dd>{% set labels = status_labels_for(application.service, application) %}{% with status=application.application_status, labels=labels %}{% include "applications/_status.html" %}{% endwith %}</dd>
-                    </div>
-                    <div>
-                        <dt>Payment</dt>
-                        <dd>{% if application.payment_status %}{% with status=application.payment_status, labels=payment_status_labels %}{% include "applications/_status.html" %}{% endwith %}{% else %}No payment recorded{% endif %}</dd>
-                    </div>
-                    <div>
-                        <dt>Last updated</dt>
-                        <dd>{{ application.last_updated.strftime("%d %b %Y") }}</dd>
-                    </div>
+
+                <dl class="detail-list citizen-track-meta">
+                    <div><dt>Last updated</dt><dd>{{ application.last_updated.strftime("%d %b %Y") }}</dd></div>
+                    <div><dt>Submitted</dt><dd>{{ application.submission_date.strftime("%d %b %Y") }}</dd></div>
+                    <div><dt>Payment</dt><dd>{% if application.payment_status %}{% with status=application.payment_status, labels=payment_status_labels %}{% include "applications/_status.html" %}{% endwith %}{% else %}<span class="citizen-muted">No payment recorded</span>{% endif %}</dd></div>
                 </dl>
-                {% set labels = status_labels_for(application.service, application) %}
-                {% set events = events_by_application.get(application.application_id, []) %}
+
                 {% if events %}
-                <ol class="track-events">
-                    {% for event in events %}
-                    <li>
-                        <p class="notice-title">{% with status=event.new_status, labels=labels %}{% include "applications/_status.html" %}{% endwith %}</p>
-                        <p>{{ event.update_description }}</p>
-                        <p class="notice-meta">{{ event.recorded_at.strftime("%d %b %Y, %I:%M %p") }}{% if event.previous_status %} · from {{ labels.get(event.previous_status, event.previous_status) }}{% endif %}</p>
-                    </li>
-                    {% endfor %}
-                </ol>
+                <details class="citizen-track-events">
+                    <summary><span>Status history</span><span class="citizen-track-event-count">{{ events|length }} update{{ '' if events|length == 1 else 's' }}</span></summary>
+                    <ol class="track-events">
+                        {% for event in events %}
+                        <li>
+                            <p class="notice-title">{% with status=event.new_status, labels=labels %}{% include "applications/_status.html" %}{% endwith %}</p>
+                            <p>{{ event.update_description }}</p>
+                            <p class="notice-meta">{{ event.recorded_at.strftime("%d %b %Y, %I:%M %p") }}{% if event.previous_status %} · from {{ labels.get(event.previous_status, event.previous_status) }}{% endif %}</p>
+                        </li>
+                        {% endfor %}
+                    </ol>
+                </details>
                 {% else %}
                 <p class="empty-note">No status updates have been recorded for this application yet.</p>
                 {% endif %}
-                <a href="{{ url_for('citizen.application_detail', application_id=application.application_id) }}">View details</a>
+
+                <div class="citizen-track-actions">
+                    <a class="citizen-row-action" href="{{ url_for('citizen.application_detail', application_id=application.application_id) }}">View details <span aria-hidden="true">→</span></a>
+                </div>
             </article>
             {% endfor %}
         </div>
+        {% elif total_count > 0 %}
+        <div class="citizen-empty-state">
+            <h2>No applications found</h2>
+            <p>Try adjusting your search or status filter.</p>
+            <a class="citizen-filter-clear" href="{{ url_for('citizen.tracking') }}">Clear filters</a>
+        </div>
         {% else %}
-        <p class="empty-state" role="status">You have no applications to track yet.</p>
+        <div class="citizen-empty-state">
+            <h2>No applications to track</h2>
+            <p>Once you submit an application, its progress and status updates will appear here.</p>
+            <a class="citizen-filter-btn" href="{{ url_for('citizen.services') }}">Browse services</a>
+        </div>
         {% endif %}
     </section>
 </div>

@@ -105,9 +105,12 @@ def documents_ready(application):
 
 
 def gate_message(application):
-    if not is_senior_application(application) or is_confirmed(application):
+    if not is_senior_application(application):
         return ""
-    return _config(application).get("gate_message") or (
+    config = _config(application)
+    if not config or is_confirmed(application):
+        return ""
+    return config.get("gate_message") or (
         "Confirm the applicant's submitted documents or physical appearance before updating the application status or dispatch status."
     )
 
@@ -181,7 +184,7 @@ def summary(application):
     record = confirmation(application)
     method = fulfillment_method(application)
     if method == PICKUP:
-        method_label = "Pickup at OSCA office"
+        method_label = "Show up at OSCA office to submit documents"
     elif method == DELIVERY:
         method_label = "Home delivery"
     else:
@@ -191,6 +194,7 @@ def summary(application):
         "label": config.get("label") or "Confirm documents and physical appearance",
         "help": config.get("help") or "",
         "gate_message": gate_message(application),
+        "requirements": list(config.get("requirements") or ()),
         "confirmed": bool(record.get("confirmed")),
         "fulfillment_method": method,
         "fulfillment_label": method_label,

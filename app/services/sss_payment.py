@@ -8,6 +8,7 @@ from sqlalchemy import update
 from app import db
 from app.models.application import Application
 from app.models.notification import Notification
+from app.services.notification_service import should_notify
 from app.services.application_forms import SSS_MYSSS_TYPE_NEW, specification_for
 from app.services.application_service import field_map, missing_documents, read_details, write_details
 from app.services.tracking_service import add_event
@@ -72,7 +73,7 @@ def payment_summary(application):
         fulfillment_label = (
             "Home delivery"
             if method == "delivery"
-            else "Pickup at SSS/partner office"
+            else "Show up at SSS/partner office to submit documents"
             if method
             else "—"
         )
@@ -167,18 +168,18 @@ def finalize_sss_application(application, user, new_status="submitted"):
         now,
     )
     notice = spec.get("submit_notice")
-    db.session.add(
-        Notification(
-            user_id=user.user_id,
-            notification_title="SSS request received",
-            notification_message=(
-                notice.format(reference=application.tracking_number)
-                if notice
-                else (
-                    f"Your SSS request {application.tracking_number} was submitted in OneGov PH. "
-                    "No payment was collected. OneGov PH has not issued an SS Number."
-                )
-            ),
+    _n_user = db.session.get(__import__('app.models.user',fromlist=['User']).User, user.user_id) if not isinstance(user.user_id, __import__('app.models.user',fromlist=['User']).User) else user.user_id
+    if should_notify(_n_user, "system", 'in_app'):
+        db.session.add(Notification(
+        user_id=user.user_id,
+        notification_title="SSS request received",
+        notification_message=(
+        notice.format(reference=application.tracking_number)
+        if notice
+        else (
+        f"Your SSS request {application.tracking_number} was submitted in OneGov PH. "
+        "No payment was collected. OneGov PH has not issued an SS Number."
+        )),
             notification_type="application",
             read_status="unread",
             created_date=now,

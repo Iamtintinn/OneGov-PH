@@ -141,7 +141,11 @@ class User(UserMixin, db.Model):
 
     @login_otp_enabled.setter
     def login_otp_enabled(self, value):
-        self._otp_login_enabled = bool(value)
+        try:
+            self._otp_login_enabled = bool(value)
+        except Exception:
+            # Column may not exist yet; ignore so settings save does not crash.
+            pass
 
     def check_password(self, password):
         if not self.password_hash:

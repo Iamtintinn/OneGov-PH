@@ -36,10 +36,19 @@ admin_portal_bp = Blueprint("admin_portal", __name__)
 
 
 def _confirmation_gate(application):
+    from app.services.nbi_admin import gate_message as nbi_gate_message
     from app.services.passport_admin import gate_message
+    from app.services.philsys_admin import gate_message as philsys_gate_message
     from app.services.senior_admin import gate_message as senior_gate_message
+    from app.services.sss_admin import gate_message as sss_gate_message
 
-    return gate_message(application) or senior_gate_message(application)
+    return (
+        gate_message(application)
+        or senior_gate_message(application)
+        or nbi_gate_message(application)
+        or philsys_gate_message(application)
+        or sss_gate_message(application)
+    )
 
 
 LEGACY_STATUS_LABELS = {
@@ -320,22 +329,38 @@ def tracking_detail_data(application, applicant=None, include_map=True):
     )
     from app.services.application_forms import specification_for
     from app.services.application_service import field_map
+    from app.services.nbi_admin import summary as nbi_confirmation_summary
     from app.services.passport_delivery import PICKUP
     from app.services.nbi_delivery import PICKUP as NBI_PICKUP
     from app.services.nbi_delivery import fulfillment_method as nbi_fulfillment_method
+    from app.services.philsys_admin import summary as philsys_confirmation_summary
+    from app.services.philsys_delivery import PICKUP as PHILSYS_PICKUP
+    from app.services.philsys_delivery import fulfillment_method as philsys_fulfillment_method
     from app.services.senior_admin import summary as senior_confirmation_summary
     from app.services.senior_delivery import PICKUP as SENIOR_PICKUP
     from app.services.senior_delivery import fulfillment_method as senior_fulfillment_method
+    from app.services.sss_admin import summary as sss_confirmation_summary
+    from app.services.sss_delivery import PICKUP as SSS_PICKUP
+    from app.services.sss_delivery import fulfillment_method as sss_fulfillment_method
 
     passport = passport_summary(application)
     spec = specification_for(application.service, field_map(application))
     is_senior = bool(spec and spec.get("kind") == "senior")
     is_nbi = bool(spec and spec.get("kind") == "nbi")
+    is_philsys = bool(spec and spec.get("kind") == "philsys")
+    is_sss = bool(spec and spec.get("kind") == "sss")
     senior_method = senior_fulfillment_method(application) if is_senior else ""
     senior_fulfillment = {"method": senior_method} if is_senior else None
     nbi_method = nbi_fulfillment_method(application) if is_nbi else ""
     nbi_fulfillment = {"method": nbi_method} if is_nbi else None
+    philsys_method = philsys_fulfillment_method(application) if is_philsys else ""
+    philsys_fulfillment = {"method": philsys_method} if is_philsys else None
+    sss_method = sss_fulfillment_method(application) if is_sss else ""
+    sss_fulfillment = {"method": sss_method} if is_sss else None
     senior_confirmation = senior_confirmation_summary(application)
+    nbi_confirmation = nbi_confirmation_summary(application)
+    philsys_confirmation = philsys_confirmation_summary(application)
+    sss_confirmation = sss_confirmation_summary(application)
     state = _admin_tracking_state(application)
     service_labels = _service_status_labels(application)
     processing_key, processing_label = _current_processing(
@@ -349,11 +374,17 @@ def tracking_detail_data(application, applicant=None, include_map=True):
         processing_label = "Ready for Pickup"
     elif is_nbi and nbi_method == NBI_PICKUP and processing_key == "ready_for_dispatch":
         processing_label = "Ready for Pickup"
+    elif is_philsys and philsys_method == PHILSYS_PICKUP and processing_key == "ready_for_dispatch":
+        processing_label = "Ready for Pickup"
+    elif is_sss and sss_method == SSS_PICKUP and processing_key == "ready_for_dispatch":
+        processing_label = "Ready for Pickup"
     delivery = _delivery_state(state)
     is_pickup = bool(
         (passport and passport["fulfillment_method"] == PICKUP)
         or (is_senior and senior_method == SENIOR_PICKUP)
         or (is_nbi and nbi_method == NBI_PICKUP)
+        or (is_philsys and philsys_method == PHILSYS_PICKUP)
+        or (is_sss and sss_method == SSS_PICKUP)
     )
     if is_pickup and application.application_status == "completed":
         delivery["label"] = "Received"
@@ -363,20 +394,32 @@ def tracking_detail_data(application, applicant=None, include_map=True):
         and not (passport and passport["fulfillment_method"] == PICKUP)
         and not (is_senior and senior_method == SENIOR_PICKUP)
         and not (is_nbi and nbi_method == NBI_PICKUP)
+        and not (is_philsys and philsys_method == PHILSYS_PICKUP)
+        and not (is_sss and sss_method == SSS_PICKUP)
     ):
         map_payload = _delivery_map_data(application, delivery, applicant)
-    gated = bool(passport and passport["gate_message"]) or bool(
-        senior_confirmation and senior_confirmation["gate_message"]
-    )
+    gated = bool(passport and passport.get("gate_message")) or bool(
+        senior_confirmation and senior_confirmation.get("gate_message")
+    ) or bool(nbi_confirmation and nbi_confirmation.get("gate_message")) or bool(
+        philsys_confirmation and philsys_confirmation.get("gate_message")
+    ) or bool(sss_confirmation and sss_confirmation.get("gate_message"))
+    if not gated:
+        spec_has_confirmation = bool((spec or {}).get("physical_requirements_confirmation") or (spec or {}).get("senior_confirmation"))
+        if spec_has_confirmation:
+            if passport and not passport.get("confirmed"):
+                gated = True
+            elif senior_confirmation and not senior_confirmation.get("confirmed"):
+                gated = True
+            elif nbi_confirmation and nbi_confirmation.get("schedule_recorded") and not nbi_confirmation.get("confirmed"):
+                gated = True
+            elif philsys_confirmation and philsys_confirmation.get("schedule_recorded") and not philsys_confirmation.get("confirmed"):
+                gated = True
+            elif sss_confirmation and sss_confirmation.get("schedule_recorded") and not sss_confirmation.get("confirmed"):
+                gated = True
     can_manage_delivery = application.application_status == "ready_for_release" or bool(
         delivery["status"]
     )
-    if (
-        gated
-        or (passport and passport["fulfillment_method"] == PICKUP)
-        or (is_senior and senior_method == SENIOR_PICKUP)
-        or (is_nbi and nbi_method == NBI_PICKUP)
-    ):
+    if gated or is_pickup:
         can_manage_delivery = False
     return {
         "processing_key": processing_key,
@@ -390,9 +433,22 @@ def tracking_detail_data(application, applicant=None, include_map=True):
         "passport_fulfillment": passport,
         "senior_fulfillment": senior_fulfillment,
         "nbi_fulfillment": nbi_fulfillment,
+        "nbi_confirmation": nbi_confirmation,
+        "philsys_fulfillment": philsys_fulfillment,
+        "philsys_confirmation": philsys_confirmation,
+        "sss_fulfillment": sss_fulfillment,
+        "sss_confirmation": sss_confirmation,
         "senior_confirmation": senior_confirmation,
-        "can_update_status": application.application_status not in {"draft", "cancelled"}
-        and not gated,
+        "can_update_status": application.application_status not in {"draft", "cancelled"},
+        "status_update_locked": gated,
+        "status_update_gate_message": (
+            (passport or {}).get("gate_message")
+            or (senior_confirmation or {}).get("gate_message")
+            or (nbi_confirmation or {}).get("gate_message")
+            or (philsys_confirmation or {}).get("gate_message")
+            or (sss_confirmation or {}).get("gate_message")
+            or ""
+        ),
         "can_manage_delivery": can_manage_delivery,
         "show_map": map_payload is not None,
         "map": map_payload,
@@ -751,12 +807,18 @@ _add_rule(
     "profile",
     ("GET", "POST"),
 )
-_add_rule(
-    "/admin/portal/settings",
-    citizen.settings,
-    "settings",
-    ("GET", "POST"),
-)
+@admin_portal_bp.route("/admin/portal/settings", methods=["GET"])
+@admin_console_required
+def settings():
+    from app.routes.citizen_settings import _ctx
+    section = request.args.get("section", "personal")
+    allowed = {"personal", "address", "security", "notifications", "privacy", "preferences", "help"}
+    if section not in allowed:
+        section = "personal"
+    ctx = _ctx(section)
+    ctx["page"] = "admin_portal.settings"
+    ctx["admin_settings_mode"] = True
+    return render_template("citizen/settings/index.html", **ctx)
 
 
 @admin_portal_bp.route("/admin/portal/payments")

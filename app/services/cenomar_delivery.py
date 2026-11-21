@@ -4,6 +4,7 @@ from datetime import datetime
 
 from app import db
 from app.models.notification import Notification
+from app.services.notification_service import should_notify
 from app.services.application_service import read_details, write_details
 from app.services.birth_delivery import (
     CITY,
@@ -60,18 +61,18 @@ def save_delivery(application, user, values):
     write_details(application, details, commit=False)
 
     now = _now()
-    db.session.add(
-        Notification(
-            user_id=user.user_id,
-            notification_title="Delivery details saved",
-            notification_message=(
-                "Your CENOMAR home-delivery location and recipient details "
-                f"were saved for {payload['address'] or 'the pinned location'}."
-            ),
-            notification_type="application",
-            read_status="unread",
-            created_date=now,
-        )
-    )
+    _n_user = db.session.get(__import__('app.models.user',fromlist=['User']).User, user.user_id) if not isinstance(user.user_id, __import__('app.models.user',fromlist=['User']).User) else user.user_id
+    if should_notify(_n_user, "application", 'in_app'):
+        db.session.add(Notification(
+        user_id=user.user_id,
+        notification_title="Delivery details saved",
+        notification_message=(
+        "Your CENOMAR home-delivery location and recipient details "
+        f"were saved for {payload['address'] or 'the pinned location'}."
+        ),
+        notification_type="application",
+        read_status="unread",
+        created_date=now,
+        ))
     db.session.commit()
     return None

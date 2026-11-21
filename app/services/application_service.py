@@ -13,6 +13,7 @@ from werkzeug.utils import secure_filename
 from app import db
 from app.models.application import Application, ApplicationRequirement
 from app.models.notification import Notification
+from app.services.notification_service import should_notify
 from app.services.application_forms import specification_for
 from app.utils.validators import clean_text, normalize_contact_number, normalize_email, validate_name
 
@@ -71,6 +72,12 @@ def read_details(application):
         details["physical_requirements"] = raw["physical_requirements"]
     if isinstance(raw.get("senior_confirmation"), dict):
         details["senior_confirmation"] = raw["senior_confirmation"]
+    if isinstance(raw.get("nbi_physical_requirements"), dict):
+        details["nbi_physical_requirements"] = raw["nbi_physical_requirements"]
+    if isinstance(raw.get("philsys_physical_requirements"), dict):
+        details["philsys_physical_requirements"] = raw["philsys_physical_requirements"]
+    if isinstance(raw.get("sss_physical_requirements"), dict):
+        details["sss_physical_requirements"] = raw["sss_physical_requirements"]
     if raw.get("passport_status_key"):
         details["passport_status_key"] = raw["passport_status_key"]
     if raw.get("senior_status_key"):
@@ -119,6 +126,12 @@ def write_details(application, details, commit=True):
         payload["physical_requirements"] = details["physical_requirements"]
     if isinstance(details.get("senior_confirmation"), dict):
         payload["senior_confirmation"] = details["senior_confirmation"]
+    if isinstance(details.get("nbi_physical_requirements"), dict):
+        payload["nbi_physical_requirements"] = details["nbi_physical_requirements"]
+    if isinstance(details.get("philsys_physical_requirements"), dict):
+        payload["philsys_physical_requirements"] = details["philsys_physical_requirements"]
+    if isinstance(details.get("sss_physical_requirements"), dict):
+        payload["sss_physical_requirements"] = details["sss_physical_requirements"]
     if details.get("passport_status_key"):
         payload["passport_status_key"] = details["passport_status_key"]
     if details.get("senior_status_key"):
@@ -1276,21 +1289,21 @@ def submit_application(application, user):
         now,
     )
     notice = spec.get("submit_notice")
-    db.session.add(
-        Notification(
-            user_id=user.user_id,
-            notification_title="Application received",
-            notification_message=(
-                notice.format(reference=application.tracking_number)
-                if notice
-                else (
-                    f"Your National ID preparation {application.tracking_number} is pending in OneGov PH. "
-                    "This is not PhilSys registration, and OneGov PH does not issue a National ID."
-                    if spec.get("kind") == "philsys"
-                    else f"Your {application.service.service_name} request {application.tracking_number} "
-                    "is pending. OneGov PH is tracking it and has not filed it with the agency."
-                )
-            ),
+    _n_user = db.session.get(__import__('app.models.user',fromlist=['User']).User, user.user_id) if not isinstance(user.user_id, __import__('app.models.user',fromlist=['User']).User) else user.user_id
+    if should_notify(_n_user, "system", 'in_app'):
+        db.session.add(Notification(
+        user_id=user.user_id,
+        notification_title="Application received",
+        notification_message=(
+        notice.format(reference=application.tracking_number)
+        if notice
+        else (
+        f"Your National ID preparation {application.tracking_number} is pending in OneGov PH. "
+        "This is not PhilSys registration, and OneGov PH does not issue a National ID."
+        if spec.get("kind") == "philsys"
+        else f"Your {application.service.service_name} request {application.tracking_number} "
+        "is pending. OneGov PH is tracking it and has not filed it with the agency."
+        )),
             notification_type="application",
             read_status="unread",
             created_date=now,

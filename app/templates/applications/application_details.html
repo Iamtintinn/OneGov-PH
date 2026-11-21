@@ -54,7 +54,7 @@
             <div><dt>Fulfillment</dt><dd>{{ passport_physical.fulfillment_label }}</dd></div>
             <div><dt>Confirmed on</dt><dd>{{ passport_physical.confirmed_at_label or "—" }}</dd></div>
             {% if passport_physical.pickup_location %}
-            <div><dt>Pickup office</dt><dd>{{ passport_physical.pickup_location }}</dd></div>
+            <div><dt>Office address</dt><dd>{{ passport_physical.pickup_location }}</dd></div>
             {% endif %}
             {% if passport_physical.pickup_id %}
             <div><dt>Pickup ID</dt><dd class="pay-mono">{{ passport_physical.pickup_id }}</dd></div>
@@ -67,24 +67,24 @@
         {% if spec and spec.kind == 'senior' and senior_delivery %}
         <h2>Pickup or delivery</h2>
         <dl class="detail-list">
-            <div><dt>Fulfillment</dt><dd>{{ 'Home delivery' if senior_delivery.method == 'delivery' else 'Pickup at OSCA office' }}</dd></div>
+            <div><dt>Fulfillment</dt><dd>{{ 'Home delivery' if senior_delivery.method == 'delivery' else 'Show up at OSCA office to submit documents' }}</dd></div>
             {% if senior_delivery.method == 'delivery' %}
             <div><dt>Delivery address</dt><dd>{{ senior_delivery_address or "—" }}</dd></div>
             {% if senior_delivery.recipient_name %}<div><dt>Recipient</dt><dd>{{ senior_delivery.recipient_name }}{% if senior_delivery.contact_number %} · {{ senior_delivery.contact_number }}{% endif %}</dd></div>{% endif %}
             {% else %}
-            <div><dt>Pickup office</dt><dd>{{ senior_delivery.pickup_location or "—" }}</dd></div>
+            <div><dt>Office address</dt><dd>{{ senior_delivery.pickup_location or "—" }}</dd></div>
             {% endif %}
         </dl>
         {% endif %}
         {% if spec and spec.kind == 'nbi' and nbi_delivery %}
         <h2>Pickup or delivery</h2>
         <dl class="detail-list">
-            <div><dt>Fulfillment</dt><dd>{{ 'Home delivery' if nbi_delivery.method == 'delivery' else 'Pickup at NBI Clearance Center' }}</dd></div>
+            <div><dt>Fulfillment</dt><dd>{{ 'Home delivery' if nbi_delivery.method == 'delivery' else 'Show up at NBI Clearance Center to submit documents' }}</dd></div>
             {% if nbi_delivery.method == 'delivery' %}
             <div><dt>Delivery address</dt><dd>{{ nbi_delivery_address or "—" }}</dd></div>
             {% if nbi_delivery.recipient_name %}<div><dt>Recipient</dt><dd>{{ nbi_delivery.recipient_name }}{% if nbi_delivery.contact_number %} · {{ nbi_delivery.contact_number }}{% endif %}</dd></div>{% endif %}
             {% else %}
-            <div><dt>Pickup office</dt><dd>{{ nbi_delivery.pickup_location or "—" }}</dd></div>
+            <div><dt>Office address</dt><dd>{{ nbi_delivery.pickup_location or "—" }}</dd></div>
             {% endif %}
         </dl>
         {% endif %}

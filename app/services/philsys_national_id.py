@@ -524,6 +524,34 @@ def _legacy_specification(values=None, service_name=None):
             "Your National ID preparation {reference} was submitted in OneGov PH. "
             "It is not PhilSys registration. Official registration, identity verification, biometric capture, and National ID issuance remain with authorized PSA personnel."
         ),
+        "physical_requirements_confirmation": {
+            "label": "Confirm physical requirements",
+            "help": (
+                "Confirm that the applicant submitted the required documents and completed "
+                "the physical PhilSys requirements before changing the application status."
+            ),
+            "gate_message": (
+                "Confirm the applicant's documents and physical requirements before updating the application status or dispatch status."
+            ),
+            "pickup_id_prefix": "PHILSYS-PU",
+            "pickup_lead_business_days": 7,
+            "requirements": [
+                "Required PhilSys supporting document(s) for the selected application type",
+                "Printed/ready OneGov PH reference and confirmation details",
+                "Applicant present for PhilSys registration/verification as required",
+            ],
+        },
+        "admin_status_options": [
+            {"key": "application_submitted", "label": "Application Submitted", "legacy_status": "submitted"},
+            {"key": "payment_confirmed", "label": "Payment Confirmed", "legacy_status": "paid"},
+            {"key": "requirements_under_review", "label": "Requirements Under Review", "legacy_status": "under_review"},
+            {"key": "rejected", "label": "Rejected", "legacy_status": "rejected"},
+            {"key": "requirements_verified", "label": "Requirements Verified", "legacy_status": "approved"},
+            {"key": "processing_document", "label": "Processing Document", "legacy_status": "processing"},
+            {"key": "document_approved", "label": "Document Approved", "legacy_status": "approved"},
+            {"key": "ready_for_dispatch", "label": "Ready for Dispatch", "legacy_status": "ready_for_release"},
+            {"key": "completed", "label": "Completed", "legacy_status": "completed"},
+        ],
         "status_labels": {
             "submitted": "Submitted",
             "under_review": "Under review",
@@ -596,6 +624,34 @@ def _registration_specification(values=None):
             "Your National ID preparation {reference} was submitted in OneGov PH. "
             "It is not PhilSys registration. Official registration, identity verification, biometric capture, and National ID issuance remain with authorized PSA personnel."
         ),
+        "physical_requirements_confirmation": {
+            "label": "Confirm physical requirements",
+            "help": (
+                "Confirm that the applicant submitted the required documents and completed "
+                "the physical PhilSys requirements before changing the application status."
+            ),
+            "gate_message": (
+                "Confirm the applicant's documents and physical requirements before updating the application status or dispatch status."
+            ),
+            "pickup_id_prefix": "PHILSYS-PU",
+            "pickup_lead_business_days": 7,
+            "requirements": [
+                "Required PhilSys supporting document(s) for the selected application type",
+                "Printed/ready OneGov PH reference and confirmation details",
+                "Applicant present for PhilSys registration/verification as required",
+            ],
+        },
+        "admin_status_options": [
+            {"key": "application_submitted", "label": "Application Submitted", "legacy_status": "submitted"},
+            {"key": "payment_confirmed", "label": "Payment Confirmed", "legacy_status": "paid"},
+            {"key": "requirements_under_review", "label": "Requirements Under Review", "legacy_status": "under_review"},
+            {"key": "rejected", "label": "Rejected", "legacy_status": "rejected"},
+            {"key": "requirements_verified", "label": "Requirements Verified", "legacy_status": "approved"},
+            {"key": "processing_document", "label": "Processing Document", "legacy_status": "processing"},
+            {"key": "document_approved", "label": "Document Approved", "legacy_status": "approved"},
+            {"key": "ready_for_dispatch", "label": "Ready for Dispatch", "legacy_status": "ready_for_release"},
+            {"key": "completed", "label": "Completed", "legacy_status": "completed"},
+        ],
         "status_labels": {
             "submitted": "Submitted",
             "under_review": "Under review",

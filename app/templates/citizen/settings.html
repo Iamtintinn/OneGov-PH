@@ -4,59 +4,65 @@
 {% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
 {% block content %}
 <div class="dash-page site-width">
-    <section class="detail-card profile-card" aria-labelledby="settings-heading">
-        <p class="dash-kicker">Account</p>
-        <h1 id="settings-heading">Settings</h1>
-        <dl class="detail-list">
+    <section class="dash-section citizen-settings-page" aria-labelledby="settings-heading">
+        <div class="citizen-list-head citizen-settings-hero">
             <div>
-                <dt>Email</dt>
-                <dd>{{ current_user.email }}</dd>
+                <p class="dash-kicker">Account</p>
+                <h1 id="settings-heading">Settings</h1>
+                <p class="citizen-list-sub">Manage your account information, password, and login verification preferences.</p>
             </div>
-            <div>
-                <dt>Role</dt>
-                <dd>{{ current_user.role_label }}</dd>
-            </div>
-            <div>
-                <dt>Account status</dt>
-                <dd>{{ current_user.account_status|replace('_', ' ')|title }}</dd>
-            </div>
-            <div>
-                <dt>Email verification</dt>
-                <dd>{{ current_user.email_verification_status|replace('_', ' ')|title }}</dd>
-            </div>
-            <div>
-                <dt>Date registered</dt>
-                <dd>{{ current_user.date_registered.strftime("%d %b %Y") }}</dd>
-            </div>
-        </dl>
-        <h2>Change password</h2>
-        <form class="dash-form" method="post" action="{{ url_for('citizen.settings') }}" novalidate>
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="action" value="password">
-            <label for="current_password">Current password</label>
-            <input id="current_password" name="current_password" type="password" autocomplete="current-password" required aria-invalid="{{ 'true' if errors.current_password else 'false' }}">
-            {% if errors.current_password %}<p class="field-error">{{ errors.current_password }}</p>{% endif %}
-            <label for="password">New password</label>
-            <input id="password" name="password" type="password" autocomplete="new-password" required aria-invalid="{{ 'true' if errors.password else 'false' }}">
-            {% if errors.password %}<p class="field-error">{{ errors.password }}</p>{% endif %}
-            <label for="confirm_password">Confirm new password</label>
-            <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required aria-invalid="{{ 'true' if errors.confirm_password else 'false' }}">
-            {% if errors.confirm_password %}<p class="field-error">{{ errors.confirm_password }}</p>{% endif %}
-            <p class="empty-note">Use 8 to 128 characters, with at least one letter and one number.</p>
-            <button class="dash-button" type="submit">Update password</button>
-        </form>
+        </div>
 
-        <h2>Login verification (OTP)</h2>
-        <form class="dash-form" method="post" action="{{ url_for('citizen.settings') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="action" value="otp_login">
-            <label for="otp_login_enabled">
-                <input id="otp_login_enabled" name="otp_login_enabled" type="checkbox" value="1" {% if current_user.login_otp_enabled %}checked{% endif %}>
-                Require a one-time verification code when logging in
-            </label>
-            <p class="empty-note">When enabled, a 6-digit code will be emailed to you each time you sign in. (OTP is always required when creating a new account.)</p>
-            <button class="dash-button" type="submit">Save login verification setting</button>
-        </form>
+        <div class="citizen-settings-grid">
+            <article class="detail-card citizen-settings-card">
+                <div class="citizen-settings-card-head"><p class="review-kicker">ACCOUNT INFORMATION</p><h2>Account details</h2></div>
+                <dl class="detail-list citizen-settings-list">
+                    <div><dt>Email</dt><dd>{{ current_user.email }}</dd></div>
+                    <div><dt>Role</dt><dd>{{ current_user.role_label }}</dd></div>
+                    <div><dt>Account status</dt><dd>{{ current_user.account_status|replace('_', ' ')|title }}</dd></div>
+                    <div><dt>Email verification</dt><dd>{{ current_user.email_verification_status|replace('_', ' ')|title }}</dd></div>
+                    <div><dt>Date registered</dt><dd>{{ current_user.date_registered.strftime("%d %b %Y") }}</dd></div>
+                </dl>
+            </article>
+
+            <article class="detail-card citizen-settings-card">
+                <div class="citizen-settings-card-head"><p class="review-kicker">SECURITY</p><h2>Change password</h2></div>
+                <form class="dash-form citizen-settings-form" method="post" action="{{ url_for('citizen_settings.index') }}" novalidate>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="password">
+                    <label for="current_password">Current password</label>
+                    <input id="current_password" name="current_password" type="password" autocomplete="current-password" required aria-invalid="{{ 'true' if errors.current_password else 'false' }}">
+                    {% if errors.current_password %}<p class="field-error">{{ errors.current_password }}</p>{% endif %}
+                    <label for="password">New password</label>
+                    <input id="password" name="password" type="password" autocomplete="new-password" required aria-invalid="{{ 'true' if errors.password else 'false' }}">
+                    {% if errors.password %}<p class="field-error">{{ errors.password }}</p>{% endif %}
+                    <label for="confirm_password">Confirm new password</label>
+                    <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required aria-invalid="{{ 'true' if errors.confirm_password else 'false' }}">
+                    {% if errors.confirm_password %}<p class="field-error">{{ errors.confirm_password }}</p>{% endif %}
+                    <p class="empty-note">Use 8 to 128 characters, with at least one letter and one number.</p>
+                    <div class="citizen-settings-actions"><button class="dash-button" type="submit">Update password</button></div>
+                </form>
+            </article>
+
+            <article class="detail-card citizen-settings-card citizen-settings-card--wide">
+                <div class="citizen-settings-card-head"><p class="review-kicker">LOGIN VERIFICATION</p><h2>One-time password (OTP)</h2></div>
+                <form class="dash-form citizen-settings-form" method="post" action="{{ url_for('citizen_settings.index') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="otp_login">
+                    <div class="citizen-toggle-row">
+                        <div class="citizen-toggle-copy">
+                            <label class="citizen-toggle-title" for="otp_login_enabled">Require a one-time verification code when logging in</label>
+                            <p class="empty-note">When enabled, a 6-digit code will be emailed to you each time you sign in. OTP is always required when creating a new account.</p>
+                        </div>
+                        <label class="citizen-toggle" aria-label="Toggle login OTP verification">
+                            <input id="otp_login_enabled" name="otp_login_enabled" type="checkbox" value="1" {% if current_user.login_otp_enabled %}checked{% endif %}>
+                            <span class="citizen-toggle-ui" aria-hidden="true"></span>
+                        </label>
+                    </div>
+                    <div class="citizen-settings-actions"><button class="dash-button" type="submit">Save login verification setting</button></div>
+                </form>
+            </article>
+        </div>
     </section>
 </div>
 {% endblock %}

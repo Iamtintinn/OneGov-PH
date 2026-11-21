@@ -93,7 +93,7 @@ def ensure_confirmation_pdf(application):
         )
     elif method == PICKUP:
         details_rows = details_rows + (
-            ("Fulfillment", "Pickup at NBI Clearance Center"),
+            ("Fulfillment", "Show up at NBI Clearance Center to submit documents"),
             ("Pickup location", (delivery or {}).get("pickup_location") or ""),
         )
     fee_lines = [

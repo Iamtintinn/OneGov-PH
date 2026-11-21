@@ -12,6 +12,7 @@ from sqlalchemy import update
 from app import db
 from app.models.application import Application
 from app.models.notification import Notification
+from app.services.notification_service import should_notify
 from app.models.payment import Payment
 from app.services.application_forms import specification_for
 from app.services.application_service import field_map, missing_documents, read_details
@@ -186,18 +187,18 @@ def finalize_barangay_application(application, user, new_status):
             "It is not an official filing."
         )
     )
-    db.session.add(
-        Notification(
-            user_id=user.user_id,
-            notification_title=title,
-            notification_message=(
-                notice.format(reference=application.tracking_number) if notice else default_message
-            ),
-            notification_type="application",
-            read_status="unread",
-            created_date=now,
-        )
-    )
+    _n_user = db.session.get(__import__('app.models.user',fromlist=['User']).User, user.user_id) if not isinstance(user.user_id, __import__('app.models.user',fromlist=['User']).User) else user.user_id
+    if should_notify(_n_user, "application", 'in_app'):
+        db.session.add(Notification(
+        user_id=user.user_id,
+        notification_title=title,
+        notification_message=(
+        notice.format(reference=application.tracking_number) if notice else default_message
+        ),
+        notification_type="application",
+        read_status="unread",
+        created_date=now,
+        ))
     db.session.commit()
     application.application_status = new_status
     application.submission_date = now
@@ -262,16 +263,16 @@ def record_demo_payment(application, user, choice, online_method=None):
                 transaction_date=now if status == "paid" else None,
             )
         )
-    db.session.add(
-        Notification(
+        _n_user = db.session.get(__import__('app.models.user',fromlist=['User']).User, user.user_id) if not isinstance(user.user_id, __import__('app.models.user',fromlist=['User']).User) else user.user_id
+        if should_notify(_n_user, "payment", 'in_app'):
+            db.session.add(Notification(
             user_id=user.user_id,
             notification_title=title,
             notification_message=message,
             notification_type="payment",
             read_status="unread",
             created_date=now,
-        )
-    )
+            ))
     db.session.commit()
     return finalize_barangay_application(application, user, app_status)
 
@@ -368,18 +369,18 @@ def start_maya_checkout(application, user):
     payment.payment_method = "maya"
     payment.payment_status = "pending"
     payment.transaction_date = None
-    db.session.add(
-        Notification(
-            user_id=user.user_id,
-            notification_title="Maya Checkout started",
-            notification_message=(
-                f"Sandbox Maya checkout was created for ₱{amount:,.2f} "
-                f"(ref {payment.payment_reference}). Complete payment on Maya’s page."
-            ),
-            notification_type="payment",
-            read_status="unread",
-            created_date=now,
-        )
-    )
+    _n_user = db.session.get(__import__('app.models.user',fromlist=['User']).User, user.user_id) if not isinstance(user.user_id, __import__('app.models.user',fromlist=['User']).User) else user.user_id
+    if should_notify(_n_user, "payment", 'in_app'):
+        db.session.add(Notification(
+        user_id=user.user_id,
+        notification_title="Maya Checkout started",
+        notification_message=(
+        f"Sandbox Maya checkout was created for ₱{amount:,.2f} "
+        f"(ref {payment.payment_reference}). Complete payment on Maya’s page."
+        ),
+        notification_type="payment",
+        read_status="unread",
+        created_date=now,
+        ))
     db.session.commit()
     return checkout["redirectUrl"], None

@@ -31,7 +31,6 @@
         </div>
         <dl class="review-header-meta">
             <div><dt>Submitted</dt><dd>{{ application.submission_date.strftime("%d %b %Y, %I:%M %p") }}</dd></div>
-            <div><dt>Current status</dt><dd><span class="admin-status-pill admin-status-pill--{{ application.application_status }}">{{ tracking.processing_label }}</span></dd></div>
         </dl>
     </header>
 
@@ -93,92 +92,123 @@
         </button>
     </section>
 
-    {% set passport = tracking.passport_fulfillment %}
-    {% if passport %}
-    <section class="review-card review-passport-confirmation-card">
-        <div class="review-card-heading">
-            <div><p class="review-kicker">PASSPORT REQUIREMENTS</p><h2>Documents and physical requirements</h2></div>
-            <span class="admin-status-pill admin-status-pill--{{ 'approved' if passport.confirmed else 'pending' }}">{{ 'Confirmed' if passport.confirmed else 'Pending confirmation' }}</span>
-        </div>
-        <dl class="review-detail-grid">
-            <div><dt>Fulfillment</dt><dd>{{ passport.fulfillment_label }}</dd></div>
-            {% if passport.pickup_location %}<div class="review-detail-wide"><dt>Pickup office</dt><dd>{{ passport.pickup_location }}</dd></div>{% endif %}
-            {% if passport.confirmed %}
-            <div><dt>Confirmed by</dt><dd>{{ passport.confirmed_by_name or "Administrator" }}</dd></div>
-            <div><dt>Confirmed at</dt><dd>{{ passport.confirmed_at_label or "—" }}</dd></div>
-            {% if passport.pickup_id %}<div><dt>Pickup ID</dt><dd class="review-mono">{{ passport.pickup_id }}</dd></div>{% endif %}
-            {% if passport.pickup_date_label %}<div><dt>Pickup date</dt><dd>{{ passport.pickup_date_label }}</dd></div>{% endif %}
-            {% endif %}
-        </dl>
-        {% if not passport.confirmed %}<p class="review-hint">{{ passport.help }}</p>{% elif passport.fulfillment_method == 'pickup' %}<p class="review-hint">Pickup details are ready. No courier assignment is needed for this application.</p>{% else %}<p class="review-hint">Confirmation complete. Delivery updates will appear below when available.</p>{% endif %}
-    </section>
-    {% endif %}
-
-    {% set senior_confirmation = tracking.senior_confirmation %}
-    {% if senior_confirmation %}
-    <section class="review-card review-passport-confirmation-card">
-        <div class="review-card-heading">
-            <div><p class="review-kicker">SENIOR CITIZEN ID REQUIREMENTS</p><h2>Documents and physical appearance</h2></div>
-            <span class="admin-status-pill admin-status-pill--{{ 'approved' if senior_confirmation.confirmed else 'pending' }}">{{ 'Confirmed' if senior_confirmation.confirmed else 'Pending confirmation' }}</span>
-        </div>
-        <dl class="review-detail-grid">
-            <div><dt>Fulfillment</dt><dd>{{ senior_confirmation.fulfillment_label }}</dd></div>
-            <div><dt>Required documents</dt><dd>{{ senior_confirmation.documents_label }}</dd></div>
-            {% if senior_confirmation.confirmed %}
-            <div><dt>Confirmed by</dt><dd>{{ senior_confirmation.confirmed_by_name or "Administrator" }}</dd></div>
-            <div><dt>Confirmed at</dt><dd>{{ senior_confirmation.confirmed_at_label or "—" }}</dd></div>
-            <div><dt>Physical appearance</dt><dd>{{ "Confirmed" if senior_confirmation.physical_appearance else "Documents submitted" }}</dd></div>
-            {% if senior_confirmation.pickup_id %}<div><dt>Pickup ID</dt><dd class="review-mono">{{ senior_confirmation.pickup_id }}</dd></div>{% endif %}
-            {% if senior_confirmation.pickup_date_label %}<div><dt>Pickup date</dt><dd>{{ senior_confirmation.pickup_date_label }}</dd></div>{% endif %}
-            {% if senior_confirmation.pickup_location %}<div class="review-detail-wide"><dt>Pickup office</dt><dd>{{ senior_confirmation.pickup_location }}</dd></div>{% endif %}
-            {% endif %}
-        </dl>
-        {% if not senior_confirmation.confirmed %}<p class="review-hint">{{ senior_confirmation.help }}</p>{% elif senior_confirmation.fulfillment_method == 'pickup' %}<p class="review-hint">Pickup details are ready. Status updates will appear when the ID is available.</p>{% else %}<p class="review-hint">Confirmation complete. Delivery updates will appear below when available.</p>{% endif %}
-    </section>
-    {% endif %}
-
     {% set nbi_fulfillment = tracking.nbi_fulfillment %}
-    {% if nbi_fulfillment %}
-    <section class="review-card review-passport-confirmation-card">
-        <div class="review-card-heading">
-            <div><p class="review-kicker">NBI CLEARANCE DELIVERY</p><h2>Pickup or home delivery</h2></div>
-            <span class="admin-status-pill admin-status-pill--{{ 'approved' if nbi_fulfillment.method else 'pending' }}">{{ 'Selected' if nbi_fulfillment.method else 'Not selected' }}</span>
-        </div>
-        <dl class="review-detail-grid">
-            <div><dt>Fulfillment</dt><dd>{{ 'Home delivery' if nbi_fulfillment.method == 'delivery' else 'Pickup at NBI Clearance Center' }}</dd></div>
-            <div class="review-detail-wide"><dt>{% if nbi_fulfillment.method == 'delivery' %}Delivery address{% else %}Pickup office{% endif %}</dt><dd>{{ tracking.citizen_delivery.address or tracking.citizen_delivery.pickup_location or '—' }}</dd></div>
-        </dl>
-    </section>
-    {% endif %}
 
-    <section class="review-control-grid" aria-label="Application status">
-        <div class="review-card review-processing-card">
+    {% set sss_confirmation = tracking.sss_confirmation %}
+    <section class="review-control-grid" aria-label="Requirements and delivery status">
+        {% if sss_confirmation and sss_confirmation.schedule_recorded %}
+        <section class="review-card review-passport-confirmation-card" id="sss-confirmation">
             <div class="review-card-heading">
-                <div><p class="review-kicker">APPLICATION PROCESSING</p><h2>Application status</h2></div>
-                <span class="admin-status-pill admin-status-pill--{{ application.application_status }}">{{ tracking.processing_label }}</span>
+                <div><p class="review-kicker">SSS REQUIREMENTS</p><h2>Documents and physical requirements</h2></div>
+                <span class="admin-status-pill admin-status-pill--{{ 'approved' if sss_confirmation.confirmed else 'pending' }}">{{ 'Confirmed' if sss_confirmation.confirmed else 'Pending confirmation' }}</span>
             </div>
             <dl class="review-detail-grid">
-                <div><dt>Current status</dt><dd>{{ tracking.processing_label }}</dd></div>
-                <div><dt>Last updated</dt><dd>{{ application.last_updated.strftime("%d %b %Y, %I:%M %p") }}</dd></div>
+                <div><dt>Fulfillment</dt><dd>{{ sss_confirmation.fulfillment_label }}</dd></div>
+                <div class="review-detail-wide"><dt>{% if sss_confirmation.fulfillment_method == 'delivery' %}Delivery address{% else %}Office address{% endif %}</dt><dd>{{ tracking.citizen_delivery.address or sss_confirmation.pickup_location or sss_confirmation.pickup_address or '—' }}</dd></div>
+                {% if sss_confirmation.confirmed %}
+                <div><dt>Confirmed by</dt><dd>{{ sss_confirmation.confirmed_by_name or "Administrator" }}</dd></div>
+                <div><dt>Confirmed at</dt><dd>{{ sss_confirmation.confirmed_at_label or "—" }}</dd></div>
+                {% if sss_confirmation.pickup_id %}<div><dt>Pickup ID</dt><dd class="review-mono">{{ sss_confirmation.pickup_id }}</dd></div>{% endif %}
+                {% if sss_confirmation.pickup_date_label %}<div><dt>Pickup date</dt><dd>{{ sss_confirmation.pickup_date_label }}</dd></div>{% endif %}
+                {% endif %}
             </dl>
-            <p class="review-hint">Status updates are managed by authorized personnel. You will see changes here as they happen.</p>
-        </div>
+            {% if sss_confirmation.requirements %}
+            <div class="review-modal-section" style="margin-top:1rem;">
+                <h3>Physical requirements to confirm</h3>
+                <ul style="margin:.5rem 0 0;padding-left:1.2rem;">
+                    {% for item in sss_confirmation.requirements %}<li>{{ item }}</li>{% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            {% if not sss_confirmation.confirmed %}
+            <p class="review-hint">{{ sss_confirmation.help }}</p>
+            {% elif sss_confirmation.fulfillment_method == 'pickup' %}
+            <p class="review-hint">Confirmation complete. You will see pickup details below when the status is Ready for Pickup.</p>
+            {% else %}
+            <p class="review-hint">Confirmation complete. Delivery updates will appear below when available.</p>
+            {% endif %}
+        </section>
+        {% endif %}
 
         <div class="review-card review-delivery-card">
             <div class="review-card-heading">
                 <div><p class="review-kicker">DELIVERY MANAGEMENT</p><h2>Delivery status</h2></div>
                 <span class="admin-status-pill admin-status-pill--{{ tracking.delivery.status or 'pending' }}">{{ tracking.delivery.label }}</span>
             </div>
+            {% set pickup = namespace(active=false, label='Pickup', location='', pickup_id='', pickup_date='', confirmed=false) %}
             {% if passport and passport.fulfillment_method == 'pickup' %}
-            <dl class="review-detail-grid">
-                <div><dt>Fulfillment</dt><dd>Pickup at DFA office</dd></div>
-                {% if passport.pickup_location %}<div class="review-detail-wide"><dt>Pickup office</dt><dd>{{ passport.pickup_location }}</dd></div>{% endif %}
-                {% if passport.confirmed %}<div><dt>Pickup ID</dt><dd class="review-mono">{{ passport.pickup_id }}</dd></div><div><dt>Pickup date</dt><dd>{{ passport.pickup_date_label }}</dd></div>{% else %}<div class="review-detail-wide"><dt>Pickup details</dt><dd>Available after confirmation.</dd></div>{% endif %}
-            </dl>
+                {% set pickup.active = true %}
+                {% set pickup.label = passport.fulfillment_label or 'Show up at DFA office to submit documents' %}
+                {% set pickup.location = passport.pickup_location or tracking.citizen_delivery.pickup_location or '—' %}
+                {% set pickup.pickup_id = passport.pickup_id or '' %}
+                {% set pickup.pickup_date = passport.pickup_date_label or '' %}
+                {% set pickup.confirmed = passport.confirmed %}
+            {% elif tracking.senior_confirmation and tracking.senior_confirmation.fulfillment_method == 'pickup' %}
+                {% set pickup.active = true %}
+                {% set pickup.label = tracking.senior_confirmation.fulfillment_label or 'Show up at OSCA office to submit documents' %}
+                {% set pickup.location = tracking.senior_confirmation.pickup_location or tracking.citizen_delivery.pickup_location or '—' %}
+                {% set pickup.pickup_id = tracking.senior_confirmation.pickup_id or '' %}
+                {% set pickup.pickup_date = tracking.senior_confirmation.pickup_date_label or '' %}
+                {% set pickup.confirmed = tracking.senior_confirmation.confirmed %}
+            {% elif tracking.nbi_confirmation and tracking.nbi_confirmation.fulfillment_method == 'pickup' %}
+                {% set pickup.active = true %}
+                {% set pickup.label = tracking.nbi_confirmation.fulfillment_label or 'Show up at NBI Clearance Center to submit documents' %}
+                {% set pickup.location = tracking.nbi_confirmation.pickup_location or tracking.nbi_confirmation.pickup_address or tracking.citizen_delivery.pickup_location or '—' %}
+                {% set pickup.pickup_id = tracking.nbi_confirmation.pickup_id or '' %}
+                {% set pickup.pickup_date = tracking.nbi_confirmation.pickup_date_label or '' %}
+                {% set pickup.confirmed = tracking.nbi_confirmation.confirmed %}
+            {% elif tracking.philsys_confirmation and tracking.philsys_confirmation.fulfillment_method == 'pickup' %}
+                {% set pickup.active = true %}
+                {% set pickup.label = tracking.philsys_confirmation.fulfillment_label or 'Show up at registration center to submit documents' %}
+                {% set pickup.location = tracking.philsys_confirmation.pickup_location or tracking.philsys_confirmation.pickup_address or tracking.citizen_delivery.pickup_location or '—' %}
+                {% set pickup.pickup_id = tracking.philsys_confirmation.pickup_id or '' %}
+                {% set pickup.pickup_date = tracking.philsys_confirmation.pickup_date_label or '' %}
+                {% set pickup.confirmed = tracking.philsys_confirmation.confirmed %}
+            {% elif tracking.sss_confirmation and tracking.sss_confirmation.fulfillment_method == 'pickup' %}
+                {% set pickup.active = true %}
+                {% set pickup.label = tracking.sss_confirmation.fulfillment_label or 'Show up at SSS/partner office to submit documents' %}
+                {% set pickup.location = tracking.sss_confirmation.pickup_location or tracking.sss_confirmation.pickup_address or tracking.citizen_delivery.pickup_location or '—' %}
+                {% set pickup.pickup_id = tracking.sss_confirmation.pickup_id or '' %}
+                {% set pickup.pickup_date = tracking.sss_confirmation.pickup_date_label or '' %}
+                {% set pickup.confirmed = tracking.sss_confirmation.confirmed %}
             {% elif tracking.senior_fulfillment and tracking.senior_fulfillment.method == 'pickup' %}
-            <dl class="review-detail-grid"><div><dt>Fulfillment</dt><dd>Pickup at OSCA office</dd></div><div class="review-detail-wide"><dt>Pickup office</dt><dd>{{ tracking.citizen_delivery.pickup_location or '—' }}</dd></div></dl>
+                {% set pickup.active = true %}
+                {% set pickup.label = 'Show up at OSCA office to submit documents' %}
+                {% set pickup.location = tracking.citizen_delivery.pickup_location or '—' %}
             {% elif tracking.nbi_fulfillment and tracking.nbi_fulfillment.method == 'pickup' %}
-            <dl class="review-detail-grid"><div><dt>Fulfillment</dt><dd>Pickup at NBI Clearance Center</dd></div><div class="review-detail-wide"><dt>Pickup office</dt><dd>{{ tracking.citizen_delivery.pickup_location or '—' }}</dd></div></dl>
+                {% set pickup.active = true %}
+                {% set pickup.label = 'Show up at NBI Clearance Center to submit documents' %}
+                {% set pickup.location = tracking.citizen_delivery.pickup_location or '—' %}
+            {% elif tracking.philsys_fulfillment and tracking.philsys_fulfillment.method == 'pickup' %}
+                {% set pickup.active = true %}
+                {% set pickup.label = 'Show up at registration center to submit documents' %}
+                {% set pickup.location = tracking.citizen_delivery.pickup_location or '—' %}
+            {% elif tracking.sss_fulfillment and tracking.sss_fulfillment.method == 'pickup' %}
+                {% set pickup.active = true %}
+                {% set pickup.label = 'Show up at SSS/partner office to submit documents' %}
+                {% set pickup.location = tracking.citizen_delivery.pickup_location or '—' %}
+            {% endif %}
+            {% if pickup.active %}
+            {% set pickup_ready = application.application_status in ['ready_for_release', 'completed'] or tracking.processing_selected == 'ready_for_dispatch' or tracking.processing_label == 'Ready for Pickup' or tracking.delivery.label == 'Ready for Pickup' or tracking.delivery.label == 'Received' %}
+            <dl class="review-detail-grid">
+                <div><dt>Fulfillment</dt><dd>{{ pickup.label }}</dd></div>
+                <div class="review-detail-wide"><dt>Office address</dt><dd>{{ pickup.location or '—' }}</dd></div>
+                {% if pickup_ready and pickup.confirmed and pickup.pickup_id %}
+                <div><dt>Pickup ID</dt><dd class="review-mono">{{ pickup.pickup_id }}</dd></div>
+                {% elif pickup_ready and not pickup.confirmed %}
+                <div class="review-detail-wide"><dt>Pickup ID</dt><dd>Available after confirming physical requirements.</dd></div>
+                {% else %}
+                <div class="review-detail-wide"><dt>Pickup ID</dt><dd>Available when application status is set to Ready for Pickup.</dd></div>
+                {% endif %}
+            </dl>
+            {% if pickup_ready and application.application_status != 'completed' %}
+            <form class="review-form" method="post" action="{{ url_for('citizen.mark_application_received', application_id=application.application_id) }}" style="margin-top:1rem;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="review-form-actions"><button class="admin-button admin-button--primary" type="submit">Received</button></div>
+            </form>
+            {% elif application.application_status == 'completed' %}
+            <p class="review-hint" style="margin-top:1rem;">This application has been marked as received.</p>
+            {% endif %}
             {% else %}
             <dl class="review-detail-grid">
                 <div><dt>Assigned courier</dt><dd>{{ tracking.delivery.courier_name or "Not assigned" }}</dd></div>

@@ -7,6 +7,7 @@ from sqlalchemy import update
 from app import db
 from app.models.application import Application, ApplicationEvent
 from app.models.notification import Notification
+from app.services.notification_service import should_notify
 from app.utils.validators import clean_text
 
 CLOSED_STATUSES = frozenset({"cancelled", "completed", "rejected"})
@@ -80,18 +81,18 @@ def cancel_application(application, user, reason):
         previous,
         now,
     )
-    db.session.add(
-        Notification(
-            user_id=user.user_id,
-            notification_title="Application cancelled",
-            notification_message=(
-                f"Your {application.service.service_name} request {application.tracking_number} "
-                "was cancelled in OneGov PH. This does not withdraw a filing from a government agency."
-            ),
-            notification_type="application",
-            read_status="unread",
-            created_date=now,
-        )
-    )
+    _n_user = db.session.get(__import__('app.models.user',fromlist=['User']).User, user.user_id) if not isinstance(user.user_id, __import__('app.models.user',fromlist=['User']).User) else user.user_id
+    if should_notify(_n_user, "application", 'in_app'):
+        db.session.add(Notification(
+        user_id=user.user_id,
+        notification_title="Application cancelled",
+        notification_message=(
+        f"Your {application.service.service_name} request {application.tracking_number} "
+        "was cancelled in OneGov PH. This does not withdraw a filing from a government agency."
+        ),
+        notification_type="application",
+        read_status="unread",
+        created_date=now,
+        ))
     db.session.commit()
     return None

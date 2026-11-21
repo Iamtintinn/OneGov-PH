@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+{% block title %}Settings · OneGov PH{% endblock %}
+{% block body_class %}{{ 'citizen-dashboard admin-dashboard' if admin_settings_mode else 'citizen-dashboard' }}{% endblock %}
+{% block site_header %}{% include "admin/_header.html" if admin_settings_mode else "citizen/_header.html" %}{% endblock %}
+{% block content %}
+<div class="{{ 'admin-main' if admin_settings_mode else 'dash-page site-width' }}">
+  <section class="citizen-settings-page" aria-labelledby="settings-heading">
+    <div class="citizen-settings-hero">
+      <div>
+        <p class="dash-kicker">Citizen Account</p>
+        <h1 id="settings-heading">Account Settings</h1>
+        <p class="citizen-list-sub">Manage your profile, security, notifications, privacy, and application preferences in one place.</p>
+      </div>
+    </div>
+
+    <div class="cset-profile-card">
+      <div class="cset-profile-left">
+        <div class="cset-avatar-wrap" aria-hidden="true">
+          {% if profile_picture_url %}
+          <img src="{{ profile_picture_url }}" alt="Profile picture" class="cset-avatar-img">
+          {% else %}
+          <div class="cset-avatar-fallback">{{ ((current_user.first_name or '')[:1] ~ (current_user.last_name or '')[:1])|upper or 'U' }}</div>
+          {% endif %}
+        </div>
+        <div>
+          <h2 class="cset-profile-name">{{ current_user.full_name }}</h2>
+          <p class="cset-profile-meta">{{ current_user.email }}<span>•</span>{{ current_user.contact_number or 'No contact number' }}</p>
+          <div class="cset-profile-badges">
+            <span class="cset-badge {{ 'cset-badge-ok' if current_user.email_verification_status == 'verified' else 'cset-badge-warn' }}">{{ 'Email verified' if current_user.email_verification_status == 'verified' else 'Email unverified' }}</span>
+            <span class="cset-badge cset-badge-muted">Member since {{ current_user.date_registered.strftime('%d %b %Y') if current_user.date_registered else '—' }}</span>
+            {% if last_login %}<span class="cset-badge cset-badge-muted">Last login {{ last_login.strftime('%d %b %Y, %I:%M %p') }}</span>{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cset-layout">
+      <aside class="cset-nav" aria-label="Settings sections">
+        {% set nav = [
+          ('personal','Personal Information','Manage your profile and contact details'),
+          ('address','Address Information','Saved addresses and default delivery'),
+          ('security','Account Security','Password, 2FA, and login activity'),
+          ('notifications','Notification Preferences','Control how you receive updates'),
+          ('privacy','Privacy & Data','Consent, export, and account requests'),
+          ('preferences','Application Preferences','Defaults for future applications'),
+          ('help','Help & Support','FAQs, support, and issue reporting')
+        ] %}
+        {% for key,label,desc in nav %}
+        <a href="{{ url_for('admin_portal.settings' if admin_settings_mode else 'citizen_settings.index', section=key) }}" class="cset-nav-item {{ 'is-active' if section==key else '' }}" {% if section==key %}aria-current="page"{% endif %}>
+          <span class="cset-nav-label-wrap"><span class="cset-nav-label">{{ label }}</span><small class="cset-nav-desc">{{ desc }}</small></span>
+        </a>
+        {% endfor %}
+      </aside>
+
+      <div class="cset-content">
+        <div id="cset-toast" class="cset-toast" role="status" aria-live="polite"></div>
+
+        {% if section == 'personal' %}
+        <section class="cset-card">
+          <div class="cset-card-head"><div><p class="cset-kicker">Profile</p><h3>Personal Information</h3></div></div>
+          <form class="cset-form ajax-settings-form" method="post" action="{{ url_for('citizen_settings.save_personal') }}" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="cset-grid">
+              <div class="cset-field cset-field-full"><label for="profile_picture">Profile picture</label><input id="profile_picture" name="profile_picture" type="file" accept=".jpg,.jpeg,.png,.webp"><p class="cset-help">JPG, PNG, or WEBP. Max 2MB.</p></div>
+              <div class="cset-field"><label for="first_name">First name</label><input id="first_name" name="first_name" value="{{ current_user.first_name }}" required></div>
+              <div class="cset-field"><label for="middle_name">Middle name <span>(optional)</span></label><input id="middle_name" name="middle_name" value="{{ current_user.middle_name or '' }}"></div>
+              <div class="cset-field"><label for="last_name">Last name</label><input id="last_name" name="last_name" value="{{ current_user.last_name }}" required></div>
+              <div class="cset-field"><label for="suffix">Suffix <span>(optional)</span></label><input id="suffix" name="suffix" value="{{ profile_extra.suffix }}"></div>
+              <div class="cset-field"><label for="date_of_birth">Date of birth</label><input id="date_of_birth" name="date_of_birth" type="date" value="{{ profile_extra.date_of_birth }}"></div>
+              <div class="cset-field"><label for="sex">Sex</label><select id="sex" name="sex"><option value="">Select</option>{% for o in sex_options %}<option value="{{ o }}" {% if profile_extra.sex==o %}selected{% endif %}>{{ o }}</option>{% endfor %}</select></div>
+              <div class="cset-field"><label for="civil_status">Civil status</label><select id="civil_status" name="civil_status"><option value="">Select</option>{% for o in civil_status_options %}<option value="{{ o }}" {% if profile_extra.civil_status==o %}selected{% endif %}>{{ o }}</option>{% endfor %}</select></div>
+              <div class="cset-field"><label for="nationality">Nationality</label><input id="nationality" name="nationality" value="{{ profile_extra.nationality or 'Filipino' }}"></div>
+              <div class="cset-field"><label for="email">Email address</label><input id="email" name="email" type="email" value="{{ current_user.email }}" required><p class="cset-help">Changing email will require re-verification.</p></div>
+              <div class="cset-field"><label for="contact_number">Contact number</label><input id="contact_number" name="contact_number" value="{{ current_user.contact_number or '' }}" required></div>
+            </div>
+            <div class="cset-actions"><button type="submit" class="cset-btn cset-btn-primary" data-loading="Saving...">Save changes</button></div>
+          </form>
+        </section>
+        {% endif %}
+
+        {% if section == 'address' %}
+        <section class="cset-card">
+          <div class="cset-card-head"><div><p class="cset-kicker">Address</p><h3>Address Information</h3></div></div>
+          <div class="cset-address-list">
+            {% for a in addresses %}
+            <div class="cset-address-item {{ 'is-default' if a.is_default else '' }}">
+              <div>
+                <p class="cset-address-title">{{ a.house_unit }} {{ a.street }}{% if a.is_default %}<span class="cset-badge cset-badge-ok">Default</span>{% endif %}</p>
+                <p class="cset-address-meta">{{ a.barangay }}, {{ a.city }}, {{ a.province }}, {{ a.region }} {{ a.zip_code }}</p>
+              </div>
+              <div class="cset-address-actions">
+                <button type="button" class="cset-btn cset-btn-ghost" onclick="editAddress({{ a|tojson|forceescape }})">Edit</button>
+                <form method="post" action="{{ url_for('citizen_settings.save_address') }}" class="ajax-settings-form inline-form-confirm" data-confirm="Remove this address?">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="delete"><input type="hidden" name="address_id" value="{{ a.id }}">
+                  <button type="submit" class="cset-btn cset-btn-danger-ghost">Remove</button>
+                </form>
+              </div>
+            </div>
+            {% else %}
+            <p class="cset-empty">No saved addresses yet.</p>
+            {% endfor %}
+          </div>
+          <hr class="cset-divider">
+          <h4 class="cset-subhead" id="address-form-title">Add / Edit address</h4>
+          <form class="cset-form ajax-settings-form" method="post" action="{{ url_for('citizen_settings.save_address') }}" id="address-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="address_id" id="address_id" value="">
+            <div class="cset-grid">
+              <div class="cset-field"><label for="house_unit">House/Unit Number</label><input id="house_unit" name="house_unit"></div>
+              <div class="cset-field"><label for="street">Street</label><input id="street" name="street"></div>
+              <div class="cset-field"><label for="barangay">Barangay</label><input id="barangay" name="barangay" required></div>
+              <div class="cset-field"><label for="city">City/Municipality</label><input id="city" name="city" required></div>
+              <div class="cset-field"><label for="province">Province</label><input id="province" name="province" required></div>
+              <div class="cset-field"><label for="region">Region</label><input id="region" name="region" required></div>
+              <div class="cset-field"><label for="zip_code">ZIP Code</label><input id="zip_code" name="zip_code"></div>
+              <div class="cset-field cset-field-check"><label><input type="checkbox" name="is_default" value="1" id="is_default"> Set as default address</label></div>
+            </div>
+            <p class="cset-help">Default address can be used for future applications and deliveries.</p>
+            <div class="cset-actions"><button type="button" class="cset-btn cset-btn-ghost" onclick="resetAddressForm()">Clear</button><button type="submit" class="cset-btn cset-btn-primary" data-loading="Saving...">Save address</button></div>
+          </form>
+        </section>
+        {% endif %}
+
+        {% if section == 'security' %}
+        <section class="cset-card">
+          <div class="cset-card-head"><div><p class="cset-kicker">Security</p><h3>Change Password</h3><p class="cset-help" style="margin-top:.45rem">Keep your account secure with a strong, unique password.</p></div></div>
+          <form class="cset-form ajax-settings-form" method="post" action="{{ url_for('citizen_settings.change_password') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="cset-grid">
+              <div class="cset-field cset-field-full"><label for="current_password">Current password</label><input id="current_password" name="current_password" type="password" required></div>
+              <div class="cset-field"><label for="password">New password</label><input id="password" name="password" type="password" minlength="8" required></div>
+              <div class="cset-field"><label for="confirm_password">Confirm new password</label><input id="confirm_password" name="confirm_password" type="password" minlength="8" required></div>
+            </div>
+            <p class="cset-help">Use at least 8 characters. Avoid reusing old passwords.</p>
+            <div class="cset-actions"><button type="submit" class="cset-btn cset-btn-primary" data-loading="Updating...">Update password</button></div>
+          </form>
+        </section>
+
+        <section class="cset-card">
+          <div class="cset-card-head"><div><p class="cset-kicker">Security</p><h3>Two-Factor Authentication</h3></div></div>
+          <form class="cset-form ajax-settings-form" method="post" action="{{ url_for('citizen_settings.toggle_2fa') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% set tfa = (current_user.admin_permissions or {}).get('citizen_settings',{}).get('two_factor_enabled', false) %}
+            <label class="cset-toggle-row"><span><strong>Enable two-factor authentication</strong><small>Add an extra verification step for sensitive account actions.</small></span><input type="checkbox" name="enabled" value="1" {% if tfa %}checked{% endif %} onchange="this.form.requestSubmit()"></label>
+          </form>
+        </section>
+
+        <section class="cset-card">
+          <div class="cset-card-head"><div><p class="cset-kicker">Security</p><h3>Login Activity</h3></div><span class="cset-badge cset-badge-muted">Last login: {{ last_login.strftime('%d %b %Y, %I:%M %p') if last_login else '—' }}</span></div>
+          <div class="cset-table-wrap">
+            <table class="cset-table"><thead><tr><th>Date/Time</th><th>Action</th><th>Description</th></tr></thead><tbody>
+            {% for a in login_activity %}
+              <tr><td>{{ a.created_at.strftime('%d %b %Y, %I:%M %p') if a.created_at else '—' }}</td><td>{{ a.action }}</td><td>{{ a.description or '—' }}</td></tr>
+            {% else %}<tr><td colspan="3" class="cset-empty-cell">No login activity found.</td></tr>{% endfor %}
+            </tbody></table>
+          </div>
+        </section>
+
+        <section class="cset-card">
+          <div class="cset-card-head"><div><p class="cset-kicker">Security</p><h3>Active Sessions / Devices</h3></div></div>
+          <div class="cset-session-list">
+            {% for s in active_sessions %}
+            <div class="cset-session-item"><div><p class="cset-address-title">{{ s.user_agent[:80] if s.user_agent else 'Unknown device' }}</p><p class="cset-address-meta">IP: {{ s.ip_address or '—' }} · Last seen: {{ s.last_seen_at.strftime('%d %b %Y, %I:%M %p') if s.last_seen_at else '—' }}</p></div></div>
+            {% else %}<p class="cset-empty">No active session records. Session tracking will appear after the migration and next login.</p>{% endfor %}
+          </div>
+          <div class="cset-actions"><form method="post" action="{{ url_for('citizen_settings.logout_all_devices') }}" class="inline-form-confirm" data-confirm="Log out from all devices? You will need to sign in again."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="cset-btn cset-btn-danger">Logout from all devices</button></form></div>
+        </section>
+        {% endif %}
+
+        {% if section == 'notifications' %}
+        <section class="cset-card">
+          <div class="cset-card-head"><div><p class="cset-kicker">Notifications</p><h3>Notification Preferences</h3><p class="cset-help" style="margin-top:.45rem">Choose how you want to receive updates for each activity type.</p></div></div>
+          <form class="cset-form ajax-settings-form" method="post" action="{{ url_for('citizen_settings.save_notifications') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="cset-table-wrap">
+              <table class="cset-table cset-pref-table"><thead><tr><th>Category</th><th>In-App</th><th>Email</th><th>SMS</th></tr></thead><tbody>
+              {% for key,label in notif_categories %}
+              {% set p = notif_prefs.get(key, {}) %}
+              <tr>
+                <td>{{ label }}</td>
+                <td><label class="cset-check"><input type="checkbox" name="{{ key }}__in_app" value="1" {% if p.get('in_app',true) %}checked{% endif %}></label></td>
+                <td><label class="cset-check"><input type="checkbox" name="{{ key }}__email" value="1" {% if p.get('email') %}checked{% endif %}></label></td>
+                <td><label class="cset-check"><input type="checkbox" name="{{ key }}__sms" value="1" {% if p.get('sms') %}checked{% endif %}></label></td>
+              </tr>
+              {% endfor %}
+              </tbody></table>
+            </div>
+            <div class="cset-actions"><button type="submit" class="cset-btn cset-btn-primary" data-loading="Saving...">Save preferences</button></div>
+          </form>
+        </section>
+        {% endif %}
+
+        {% if section == 'privacy' %}
+        <section class="cset-card">
+          <div class="cset-card-head"><div><p class="cset-kicker">Privacy</p><h3>Consent / Privacy Settings</h3><p class="cset-help" style="margin-top:.45rem">Control how your data is used across OneGov PH services.</p></div></div>
+          <form class="cset-form ajax-settings-form" method="post" action="{{ url_for('citizen_settings.save_privacy') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="cset-toggle-row"><span><strong>Terms and conditions</strong><small>Required for using OneGov PH services.</small></span><input type="checkbox" name="terms_accepted" value="1" {% if privacy.terms_accepted %}checked{% endif %}></label>
+            <label class="cset-toggle-row"><span><strong>Privacy policy</strong><small>Allow processing of personal data as described in the privacy policy.</small></span><input type="checkbox" name="privacy_accepted" value="1" {% if privacy.privacy_accepted %}checked{% endif %}></label>
+            <label class="cset-toggle-row"><span><strong>Data sharing consent</strong><small>Allow sharing necessary data with relevant government agencies for your applications.</small></span><input type="checkbox" name="data_sharing_consent" value="1" {% if privacy.data_sharing_consent %}checked{% endif %}></label>
+            <div class="cset-actions"><button type="submit" class="cset-btn cset-btn-primary" data-loading="Saving...">Save privacy settings</button></div>
+          </form>
+        </section>
+        <section class="cset-card">
+          <div class="cset-card-head"><div><p class="cset-kicker">Privacy</p><h3>Download My Data</h3></div></div>
+          <p class="cset-help">Download a copy of your personal account data in JSON format.</p>
+          <div class="cset-actions"><a class="cset-btn cset-btn-ghost" href="{{ url_for('citizen_settings.download_my_data') }}">Download my data</a></div>
+        </section>
+        <section class="cset-card">
+          <div class="cset-card-head"><div><p class="cset-kicker">Privacy</p><h3>Account Requests</h3></div></div>
+          <p class="cset-help">Request account deactivation or deletion. Requests are reviewed by administrators.</p>
+          <div class="cset-actions cset-actions-wrap">
+            <form method="post" action="{{ url_for('citizen_settings.account_request') }}" class="ajax-settings-form inline-form-confirm" data-confirm="Submit account deactivation request?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="request_type" value="deactivation"><button type="submit" class="cset-btn cset-btn-ghost">Request deactivation</button></form>
+            <form method="post" action="{{ url_for('citizen_settings.account_request') }}" class="ajax-settings-form inline-form-confirm" data-confirm="Submit account deletion request? This will be reviewed by an administrator."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="request_type" value="deletion"><button type="submit" class="cset-btn cset-btn-danger-ghost">Request deletion</button></form>
+          </div>
+          {% if account_requests %}
+          <div class="cset-table-wrap" style="margin-top:1rem"><table class="cset-table"><thead><tr><th>Type</th><th>Status</th><th>Date</th></tr></thead><tbody>
+          {% for r in account_requests %}<tr><td>{{ r.request_type|title }}</td><td>{{ r.status|title }}</td><td>{{ r.created_at.strftime('%d %b %Y') if r.created_at else '—' }}</td></tr>{% endfor %}
+          </tbody></table></div>
+          {% endif %}
+        </section>
+        {% endif %}
+
+        {% if section == 'preferences' %}
+        <section class="cset-card">
+          <div class="cset-card-head"><div><p class="cset-kicker">Preferences</p><h3>Application Preferences</h3></div></div>
+          <form class="cset-form ajax-settings-form" method="post" action="{{ url_for('citizen_settings.save_preferences') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="cset-grid">
+              <div class="cset-field"><label for="default_delivery_address_id">Default delivery address</label>
+                <select id="default_delivery_address_id" name="default_delivery_address_id"><option value="">Select saved address</option>
+                {% for a in addresses %}<option value="{{ a.id }}" {% if app_prefs.default_delivery_address_id==a.id|string %}selected{% endif %}>{{ a.house_unit }} {{ a.street }}, {{ a.barangay }}, {{ a.city }}</option>{% endfor %}
+                </select></div>
+              <div class="cset-field"><label for="default_application_contact_number">Default contact number for applications</label><input id="default_application_contact_number" name="default_application_contact_number" value="{{ app_prefs.default_application_contact_number or current_user.contact_number or '' }}"></div>
+              <div class="cset-field"><label for="preferred_notification_method">Preferred notification method</label><select id="preferred_notification_method" name="preferred_notification_method">{% for v,l in notif_method_options %}<option value="{{ v }}" {% if app_prefs.preferred_notification_method==v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+              <div class="cset-field"><label for="preferred_language">Preferred language</label><select id="preferred_language" name="preferred_language">{% for v,l in language_options %}<option value="{{ v }}" {% if app_prefs.preferred_language==v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+            </div>
+            <div class="cset-actions"><button type="submit" class="cset-btn cset-btn-primary" data-loading="Saving...">Save preferences</button></div>
+          </form>
+        </section>
+        {% endif %}
+
+        {% if section == 'help' %}
+        <section class="cset-card">
+          <div class="cset-card-head"><div><p class="cset-kicker">Help</p><h3>Help & Support</h3></div></div>
+          <div class="cset-help-links">
+            <a class="cset-help-link" href="{{ url_for('main.support') }}"><strong>Contact support</strong><span>Reach the OneGov PH support team.</span></a>
+            <a class="cset-help-link" href="{{ url_for('main.faq') }}"><strong>FAQs</strong><span>Find answers to common questions.</span></a>
+            <a class="cset-help-link" href="{{ url_for('main.privacy') }}"><strong>Terms and privacy policy</strong><span>Review policies governing your account.</span></a>
+          </div>
+          <hr class="cset-divider">
+          <h4 class="cset-subhead">Report a problem</h4>
+          <form class="cset-form ajax-settings-form" method="post" action="{{ url_for('citizen_settings.report_problem') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="cset-grid">
+              <div class="cset-field cset-field-full"><label for="subject">Subject</label><input id="subject" name="subject" required maxlength="120"></div>
+              <div class="cset-field cset-field-full"><label for="message">Message</label><textarea id="message" name="message" rows="5" required maxlength="1000"></textarea></div>
+            </div>
+            <div class="cset-actions"><button type="submit" class="cset-btn cset-btn-primary" data-loading="Submitting...">Submit report</button></div>
+          </form>
+        </section>
+        {% endif %}
+
+      </div>
+    </div>
+  </section>
+</div>
+<script>
+function editAddress(a){
+  ['address_id','house_unit','street','barangay','city','province','region','zip_code'].forEach(k=>{const el=document.getElementById(k); if(el) el.value=a[k]||'';});
+  const d=document.getElementById('is_default'); if(d) d.checked=!!a.is_default;
+  document.getElementById('address-form-title').textContent='Edit address';
+  document.getElementById('address-form').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function resetAddressForm(){
+  const f=document.getElementById('address-form'); if(!f) return; f.reset(); document.getElementById('address_id').value='';
+  document.getElementById('address-form-title').textContent='Add / Edit address';
+}
+function showCsetToast(msg, ok=true){
+  const t=document.getElementById('cset-toast'); if(!t) return;
+  t.textContent=msg; t.className='cset-toast is-visible '+(ok?'is-ok':'is-err');
+  clearTimeout(t._timer); t._timer=setTimeout(()=>t.classList.remove('is-visible'),3500);
+}
+document.querySelectorAll('.inline-form-confirm').forEach(f=>{
+  f.addEventListener('submit',e=>{const msg=f.dataset.confirm; if(msg&&!confirm(msg)) e.preventDefault();});
+});
+document.querySelectorAll('.ajax-settings-form').forEach(form=>{
+  form.addEventListener('submit', async e=>{
+    if(form.classList.contains('inline-form-confirm')){ /* already confirmed */ }
+    if(form.enctype==='multipart/form-data') return; // let normal submit handle file upload
+    e.preventDefault();
+    const btn=form.querySelector('[type=submit]'); const old=btn?btn.textContent:''; if(btn){btn.disabled=true; btn.textContent=btn.dataset.loading||'Saving...';}
+    try{
+      const res=await fetch(form.action,{method:'POST',body:new FormData(form),headers:{'X-Requested-With':'XMLHttpRequest'}});
+      const data=await res.json().catch(()=>({ok:res.ok,message:res.ok?'Saved.':'Request failed.'}));
+      showCsetToast(data.message||'Done.', !!data.ok);
+      if(data.ok && !form.querySelector('[name="action"][value="delete"]') && !form.action.includes('logout-all')) {
+        if(form.action.includes('/address')) setTimeout(()=>location.reload(),700);
+      }
+    }catch(err){ showCsetToast('Network error. Please try again.', false); }
+    finally{ if(btn){btn.disabled=false; btn.textContent=old;} }
+  });
+});
+</script>
+{% endblock %}

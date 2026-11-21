@@ -787,6 +787,73 @@ def application_detail(application_id):
     )
 
 
+@citizen_bp.route("/citizen/applications/<int:application_id>/received", methods=["POST"])
+@citizen_portal_required
+def mark_application_received(application_id):
+    from datetime import datetime
+    from app.routes.admin_portal import ADMIN_PROCESSING_BY_KEY, _admin_tracking_state, _delivery_state, _save_admin_tracking, _log_admin_status_event
+
+    query = visible_application_query(
+        db.select(Application).where(Application.application_id == application_id)
+    )
+    if not _uses_department_scope():
+        query = query.where(Application.applicant_id == current_user.user_id)
+    application = db.session.scalars(query).unique().first()
+    if application is None:
+        abort(404)
+
+    is_pickup = False
+    try:
+        from app.routes.admin_portal import tracking_detail_data
+        tracking = tracking_detail_data(application, db.session.get(User, application.applicant_id), include_map=False)
+        pf = tracking.get("passport_fulfillment") or {}
+        is_pickup = any([
+            pf.get("fulfillment_method") == "pickup",
+            (tracking.get("senior_fulfillment") or {}).get("method") == "pickup",
+            (tracking.get("nbi_fulfillment") or {}).get("method") == "pickup",
+            (tracking.get("philsys_fulfillment") or {}).get("method") == "pickup",
+            (tracking.get("sss_fulfillment") or {}).get("method") == "pickup",
+        ])
+    except Exception:
+        is_pickup = False
+
+    if not is_pickup:
+        flash("This action is only available for pickup applications.", "warning")
+        return redirect(url_for("citizen.application_detail", application_id=application_id))
+
+    if application.application_status != "ready_for_release":
+        flash("You can mark this application as received once it is Ready for Pickup.", "warning")
+        return redirect(url_for("citizen.application_detail", application_id=application_id))
+
+    if application.application_status == "completed":
+        return redirect(url_for("citizen.application_detail", application_id=application_id))
+
+    now = datetime.now().replace(microsecond=0)
+    state = _admin_tracking_state(application)
+    processing = state["processing"]
+    target = ADMIN_PROCESSING_BY_KEY.get("completed") or {"key": "completed", "label": "Completed", "legacy_status": "completed"}
+    entry = {
+        "key": target["key"],
+        "label": target["label"],
+        "legacy_status": target["legacy_status"],
+        "note": "Marked as received by citizen.",
+        "updated_by": current_user.user_id,
+        "updated_by_name": current_user.full_name,
+        "recorded_at": now.isoformat(),
+        "recorded_at_label": now.strftime("%d %b %Y, %I:%M %p"),
+    }
+    processing.update(entry)
+    processing.setdefault("history", []).append(dict(entry))
+    _save_admin_tracking(application, state)
+
+    previous_status = application.application_status
+    application.application_status = "completed"
+    _log_admin_status_event(application, previous_status, "Citizen marked pickup application as received.")
+    db.session.commit()
+    flash("Application marked as received.", "success")
+    return redirect(url_for("citizen.application_detail", application_id=application_id))
+
+
 @citizen_bp.route("/citizen/services")
 @citizen_portal_required
 def services():
@@ -808,12 +875,42 @@ def services():
     )
 
 
+def _filter_applications(applications, term="", status=""):
+    term = " ".join((term or "").split()).casefold()
+    status = clean_text(status)
+    filtered = []
+    for application in applications:
+        if status and application.application_status != status:
+            continue
+        if term:
+            haystack = " ".join([
+                application.tracking_number or "",
+                application.service.service_name if application.service else "",
+                application.department.department_name if application.department else "",
+                STATUS_LABELS.get(application.application_status, application.application_status or ""),
+            ]).casefold()
+            if term not in haystack:
+                continue
+        filtered.append(application)
+    return filtered
+
+
 @citizen_bp.route("/citizen/applications")
 @citizen_portal_required
 def applications():
+    all_apps = _owned_applications(current_user.user_id)
+    q = (request.args.get("q") or "")[:80]
+    status = clean_text(request.args.get("status"))
+    filtered = _filter_applications(all_apps, q, status)
+    status_options = [(key, label) for key, label in STATUS_LABELS.items() if key != "draft"]
     return render_template(
         "citizen/application_history.html",
-        applications=_owned_applications(current_user.user_id),
+        applications=filtered,
+        total_count=len(all_apps),
+        filtered_count=len(filtered),
+        q=q,
+        selected_status=status,
+        status_options=status_options,
         status_labels=STATUS_LABELS,
         payment_status_labels=PAYMENT_STATUS_LABELS,
     )
@@ -822,13 +919,22 @@ def applications():
 @citizen_bp.route("/citizen/tracking")
 @citizen_portal_required
 def tracking():
-    applications = _owned_applications(current_user.user_id)
+    all_apps = _owned_applications(current_user.user_id)
+    q = (request.args.get("q") or "")[:80]
+    status = clean_text(request.args.get("status"))
+    filtered = _filter_applications(all_apps, q, status)
     from app.services.tracking_service import events_by_application as group_events
 
-    events_by_application = group_events([item.application_id for item in applications])
+    events_by_application = group_events([item.application_id for item in filtered])
+    status_options = [(key, label) for key, label in STATUS_LABELS.items() if key != "draft"]
     return render_template(
         "applications/track_application.html",
-        applications=applications,
+        applications=filtered,
+        total_count=len(all_apps),
+        filtered_count=len(filtered),
+        q=q,
+        selected_status=status,
+        status_options=status_options,
         events_by_application=events_by_application,
         status_labels=STATUS_LABELS,
         payment_status_labels=PAYMENT_STATUS_LABELS,
@@ -910,29 +1016,8 @@ def profile():
 @citizen_bp.route("/citizen/settings", methods=["GET", "POST"])
 @citizen_portal_required
 def settings():
-    errors = {}
-    if request.method == "POST":
-        action = clean_text(request.form.get("action")) or "password"
-        if action == "otp_login":
-            current_user.login_otp_enabled = request.form.get("otp_login_enabled") == "1"
-            db.session.commit()
-            flash("Login verification setting updated.", "success")
-            return redirect(url_for("citizen.settings"))
-
-        current_password = request.form.get("current_password") or ""
-        password = request.form.get("password") or ""
-        confirm_password = request.form.get("confirm_password") or ""
-        if not current_user.check_password(current_password):
-            errors["current_password"] = "Current password is incorrect."
-        errors.update(_password_errors(password, confirm_password))
-        if not errors:
-            current_user.set_password(password)
-            db.session.commit()
-            flash("Your password has been updated.", "success")
-            return redirect(url_for("citizen.settings"))
-    return render_template("citizen/settings.html", errors=errors)
+    return redirect(url_for("citizen_settings.index"))
 
 
-from app.routes.applications import register as register_application_routes
-
-register_application_routes(citizen_bp)
+from app.routes.applications import register as _register_application_routes
+_register_application_routes(citizen_bp, base="/citizen", wrap=citizen_portal_required)

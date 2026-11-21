@@ -34,8 +34,29 @@ def home_endpoint_for_role(role):
     return "auth.login"
 
 
+def _record_user_session(user):
+    try:
+        from app import db
+        from app.models.user_session import UserSession
+        from app.services.citizen_settings_service import record_login_activity
+        ua = (request.user_agent.string or "")[:500]
+        ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "")[:64]
+        sid = session.get("_id") or session.get("_user_id") or ""
+        rec = UserSession(user_id=user.user_id, session_token=str(sid)[:255], ip_address=ip, user_agent=ua)
+        db.session.add(rec)
+        record_login_activity(user, "login", f"Signed in from {ip or 'unknown IP'}.")
+        db.session.commit()
+    except Exception:
+        try:
+            from app import db
+            db.session.rollback()
+        except Exception:
+            pass
+
+
 def establish_session(user):
     """Replace the anonymous browser session before storing the signed-in account."""
     session.clear()
     session.permanent = True
     login_user(user)
+    _record_user_session(user)

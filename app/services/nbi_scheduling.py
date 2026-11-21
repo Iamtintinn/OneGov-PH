@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from app import db
 from app.models.nbi_appointment import NbiAppointment
 from app.models.notification import Notification
+from app.services.notification_service import should_notify
 from app.services.application_service import read_details, write_details
 
 def _location(code, branch_name, region, province, city, address, latitude, longitude):
@@ -326,18 +327,18 @@ def save_appointment(application, user, location_code, appointment_date, appoint
     except IntegrityError:
         db.session.rollback()
         return "That demonstration slot was just taken. Choose another date or time."
-    db.session.add(
-        Notification(
+        _n_user = db.session.get(__import__('app.models.user',fromlist=['User']).User, user.user_id) if not isinstance(user.user_id, __import__('app.models.user',fromlist=['User']).User) else user.user_id
+        if should_notify(_n_user, "appointment", 'in_app'):
+            db.session.add(Notification(
             user_id=user.user_id,
             notification_title="Demonstration appointment saved",
             notification_message=(
-                f"Your NBI demonstration appointment for {payload['appointment_date']} "
-                f"at {payload['appointment_time']} was saved. This is not an official NBI appointment."
+            f"Your NBI demonstration appointment for {payload['appointment_date']} "
+            f"at {payload['appointment_time']} was saved. This is not an official NBI appointment."
             ),
             notification_type="appointment",
             read_status="unread",
             created_date=now,
-        )
-    )
+            ))
     db.session.commit()
     return None

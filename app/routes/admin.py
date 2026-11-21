@@ -574,6 +574,7 @@ def application_detail(application_id):
         PASSPORT_PROCESSING_STATUSES,
         tracking_detail_data,
     )
+    from app.services.application_forms import specification_for
     from app.services.passport_delivery import PICKUP
     from app.services.senior_admin import summary as senior_confirmation_summary
 
@@ -581,37 +582,34 @@ def application_detail(application_id):
     passport = tracking["passport_fulfillment"]
     senior_confirmation = senior_confirmation_summary(application)
     processing_statuses = ADMIN_PROCESSING_STATUSES
+    spec_options = (tracking.get("spec") or {}).get("admin_status_options") if isinstance(tracking.get("spec"), dict) else None
+    if not spec_options:
+        spec_options = (specification_for(application.service, field_map(application)) or {}).get("admin_status_options")
+    if spec_options:
+        processing_statuses = tuple(
+            (item.get("key"), item.get("label"), item.get("legacy_status"))
+            for item in spec_options
+            if item.get("key") and item.get("label") and item.get("legacy_status")
+        ) or ADMIN_PROCESSING_STATUSES
+    is_pickup = bool(
+        (passport and passport["fulfillment_method"] == PICKUP)
+        or (senior_confirmation and senior_confirmation["fulfillment_method"] == PICKUP)
+        or (tracking["nbi_fulfillment"] and tracking["nbi_fulfillment"]["method"] == "pickup")
+        or (tracking.get("philsys_fulfillment") and tracking["philsys_fulfillment"]["method"] == "pickup")
+        or (tracking.get("sss_fulfillment") and tracking["sss_fulfillment"]["method"] == "pickup")
+    )
+    if is_pickup:
+        processing_statuses = tuple(
+            (
+                key,
+                "Ready for Pickup" if key == "ready_for_dispatch" else label,
+                legacy,
+            )
+            for key, label, legacy in processing_statuses
+        )
     if passport:
-        is_pickup = passport["fulfillment_method"] == PICKUP
-        processing_statuses = tuple(
-            (
-                key,
-                "Ready for Pickup"
-                if is_pickup and key == "ready_for_dispatch"
-                else label,
-                legacy,
-            )
-            for key, label, legacy in ADMIN_PROCESSING_STATUSES
-        ) + tuple(
+        processing_statuses = processing_statuses + tuple(
             item for item in PASSPORT_PROCESSING_STATUSES if item[0] != "rejected"
-        )
-    elif senior_confirmation and senior_confirmation["fulfillment_method"] == PICKUP:
-        processing_statuses = tuple(
-            (
-                key,
-                "Ready for Pickup" if key == "ready_for_dispatch" else label,
-                legacy,
-            )
-            for key, label, legacy in ADMIN_PROCESSING_STATUSES
-        )
-    elif tracking["nbi_fulfillment"] and tracking["nbi_fulfillment"]["method"] == "pickup":
-        processing_statuses = tuple(
-            (
-                key,
-                "Ready for Pickup" if key == "ready_for_dispatch" else label,
-                legacy,
-            )
-            for key, label, legacy in ADMIN_PROCESSING_STATUSES
         )
 
     return render_template(
@@ -684,6 +682,93 @@ def confirm_senior_requirements(application_id):
     return redirect(url_for("admin.application_detail", application_id=application_id))
 
 
+@admin_bp.route("/admin/applications/<int:application_id>/nbi-requirements", methods=["POST"])
+@admin_console_required
+def confirm_nbi_requirements(application_id):
+    application = _application_or_404(application_id)
+    from app.services.nbi_admin import confirm, is_confirmed, is_nbi_application, schedule_recorded
+
+    if not is_nbi_application(application):
+        abort(400, description="Physical requirements are only confirmed for NBI applications.")
+    if not schedule_recorded(application):
+        flash("The applicant must have a recorded appointment schedule before confirmation.", "warning")
+        return redirect(url_for("admin.application_detail", application_id=application_id))
+    if is_confirmed(application):
+        flash("Physical requirements are already confirmed for this application.", "info")
+        return redirect(url_for("admin.application_detail", application_id=application_id))
+
+    record, error = confirm(application, current_user)
+    if error:
+        flash(error, "warning")
+        return redirect(url_for("admin.application_detail", application_id=application_id))
+
+    description = "Confirmed submitted documents and completed physical requirements."
+    if record.get("pickup_id"):
+        description += f" Pickup ID {record['pickup_id']} is scheduled for {record['pickup_date_label']}."
+    _log_application_event(application, application.application_status, description)
+    db.session.commit()
+    flash("NBI documents and physical requirements confirmed.", "success")
+    return redirect(url_for("admin.application_detail", application_id=application_id))
+
+
+@admin_bp.route("/admin/applications/<int:application_id>/philsys-requirements", methods=["POST"])
+@admin_console_required
+def confirm_philsys_requirements(application_id):
+    application = _application_or_404(application_id)
+    from app.services.philsys_admin import confirm, is_confirmed, is_philsys_application, schedule_recorded
+
+    if not is_philsys_application(application):
+        abort(400, description="Physical requirements are only confirmed for PhilSys applications.")
+    if not schedule_recorded(application):
+        flash("The applicant must have a recorded appointment schedule before confirmation.", "warning")
+        return redirect(url_for("admin.application_detail", application_id=application_id))
+    if is_confirmed(application):
+        flash("Physical requirements are already confirmed for this application.", "info")
+        return redirect(url_for("admin.application_detail", application_id=application_id))
+
+    record, error = confirm(application, current_user)
+    if error:
+        flash(error, "warning")
+        return redirect(url_for("admin.application_detail", application_id=application_id))
+
+    description = "Confirmed submitted documents and completed physical requirements."
+    if record.get("pickup_id"):
+        description += f" Pickup ID {record['pickup_id']} is scheduled for {record['pickup_date_label']}."
+    _log_application_event(application, application.application_status, description)
+    db.session.commit()
+    flash("PhilSys documents and physical requirements confirmed.", "success")
+    return redirect(url_for("admin.application_detail", application_id=application_id))
+
+
+@admin_bp.route("/admin/applications/<int:application_id>/sss-requirements", methods=["POST"])
+@admin_console_required
+def confirm_sss_requirements(application_id):
+    application = _application_or_404(application_id)
+    from app.services.sss_admin import confirm, is_confirmed, is_sss_application, schedule_recorded
+
+    if not is_sss_application(application):
+        abort(400, description="Physical requirements are only confirmed for SSS applications.")
+    if not schedule_recorded(application):
+        flash("The applicant must have a recorded appointment schedule before confirmation.", "warning")
+        return redirect(url_for("admin.application_detail", application_id=application_id))
+    if is_confirmed(application):
+        flash("Physical requirements are already confirmed for this application.", "info")
+        return redirect(url_for("admin.application_detail", application_id=application_id))
+
+    record, error = confirm(application, current_user)
+    if error:
+        flash(error, "warning")
+        return redirect(url_for("admin.application_detail", application_id=application_id))
+
+    description = "Confirmed submitted documents and completed physical requirements."
+    if record.get("pickup_id"):
+        description += f" Pickup ID {record['pickup_id']} is scheduled for {record['pickup_date_label']}."
+    _log_application_event(application, application.application_status, description)
+    db.session.commit()
+    flash("SSS documents and physical requirements confirmed.", "success")
+    return redirect(url_for("admin.application_detail", application_id=application_id))
+
+
 @admin_bp.route("/admin/applications/<int:application_id>/update", methods=["POST"])
 @role_required(User.ROLE_SYSTEM_ADMIN, User.ROLE_DEPARTMENT_STAFF, User.ROLE_DEPARTMENT_SUPERVISOR)
 def update_application(application_id):
@@ -691,16 +776,19 @@ def update_application(application_id):
     target_key = clean_text(request.form.get("application_status"))
     remarks = clean_text(request.form.get("remarks"))
     from app.services.application_service import read_details, write_details
+    from app.services.nbi_admin import gate_message as nbi_gate_message
     from app.services.passport_admin import (
         gate_message,
         is_passport_application,
         resolve_status_update,
     )
+    from app.services.philsys_admin import gate_message as philsys_gate_message
     from app.services.senior_admin import (
         gate_message as senior_gate_message,
         is_senior_application,
         resolve_status_update as resolve_senior_status_update,
     )
+    from app.services.sss_admin import gate_message as sss_gate_message
 
     passport_application = is_passport_application(application)
     senior_application = is_senior_application(application)
@@ -732,7 +820,13 @@ def update_application(application_id):
         flash("Add a reason when rejecting an application or requesting corrections.", "warning")
         return redirect(url_for("admin.application_detail", application_id=application_id))
 
-    confirmation_gate = gate_message(application) or senior_gate_message(application)
+    confirmation_gate = (
+        gate_message(application)
+        or senior_gate_message(application)
+        or nbi_gate_message(application)
+        or philsys_gate_message(application)
+        or sss_gate_message(application)
+    )
     if confirmation_gate:
         flash(confirmation_gate, "warning")
         return redirect(url_for("admin.application_detail", application_id=application_id))

@@ -85,9 +85,12 @@ def is_confirmed(application):
 
 
 def gate_message(application):
-    if not is_passport_application(application) or is_confirmed(application):
+    if not is_passport_application(application):
         return ""
-    return _config(application).get("gate_message") or (
+    config = _config(application)
+    if not config or is_confirmed(application):
+        return ""
+    return config.get("gate_message") or (
         "Confirm the applicant's documents and physical requirements before updating the application status."
     )
 
@@ -152,7 +155,7 @@ def summary(application):
     method = fulfillment_method(application)
     delivery = read_details(application).get("delivery") or {}
     if method == PICKUP:
-        method_label = "Pickup at DFA office"
+        method_label = "Show up at DFA office to submit documents"
     elif method == DELIVERY:
         method_label = "Home delivery"
     else:
@@ -162,6 +165,7 @@ def summary(application):
         "label": config.get("label") or "Confirm physical requirements",
         "help": config.get("help") or "",
         "gate_message": gate_message(application),
+        "requirements": list(config.get("requirements") or ()),
         "requires_confirmation": True,
         "confirmed": bool(record.get("confirmed")),
         "fulfillment_method": method,

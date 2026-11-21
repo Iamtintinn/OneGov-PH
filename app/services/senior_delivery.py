@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from app import db
 from app.models.notification import Notification
+from app.services.notification_service import should_notify
 from app.services.application_service import field_map, read_details, write_details
 from app.services.senior_scheduling import appointment_for, location_by_code
 from app.utils.validators import clean_text, normalize_contact_number
@@ -211,26 +212,28 @@ def validate_delivery_form(form, application):
 
 def save_pickup(application, user):
     appointment = appointment_for(application) or {}
+    location_label = appointment.get("location_label") or appointment.get("location_code") or ""
     details = read_details(application)
     details["delivery"] = {
         "method": PICKUP,
-        "pickup_location": appointment.get("location_label") or appointment.get("location_code") or "",
+        "pickup_location": location_label,
+        "pickup_address": appointment.get("address") or "",
         "saved_at": _now().isoformat(),
     }
     write_details(application, details, commit=False)
 
-    db.session.add(
-        Notification(
-            user_id=user.user_id,
-            notification_title="Senior Citizen ID pickup selected",
-            notification_message=(
-                "Your Senior Citizen ID demonstration will be picked up at the selected OSCA appointment office."
-            ),
-            notification_type="application",
-            read_status="unread",
-            created_date=_now(),
-        )
-    )
+    _n_user = db.session.get(__import__('app.models.user',fromlist=['User']).User, user.user_id) if not isinstance(user.user_id, __import__('app.models.user',fromlist=['User']).User) else user.user_id
+    if should_notify(_n_user, "application", 'in_app'):
+        db.session.add(Notification(
+        user_id=user.user_id,
+        notification_title="Senior Citizen ID pickup selected",
+        notification_message=(
+        "Your Senior Citizen ID demonstration will be picked up at the selected OSCA appointment office."
+        ),
+        notification_type="application",
+        read_status="unread",
+        created_date=_now(),
+        ))
     db.session.commit()
     return None
 
@@ -266,18 +269,18 @@ def save_delivery(application, user, values):
     details["delivery"] = payload
     write_details(application, details, commit=False)
 
-    db.session.add(
-        Notification(
-            user_id=user.user_id,
-            notification_title="Delivery details saved",
-            notification_message=(
-                "Your Senior Citizen ID home-delivery location and recipient details "
-                f"were saved for {payload['address'] or 'the pinned location'}."
-            ),
-            notification_type="application",
-            read_status="unread",
-            created_date=_now(),
-        )
-    )
+    _n_user = db.session.get(__import__('app.models.user',fromlist=['User']).User, user.user_id) if not isinstance(user.user_id, __import__('app.models.user',fromlist=['User']).User) else user.user_id
+    if should_notify(_n_user, "application", 'in_app'):
+        db.session.add(Notification(
+        user_id=user.user_id,
+        notification_title="Delivery details saved",
+        notification_message=(
+        "Your Senior Citizen ID home-delivery location and recipient details "
+        f"were saved for {payload['address'] or 'the pinned location'}."
+        ),
+        notification_type="application",
+        read_status="unread",
+        created_date=_now(),
+        ))
     db.session.commit()
     return None

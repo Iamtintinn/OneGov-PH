@@ -8,6 +8,7 @@ from sqlalchemy import update
 from app import db
 from app.models.application import Application
 from app.models.notification import Notification
+from app.services.notification_service import should_notify
 from app.services.application_forms import specification_for
 from app.services.application_service import field_map, missing_documents, read_details, write_details
 from app.services.senior_delivery import delivery_fee_for, delivery_for, fulfillment_method
@@ -59,7 +60,7 @@ def payment_summary(application):
         "city": answers.get("city") or "",
         "delivery": delivery,
         "fulfillment_method": method,
-        "fulfillment_label": "Home delivery" if method == "delivery" else "Pickup at OSCA office" if method == "pickup" else "Not selected",
+        "fulfillment_label": "Home delivery" if method == "delivery" else "Show up at OSCA office to submit documents" if method == "pickup" else "Not selected",
         "delivery_fee": delivery_fee,
         "delivery_fee_display": f"₱{delivery_fee:,.2f}",
         "fee_lines": (
@@ -125,18 +126,18 @@ def finalize_senior_application(application, user, new_status="submitted"):
         now,
     )
     notice = spec.get("submit_notice")
-    db.session.add(
-        Notification(
-            user_id=user.user_id,
-            notification_title="Senior Citizen ID request received",
-            notification_message=(
-                notice.format(reference=application.tracking_number)
-                if notice
-                else (
-                    f"Your Senior Citizen ID request {application.tracking_number} was submitted in OneGov PH. "
-                    "No payment was collected for this new application."
-                )
-            ),
+    _n_user = db.session.get(__import__('app.models.user',fromlist=['User']).User, user.user_id) if not isinstance(user.user_id, __import__('app.models.user',fromlist=['User']).User) else user.user_id
+    if should_notify(_n_user, "system", 'in_app'):
+        db.session.add(Notification(
+        user_id=user.user_id,
+        notification_title="Senior Citizen ID request received",
+        notification_message=(
+        notice.format(reference=application.tracking_number)
+        if notice
+        else (
+        f"Your Senior Citizen ID request {application.tracking_number} was submitted in OneGov PH. "
+        "No payment was collected for this new application."
+        )),
             notification_type="application",
             read_status="unread",
             created_date=now,

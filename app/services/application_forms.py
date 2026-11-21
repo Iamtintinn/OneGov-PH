@@ -327,6 +327,7 @@ def compose_birth_certificate(values=None):
         "kicker": "Civil registry assistance",
         "department_label": "PSA assistance",
         "service_title": "Birth Certificate",
+        "admin_status_options": list(ADMIN_STATUS_OPTIONS),
         "process": (
             "OneGov PH records your PSA birth certificate request so you can track the details and documents you prepared. "
             "PSA still issues the certificate."
@@ -382,6 +383,18 @@ def compose_birth_certificate(values=None):
         },
     }
 
+
+ADMIN_STATUS_OPTIONS = (
+    {"key": "application_submitted", "label": "Application Submitted", "legacy_status": "submitted"},
+    {"key": "payment_confirmed", "label": "Payment Confirmed", "legacy_status": "paid"},
+    {"key": "requirements_under_review", "label": "Requirements Under Review", "legacy_status": "under_review"},
+    {"key": "rejected", "label": "Rejected", "legacy_status": "rejected"},
+    {"key": "requirements_verified", "label": "Requirements Verified", "legacy_status": "approved"},
+    {"key": "processing_document", "label": "Processing Document", "legacy_status": "processing"},
+    {"key": "document_approved", "label": "Document Approved", "legacy_status": "approved"},
+    {"key": "ready_for_dispatch", "label": "Ready for Dispatch", "legacy_status": "ready_for_release"},
+    {"key": "completed", "label": "Completed", "legacy_status": "completed"},
+)
 
 SERVICE_FORMS = {
     "Birth Certificate": {"compose": "birth"},
@@ -460,6 +473,11 @@ SERVICE_FORMS = {
             ),
             "pickup_id_prefix": "PU",
             "pickup_lead_business_days": 7,
+            "requirements": [
+                "Original supporting documents for the selected passport application type",
+                "Printed/ready OneGov PH appointment and confirmation details",
+                "Applicant present for DFA personal appearance and biometrics",
+            ],
         },
         "status_labels": {
             "submitted": "Submitted",
@@ -476,6 +494,7 @@ SERVICE_FORMS = {
             "rejected": "Rejected",
             "cancelled": "Cancelled",
         },
+        "admin_status_options": list(ADMIN_STATUS_OPTIONS),
         "submit_event": (
             "Passport appointment and payment were saved in OneGov PH."
         ),
@@ -735,6 +754,7 @@ def compose_barangay_clearance(values=None):
         "kind": "barangay",
         "kicker": "Local government request",
         "department_label": "Barangay assistance",
+        "admin_status_options": list(ADMIN_STATUS_OPTIONS),
         "process": "Prepare a barangay clearance request for the barangay you name below. That barangay still reviews the request and issues the clearance.",
         "fields": fields,
         "documents": documents,
@@ -1057,6 +1077,7 @@ def compose_certificate_of_residency(values=None):
         "kicker": "Local government request",
         "department_label": "Barangay assistance",
         "service_title": "Certificate of Residency",
+        "admin_status_options": list(ADMIN_STATUS_OPTIONS),
         "process": "Prepare a certificate of residency for the barangay or city you name below. That office still verifies your residency and issues the certificate.",
         "fields": fields,
         "documents": tuple(documents),
@@ -1494,6 +1515,7 @@ def compose_senior_citizen_id(values=None):
             "rejected": "Rejected",
             "cancelled": "Cancelled",
         },
+        "admin_status_options": list(ADMIN_STATUS_OPTIONS),
         "senior_confirmation": {
             "label": "Confirm documents and physical appearance",
             "help": (
@@ -1505,6 +1527,11 @@ def compose_senior_citizen_id(values=None):
             ),
             "pickup_id_prefix": "OSCA-PU",
             "pickup_lead_business_days": 7,
+            "requirements": [
+                "Required Senior Citizen ID documents submitted for OSCA verification",
+                "Applicant completed physical appearance at the OSCA office (if required)",
+                "OneGov PH reference/confirmation details available for verification",
+            ],
         },
     }
 
@@ -1847,6 +1874,24 @@ def compose_nbi_clearance(values=None):
             "Your NBI clearance request {reference} was submitted in OneGov PH for monitoring. "
             "It is not an official NBI registration. Biometrics, verification, and clearance issuance remain with NBI."
         ),
+        "physical_requirements_confirmation": {
+            "label": "Confirm physical requirements",
+            "help": (
+                "Confirm that the applicant submitted the required documents and completed "
+                "the physical NBI requirements before changing the application status."
+            ),
+            "gate_message": (
+                "Confirm the applicant's documents and physical requirements before updating the application status or dispatch status."
+            ),
+            "pickup_id_prefix": "NBI-PU",
+            "pickup_lead_business_days": 7,
+            "requirements": [
+                "Valid identification/documents required for the selected NBI application type",
+                "Printed/ready OneGov PH appointment and confirmation details",
+                "Applicant present for NBI biometrics and personal appearance",
+            ],
+        },
+        "admin_status_options": list(ADMIN_STATUS_OPTIONS),
         "status_labels": {
             "submitted": "Submitted",
             "under_review": "Under review",
@@ -2037,6 +2082,7 @@ def compose_cenomar(values=None):
         "kind": "cenomar",
         "kicker": "Civil registry assistance",
         "service_title": "Certificate of No Marriage Record (CENOMAR)",
+        "admin_status_options": list(ADMIN_STATUS_OPTIONS),
         "process": (
             "A CENOMAR is an official certification issued by the Philippine Statistics Authority confirming that "
             "no marriage record has been found under the specified person’s name in the PSA civil registry."
@@ -2670,6 +2716,7 @@ def compose_sss(values=None, service_name=None):
         "recorded_statuses": SSS_RECORDED_STATUSES,
         "document_statuses": SSS_DOCUMENT_STATUSES,
         "file_rules": SSS_FILE_RULES,
+        "admin_status_options": list(ADMIN_STATUS_OPTIONS),
     }
     if is_mysss_card:
         requires_schedule = selected_type == SSS_MYSSS_TYPE_NEW
@@ -2732,6 +2779,23 @@ def compose_sss(values=None, service_name=None):
         if requires_schedule:
             base["reminders"].insert(1, "New MySSS Card applications include a demonstration appointment in OneGov PH; this is not an official SSS booking.")
             base["next_steps"].insert(0, "Attend the demonstration appointment you scheduled and bring the required identification for verification through SSS channels.")
+            base["physical_requirements_confirmation"] = {
+                "label": "Confirm physical requirements",
+                "help": (
+                    "Confirm that the applicant submitted the required documents and completed "
+                    "the physical SSS/MySSS requirements before changing the application status."
+                ),
+                "gate_message": (
+                    "Confirm the applicant's documents and physical requirements before updating the application status or dispatch status."
+                ),
+                "pickup_id_prefix": "SSS-PU",
+                "pickup_lead_business_days": 7,
+                "requirements": [
+                    "Valid primary ID or two alternative IDs (as submitted in the application)",
+                    "Printed OneGov PH reference/confirmation details",
+                    "Applicant present for physical verification at the selected SSS/partner office",
+                ],
+            }
         else:
             base["next_steps"].insert(0, "Provide your home delivery details for this assistance request before payment.")
     return base

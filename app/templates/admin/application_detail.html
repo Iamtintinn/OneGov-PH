@@ -97,7 +97,7 @@
         </div>
         <dl class="review-detail-grid">
             <div><dt>Fulfillment</dt><dd>{{ passport.fulfillment_label }}</dd></div>
-            {% if passport.pickup_location %}<div class="review-detail-wide"><dt>Pickup office</dt><dd>{{ passport.pickup_location }}</dd></div>{% endif %}
+            {% if passport.pickup_location %}<div class="review-detail-wide"><dt>Office address</dt><dd>{{ passport.pickup_location }}</dd></div>{% endif %}
             {% if passport.confirmed %}
             <div><dt>Confirmed by</dt><dd>{{ passport.confirmed_by_name or "Administrator" }}</dd></div>
             <div><dt>Confirmed at</dt><dd>{{ passport.confirmed_at_label or "—" }}</dd></div>
@@ -105,6 +105,14 @@
             {% if passport.pickup_date_label %}<div><dt>Pickup date</dt><dd>{{ passport.pickup_date_label }}</dd></div>{% endif %}
             {% endif %}
         </dl>
+        {% if passport.requirements %}
+        <div class="review-hint">
+            <strong>Physical requirements to confirm:</strong>
+            <ul>
+                {% for item in passport.requirements %}<li>{{ item }}</li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
         {% if not passport.confirmed and (is_system_admin or is_department_admin) %}
         <form class="review-form" method="post" action="{{ url_for('admin.confirm_physical_requirements', application_id=application.application_id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -137,9 +145,17 @@
             <div><dt>Physical appearance</dt><dd>{{ "Confirmed" if senior_confirmation.physical_appearance else "Documents submitted" }}</dd></div>
             {% if senior_confirmation.pickup_id %}<div><dt>Pickup ID</dt><dd class="review-mono">{{ senior_confirmation.pickup_id }}</dd></div>{% endif %}
             {% if senior_confirmation.pickup_date_label %}<div><dt>Pickup date</dt><dd>{{ senior_confirmation.pickup_date_label }}</dd></div>{% endif %}
-            {% if senior_confirmation.pickup_location %}<div class="review-detail-wide"><dt>Pickup office</dt><dd>{{ senior_confirmation.pickup_location }}</dd></div>{% endif %}
+            {% if senior_confirmation.pickup_location %}<div class="review-detail-wide"><dt>Office address</dt><dd>{{ senior_confirmation.pickup_location }}</dd></div>{% endif %}
             {% endif %}
         </dl>
+        {% if senior_confirmation.requirements %}
+        <div class="review-hint">
+            <strong>Physical requirements to confirm:</strong>
+            <ul>
+                {% for item in senior_confirmation.requirements %}<li>{{ item }}</li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
         {% if not senior_confirmation.confirmed and (is_system_admin or is_department_admin) %}
         <form class="review-form" method="post" action="{{ url_for('admin.confirm_senior_requirements', application_id=application.application_id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -161,21 +177,125 @@
     </section>
     {% endif %}
 
-    {% set nbi_fulfillment = tracking.nbi_fulfillment %}
-    {% if nbi_fulfillment %}
-    <section class="review-card review-passport-confirmation-card" id="nbi-fulfillment">
+    {% set nbi_confirmation = tracking.nbi_confirmation %}
+    {% if nbi_confirmation and nbi_confirmation.schedule_recorded %}
+    <section class="review-card review-passport-confirmation-card" id="nbi-confirmation">
         <div class="review-card-heading">
-            <div><p class="review-kicker">NBI CLEARANCE DELIVERY</p><h2>Pickup or home delivery</h2></div>
-            <span class="admin-status-pill admin-status-pill--{{ 'approved' if nbi_fulfillment.method else 'pending' }}">{{ 'Selected' if nbi_fulfillment.method else 'Not selected' }}</span>
+            <div><p class="review-kicker">NBI REQUIREMENTS</p><h2>Documents and physical requirements</h2></div>
+            <span class="admin-status-pill admin-status-pill--{{ 'approved' if nbi_confirmation.confirmed else 'pending' }}">{{ 'Confirmed' if nbi_confirmation.confirmed else 'Pending confirmation' }}</span>
         </div>
         <dl class="review-detail-grid">
-            <div><dt>Fulfillment</dt><dd>{{ 'Home delivery' if nbi_fulfillment.method == 'delivery' else 'Pickup at NBI Clearance Center' }}</dd></div>
-            <div class="review-detail-wide"><dt>{% if nbi_fulfillment.method == 'delivery' %}Delivery address{% else %}Pickup office{% endif %}</dt><dd>{{ tracking.citizen_delivery.address or tracking.citizen_delivery.pickup_location or '—' }}</dd></div>
+            <div><dt>Fulfillment</dt><dd>{{ nbi_confirmation.fulfillment_label }}</dd></div>
+            <div class="review-detail-wide"><dt>{% if nbi_confirmation.fulfillment_method == 'delivery' %}Delivery address{% else %}Office address{% endif %}</dt><dd>{{ tracking.citizen_delivery.address or nbi_confirmation.pickup_location or nbi_confirmation.pickup_address or '—' }}</dd></div>
+            {% if nbi_confirmation.confirmed %}
+            <div><dt>Confirmed by</dt><dd>{{ nbi_confirmation.confirmed_by_name or "Administrator" }}</dd></div>
+            <div><dt>Confirmed at</dt><dd>{{ nbi_confirmation.confirmed_at_label or "—" }}</dd></div>
+            {% if nbi_confirmation.pickup_id %}<div><dt>Pickup ID</dt><dd class="review-mono">{{ nbi_confirmation.pickup_id }}</dd></div>{% endif %}
+            {% if nbi_confirmation.pickup_date_label %}<div><dt>Pickup date</dt><dd>{{ nbi_confirmation.pickup_date_label }}</dd></div>{% endif %}
+            {% endif %}
         </dl>
-        {% if nbi_fulfillment.method == 'pickup' %}
-        <p class="review-hint">Pickup details are ready. Update the application status to Ready for Pickup when the clearance is available.</p>
+        {% if nbi_confirmation.requirements %}
+        <div class="review-hint">
+            <strong>Physical requirements to confirm:</strong>
+            <ul>
+                {% for item in nbi_confirmation.requirements %}<li>{{ item }}</li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        {% if not nbi_confirmation.confirmed and (is_system_admin or is_department_admin) %}
+        <form class="review-form" method="post" action="{{ url_for('admin.confirm_nbi_requirements', application_id=application.application_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p class="review-hint">{{ nbi_confirmation.help }}</p>
+            <div class="review-form-actions"><button class="admin-button admin-button--primary" type="submit">Confirm documents and physical requirements</button></div>
+        </form>
+        {% elif not nbi_confirmation.confirmed %}
+        <p class="review-hint">Only administrators can confirm physical requirements.</p>
+        {% elif nbi_confirmation.fulfillment_method == 'pickup' %}
+        <p class="review-hint">Confirmation complete. Update the application status to Ready for Pickup when the clearance is available.</p>
         {% else %}
-        <p class="review-hint">Home delivery details are available for dispatch after the clearance is ready for release.</p>
+        <p class="review-hint">Confirmation complete. You can now update the application status and delivery details.</p>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% set philsys_confirmation = tracking.philsys_confirmation %}
+    {% if philsys_confirmation and philsys_confirmation.schedule_recorded %}
+    <section class="review-card review-passport-confirmation-card" id="philsys-confirmation">
+        <div class="review-card-heading">
+            <div><p class="review-kicker">PHILSYS REQUIREMENTS</p><h2>Documents and physical requirements</h2></div>
+            <span class="admin-status-pill admin-status-pill--{{ 'approved' if philsys_confirmation.confirmed else 'pending' }}">{{ 'Confirmed' if philsys_confirmation.confirmed else 'Pending confirmation' }}</span>
+        </div>
+        <dl class="review-detail-grid">
+            <div><dt>Fulfillment</dt><dd>{{ philsys_confirmation.fulfillment_label }}</dd></div>
+            <div class="review-detail-wide"><dt>{% if philsys_confirmation.fulfillment_method == 'delivery' %}Delivery address{% else %}Office address{% endif %}</dt><dd>{{ tracking.citizen_delivery.address or philsys_confirmation.pickup_location or philsys_confirmation.pickup_address or '—' }}</dd></div>
+            {% if philsys_confirmation.confirmed %}
+            <div><dt>Confirmed by</dt><dd>{{ philsys_confirmation.confirmed_by_name or "Administrator" }}</dd></div>
+            <div><dt>Confirmed at</dt><dd>{{ philsys_confirmation.confirmed_at_label or "—" }}</dd></div>
+            {% if philsys_confirmation.pickup_id %}<div><dt>Pickup ID</dt><dd class="review-mono">{{ philsys_confirmation.pickup_id }}</dd></div>{% endif %}
+            {% if philsys_confirmation.pickup_date_label %}<div><dt>Pickup date</dt><dd>{{ philsys_confirmation.pickup_date_label }}</dd></div>{% endif %}
+            {% endif %}
+        </dl>
+        {% if philsys_confirmation.requirements %}
+        <div class="review-hint">
+            <strong>Physical requirements to confirm:</strong>
+            <ul>
+                {% for item in philsys_confirmation.requirements %}<li>{{ item }}</li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        {% if not philsys_confirmation.confirmed and (is_system_admin or is_department_admin) %}
+        <form class="review-form" method="post" action="{{ url_for('admin.confirm_philsys_requirements', application_id=application.application_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p class="review-hint">{{ philsys_confirmation.help }}</p>
+            <div class="review-form-actions"><button class="admin-button admin-button--primary" type="submit">Confirm documents and physical requirements</button></div>
+        </form>
+        {% elif not philsys_confirmation.confirmed %}
+        <p class="review-hint">Only administrators can confirm physical requirements.</p>
+        {% elif philsys_confirmation.fulfillment_method == 'pickup' %}
+        <p class="review-hint">Confirmation complete. Update the application status to Ready for Pickup when the ID is available.</p>
+        {% else %}
+        <p class="review-hint">Confirmation complete. You can now update the application status and delivery details.</p>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% set sss_confirmation = tracking.sss_confirmation %}
+    {% if sss_confirmation and sss_confirmation.schedule_recorded %}
+    <section class="review-card review-passport-confirmation-card" id="sss-confirmation">
+        <div class="review-card-heading">
+            <div><p class="review-kicker">SSS REQUIREMENTS</p><h2>Documents and physical requirements</h2></div>
+            <span class="admin-status-pill admin-status-pill--{{ 'approved' if sss_confirmation.confirmed else 'pending' }}">{{ 'Confirmed' if sss_confirmation.confirmed else 'Pending confirmation' }}</span>
+        </div>
+        <dl class="review-detail-grid">
+            <div><dt>Fulfillment</dt><dd>{{ sss_confirmation.fulfillment_label }}</dd></div>
+            <div class="review-detail-wide"><dt>{% if sss_confirmation.fulfillment_method == 'delivery' %}Delivery address{% else %}Office address{% endif %}</dt><dd>{{ tracking.citizen_delivery.address or sss_confirmation.pickup_location or sss_confirmation.pickup_address or '—' }}</dd></div>
+            {% if sss_confirmation.confirmed %}
+            <div><dt>Confirmed by</dt><dd>{{ sss_confirmation.confirmed_by_name or "Administrator" }}</dd></div>
+            <div><dt>Confirmed at</dt><dd>{{ sss_confirmation.confirmed_at_label or "—" }}</dd></div>
+            {% if sss_confirmation.pickup_id %}<div><dt>Pickup ID</dt><dd class="review-mono">{{ sss_confirmation.pickup_id }}</dd></div>{% endif %}
+            {% if sss_confirmation.pickup_date_label %}<div><dt>Pickup date</dt><dd>{{ sss_confirmation.pickup_date_label }}</dd></div>{% endif %}
+            {% endif %}
+        </dl>
+        {% if sss_confirmation.requirements %}
+        <div class="review-hint">
+            <strong>Physical requirements to confirm:</strong>
+            <ul>
+                {% for item in sss_confirmation.requirements %}<li>{{ item }}</li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        {% if not sss_confirmation.confirmed and (is_system_admin or is_department_admin) %}
+        <form class="review-form" method="post" action="{{ url_for('admin.confirm_sss_requirements', application_id=application.application_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p class="review-hint">{{ sss_confirmation.help }}</p>
+            <div class="review-form-actions"><button class="admin-button admin-button--primary" type="submit">Confirm documents and physical requirements</button></div>
+        </form>
+        {% elif not sss_confirmation.confirmed %}
+        <p class="review-hint">Only administrators can confirm physical requirements.</p>
+        {% elif sss_confirmation.fulfillment_method == 'pickup' %}
+        <p class="review-hint">Confirmation complete. Update the application status to Ready for Pickup when the card is available.</p>
+        {% else %}
+        <p class="review-hint">Confirmation complete. You can now update the application status and delivery details.</p>
         {% endif %}
     </section>
     {% endif %}
@@ -186,39 +306,25 @@
                 <div><p class="review-kicker">APPLICATION PROCESSING</p><h2>Application status</h2></div>
                 <span class="admin-status-pill admin-status-pill--{{ application.application_status }}">{{ tracking.processing_label }}</span>
             </div>
-            {% if passport and not passport.confirmed %}
-            <p class="review-hint">{{ passport.gate_message }}</p>
-            {% elif senior_confirmation and not senior_confirmation.confirmed %}
-            <p class="review-hint">{{ senior_confirmation.gate_message }}</p>
-            {% elif tracking.can_update_status %}
+            {% if tracking.can_update_status %}
             <form class="review-form" method="post" action="{{ url_for('admin_portal.tracking') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="action" value="update_status">
                 <input type="hidden" name="return_to" value="detail">
                 <input type="hidden" name="application_id" value="{{ application.application_id }}">
+                {% if tracking.status_update_locked %}
+                <p class="review-hint">{{ tracking.status_update_gate_message }}</p>
+                {% endif %}
                 <label class="review-field">Status selection
-                    <select name="processing_status" required>
+                    <select name="processing_status" required {% if tracking.status_update_locked %}disabled{% endif %}>
                         <option value="" disabled {% if not tracking.processing_selected %}selected{% endif %}>Select processing status</option>
                         {% for key, label, legacy in processing_statuses %}<option value="{{ key }}" {% if tracking.processing_selected == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
                     </select>
                 </label>
-                <label class="review-field">Remarks or update notes<textarea name="remarks" maxlength="500" rows="3" placeholder="Optional notes for this status update"></textarea></label>
-                <div class="review-form-actions"><button class="admin-button admin-button--primary" type="submit">Save Processing Status</button></div>
+                <label class="review-field">Remarks or update notes<textarea name="remarks" maxlength="500" rows="3" placeholder="Optional notes for this status update" {% if tracking.status_update_locked %}disabled{% endif %}></textarea></label>
+                <div class="review-form-actions"><button class="admin-button admin-button--primary" type="submit" {% if tracking.status_update_locked %}disabled{% endif %}>Save Processing Status</button></div>
             </form>
             {% else %}<p class="admin-empty">This application is closed and cannot be updated here.</p>{% endif %}
-            {% if not passport and not senior_confirmation and tracking.citizen_delivery.get('method') != 'delivery' %}
-            <details class="review-secondary-form">
-                <summary>Request correction or other status update</summary>
-                <form class="review-form" method="post" action="{{ url_for('admin.update_application', application_id=application.application_id) }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <label class="review-field">Application status
-                        <select name="application_status" required>{% for status in statuses if status != 'draft' %}<option value="{{ status }}" {% if application.application_status == status %}selected{% endif %}>{{ status_labels[status] }}</option>{% endfor %}</select>
-                    </label>
-                    <label class="review-field">Remarks or correction request<textarea name="remarks" maxlength="500" rows="3" placeholder="Explain the update or tell the citizen what to correct."></textarea><small>Required for rejection or correction requests.</small></label>
-                    <div class="review-form-actions"><button class="admin-button admin-button--quiet" type="submit" onclick="return confirm('Save this application status and notify the citizen?');">Save Update</button></div>
-                </form>
-            </details>
-            {% endif %}
         </div>
 
         <div class="review-card review-delivery-card" id="delivery-management">
@@ -226,24 +332,71 @@
                 <div><p class="review-kicker">DELIVERY MANAGEMENT</p><h2>Dispatch status</h2></div>
                 <span class="admin-status-pill admin-status-pill--{{ tracking.delivery.status or 'pending' }}">{{ tracking.delivery.label }}</span>
             </div>
+            {% set pickup = namespace(active=false, label='Pickup', location='', pickup_id='', pickup_date='', confirmed=false) %}
             {% if passport and passport.fulfillment_method == 'pickup' %}
-            <dl class="review-detail-grid">
-                <div><dt>Fulfillment</dt><dd>Pickup at DFA office</dd></div>
-                {% if passport.pickup_location %}<div class="review-detail-wide"><dt>Pickup office</dt><dd>{{ passport.pickup_location }}</dd></div>{% endif %}
-                {% if passport.confirmed %}
-                <div><dt>Pickup ID</dt><dd class="review-mono">{{ passport.pickup_id }}</dd></div>
-                <div><dt>Pickup date</dt><dd>{{ passport.pickup_date_label }}</dd></div>
-                {% else %}<div class="review-detail-wide"><dt>Pickup details</dt><dd>Available after confirming physical requirements.</dd></div>{% endif %}
-            </dl>
+                {% set pickup.active = true %}
+                {% set pickup.label = 'Show up at DFA office to submit documents' %}
+                {% set pickup.location = passport.pickup_location or tracking.citizen_delivery.pickup_location or '—' %}
+                {% set pickup.pickup_id = passport.pickup_id or '' %}
+                {% set pickup.pickup_date = passport.pickup_date_label or '' %}
+                {% set pickup.confirmed = passport.confirmed %}
+            {% elif senior_confirmation and senior_confirmation.fulfillment_method == 'pickup' %}
+                {% set pickup.active = true %}
+                {% set pickup.label = senior_confirmation.fulfillment_label or 'Show up at OSCA office to submit documents' %}
+                {% set pickup.location = senior_confirmation.pickup_location or tracking.citizen_delivery.pickup_location or '—' %}
+                {% set pickup.pickup_id = senior_confirmation.pickup_id or '' %}
+                {% set pickup.pickup_date = senior_confirmation.pickup_date_label or '' %}
+                {% set pickup.confirmed = senior_confirmation.confirmed %}
+            {% elif nbi_confirmation and nbi_confirmation.fulfillment_method == 'pickup' %}
+                {% set pickup.active = true %}
+                {% set pickup.label = nbi_confirmation.fulfillment_label or 'Show up at NBI Clearance Center to submit documents' %}
+                {% set pickup.location = nbi_confirmation.pickup_location or nbi_confirmation.pickup_address or tracking.citizen_delivery.pickup_location or '—' %}
+                {% set pickup.pickup_id = nbi_confirmation.pickup_id or '' %}
+                {% set pickup.pickup_date = nbi_confirmation.pickup_date_label or '' %}
+                {% set pickup.confirmed = nbi_confirmation.confirmed %}
+            {% elif philsys_confirmation and philsys_confirmation.fulfillment_method == 'pickup' %}
+                {% set pickup.active = true %}
+                {% set pickup.label = philsys_confirmation.fulfillment_label or 'Show up at registration center to submit documents' %}
+                {% set pickup.location = philsys_confirmation.pickup_location or philsys_confirmation.pickup_address or tracking.citizen_delivery.pickup_location or '—' %}
+                {% set pickup.pickup_id = philsys_confirmation.pickup_id or '' %}
+                {% set pickup.pickup_date = philsys_confirmation.pickup_date_label or '' %}
+                {% set pickup.confirmed = philsys_confirmation.confirmed %}
+            {% elif sss_confirmation and sss_confirmation.fulfillment_method == 'pickup' %}
+                {% set pickup.active = true %}
+                {% set pickup.label = sss_confirmation.fulfillment_label or 'Show up at SSS/partner office to submit documents' %}
+                {% set pickup.location = sss_confirmation.pickup_location or sss_confirmation.pickup_address or tracking.citizen_delivery.pickup_location or '—' %}
+                {% set pickup.pickup_id = sss_confirmation.pickup_id or '' %}
+                {% set pickup.pickup_date = sss_confirmation.pickup_date_label or '' %}
+                {% set pickup.confirmed = sss_confirmation.confirmed %}
             {% elif tracking.senior_fulfillment and tracking.senior_fulfillment.method == 'pickup' %}
-            <dl class="review-detail-grid">
-                <div><dt>Fulfillment</dt><dd>Pickup at OSCA office</dd></div>
-                <div class="review-detail-wide"><dt>Pickup office</dt><dd>{{ tracking.citizen_delivery.pickup_location or '—' }}</dd></div>
-            </dl>
+                {% set pickup.active = true %}
+                {% set pickup.label = 'Show up at OSCA office to submit documents' %}
+                {% set pickup.location = tracking.citizen_delivery.pickup_location or '—' %}
             {% elif tracking.nbi_fulfillment and tracking.nbi_fulfillment.method == 'pickup' %}
+                {% set pickup.active = true %}
+                {% set pickup.label = 'Show up at NBI Clearance Center to submit documents' %}
+                {% set pickup.location = tracking.citizen_delivery.pickup_location or '—' %}
+            {% elif tracking.philsys_fulfillment and tracking.philsys_fulfillment.method == 'pickup' %}
+                {% set pickup.active = true %}
+                {% set pickup.label = 'Show up at registration center to submit documents' %}
+                {% set pickup.location = tracking.citizen_delivery.pickup_location or '—' %}
+            {% elif tracking.sss_fulfillment and tracking.sss_fulfillment.method == 'pickup' %}
+                {% set pickup.active = true %}
+                {% set pickup.label = 'Show up at SSS/partner office to submit documents' %}
+                {% set pickup.location = tracking.citizen_delivery.pickup_location or '—' %}
+            {% endif %}
+            {% if pickup.active %}
+            {% set pickup_ready = application.application_status in ['ready_for_release', 'completed'] or tracking.processing_selected == 'ready_for_dispatch' or tracking.processing_label == 'Ready for Pickup' or tracking.delivery.label == 'Ready for Pickup' %}
             <dl class="review-detail-grid">
-                <div><dt>Fulfillment</dt><dd>Pickup at NBI Clearance Center</dd></div>
-                <div class="review-detail-wide"><dt>Pickup office</dt><dd>{{ tracking.citizen_delivery.pickup_location or '—' }}</dd></div>
+                <div><dt>Fulfillment</dt><dd>{{ pickup.label }}</dd></div>
+                <div class="review-detail-wide"><dt>Office address</dt><dd>{{ pickup.location or '—' }}</dd></div>
+                {% if pickup_ready and pickup.confirmed and pickup.pickup_id %}
+                <div><dt>Pickup ID</dt><dd class="review-mono">{{ pickup.pickup_id }}</dd></div>
+                {% elif pickup_ready and not pickup.confirmed %}
+                <div class="review-detail-wide"><dt>Pickup ID</dt><dd>Available after confirming physical requirements.</dd></div>
+                {% else %}
+                <div class="review-detail-wide"><dt>Pickup ID</dt><dd>Available when application status is set to Ready for Pickup.</dd></div>
+                {% endif %}
             </dl>
             {% elif is_system_admin or is_department_admin %}
             <fieldset class="review-delivery-fieldset" {% if not tracking.can_manage_delivery %}disabled{% endif %}>
@@ -275,7 +428,7 @@
                 </form>
             </div>
             </fieldset>
-            {% if passport and passport.gate_message %}<p class="review-hint">{{ passport.gate_message }}</p>{% elif senior_confirmation and senior_confirmation.gate_message %}<p class="review-hint">{{ senior_confirmation.gate_message }}</p>{% elif not tracking.can_manage_delivery %}<p class="review-hint">Set the application to Ready for Dispatch to enable courier and delivery updates.</p>{% elif tracking.delivery.status == "courier_assigned" %}<p class="review-hint">The animated route progresses once the courier marks the document Picked Up.</p>{% elif not tracking.delivery.status %}<p class="review-hint">Assign a courier, then set Picked Up to begin the animated delivery route.</p>{% endif %}
+            {% if tracking.status_update_locked %}<p class="review-hint">{{ tracking.status_update_gate_message }}</p>{% elif not tracking.can_manage_delivery %}<p class="review-hint">Set the application to Ready for Dispatch to enable courier and delivery updates.</p>{% elif tracking.delivery.status == "courier_assigned" %}<p class="review-hint">The animated route progresses once the courier marks the document Picked Up.</p>{% elif not tracking.delivery.status %}<p class="review-hint">Assign a courier, then set Picked Up to begin the animated delivery route.</p>{% endif %}
             {% else %}<p class="admin-muted">Delivery controls are reserved for administrators.</p>{% endif %}
         </div>
     </section>

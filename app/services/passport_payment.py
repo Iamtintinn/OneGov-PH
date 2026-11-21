@@ -9,6 +9,7 @@ from sqlalchemy import update
 from app import db
 from app.models.application import Application
 from app.models.notification import Notification
+from app.services.notification_service import should_notify
 from app.models.payment import Payment
 from app.models.user import User
 from app.services.application_forms import specification_for
@@ -168,18 +169,18 @@ def finalize_passport_application(application, user, new_status):
         now,
     )
     notice = spec.get("submit_notice")
-    db.session.add(
-        Notification(
-            user_id=user.user_id,
-            notification_title="Appointment confirmed (demo)",
-            notification_message=(
-                notice.format(reference=application.tracking_number)
-                if notice
-                else (
-                    f"Your passport demonstration request {application.tracking_number} was saved. "
-                    "This is not an official DFA appointment."
-                )
-            ),
+    _n_user = db.session.get(__import__('app.models.user',fromlist=['User']).User, user.user_id) if not isinstance(user.user_id, __import__('app.models.user',fromlist=['User']).User) else user.user_id
+    if should_notify(_n_user, "system", 'in_app'):
+        db.session.add(Notification(
+        user_id=user.user_id,
+        notification_title="Appointment confirmed (demo)",
+        notification_message=(
+        notice.format(reference=application.tracking_number)
+        if notice
+        else (
+        f"Your passport demonstration request {application.tracking_number} was saved. "
+        "This is not an official DFA appointment."
+        )),
             notification_type="appointment",
             read_status="unread",
             created_date=now,
@@ -250,16 +251,16 @@ def record_demo_payment(application, user, choice, online_method=None):
                 transaction_date=now if status == "paid" else None,
             )
         )
-    db.session.add(
-        Notification(
+        _n_user = db.session.get(__import__('app.models.user',fromlist=['User']).User, user.user_id) if not isinstance(user.user_id, __import__('app.models.user',fromlist=['User']).User) else user.user_id
+        if should_notify(_n_user, "payment", 'in_app'):
+            db.session.add(Notification(
             user_id=user.user_id,
             notification_title=title,
             notification_message=message,
             notification_type="payment",
             read_status="unread",
             created_date=now,
-        )
-    )
+            ))
     db.session.commit()
     return finalize_passport_application(application, user, app_status)
 
@@ -346,19 +347,19 @@ def start_maya_checkout(application, user):
     payment.payment_method = "maya"
     payment.payment_status = "pending"
     payment.transaction_date = None
-    db.session.add(
-        Notification(
-            user_id=user.user_id,
-            notification_title="Maya Checkout started",
-            notification_message=(
-                f"Sandbox Maya checkout was created for ₱{amount:,.2f} "
-                f"(ref {payment.payment_reference}). Complete payment on Maya’s page."
-            ),
-            notification_type="payment",
-            read_status="unread",
-            created_date=now,
-        )
-    )
+    _n_user = db.session.get(__import__('app.models.user',fromlist=['User']).User, user.user_id) if not isinstance(user.user_id, __import__('app.models.user',fromlist=['User']).User) else user.user_id
+    if should_notify(_n_user, "payment", 'in_app'):
+        db.session.add(Notification(
+        user_id=user.user_id,
+        notification_title="Maya Checkout started",
+        notification_message=(
+        f"Sandbox Maya checkout was created for ₱{amount:,.2f} "
+        f"(ref {payment.payment_reference}). Complete payment on Maya’s page."
+        ),
+        notification_type="payment",
+        read_status="unread",
+        created_date=now,
+        ))
     db.session.commit()
     return checkout["redirectUrl"], None
 
@@ -383,19 +384,19 @@ def _apply_verified_status(payment, application, local_status, maya_status, sour
         payment.payment_status = "paid"
         payment.transaction_date = now
         user_id = application.applicant_id
-        db.session.add(
-            Notification(
-                user_id=user_id,
-                notification_title="Maya payment successful",
-                notification_message=(
-                    f"Maya sandbox payment {payment.payment_reference} was verified as paid "
-                    f"(₱{float(payment.amount):,.2f}). Source: {source}."
-                ),
-                notification_type="payment",
-                read_status="unread",
-                created_date=now,
-            )
-        )
+        _n_user = db.session.get(__import__('app.models.user',fromlist=['User']).User, user_id) if not isinstance(user_id, __import__('app.models.user',fromlist=['User']).User) else user_id
+        if should_notify(_n_user, "payment", 'in_app'):
+            db.session.add(Notification(
+            user_id=user_id,
+            notification_title="Maya payment successful",
+            notification_message=(
+            f"Maya sandbox payment {payment.payment_reference} was verified as paid "
+            f"(₱{float(payment.amount):,.2f}). Source: {source}."
+            ),
+            notification_type="payment",
+            read_status="unread",
+            created_date=now,
+            ))
         db.session.commit()
         user = db.session.get(User, user_id)
         if user is not None and application.application_status == "draft":
@@ -423,19 +424,19 @@ def _apply_verified_status(payment, application, local_status, maya_status, sour
     if local_status in {"failed", "cancelled"}:
         payment.payment_status = local_status
         payment.transaction_date = None
-        db.session.add(
-            Notification(
-                user_id=application.applicant_id,
-                notification_title=f"Maya payment {local_status}",
-                notification_message=(
-                    f"Maya sandbox payment {payment.payment_reference} is {local_status} "
-                    f"({maya_status or 'no status'}). Source: {source}."
-                ),
-                notification_type="payment",
-                read_status="unread",
-                created_date=now,
-            )
-        )
+        _n_user = db.session.get(__import__('app.models.user',fromlist=['User']).User, application.applicant_id) if not isinstance(application.applicant_id, __import__('app.models.user',fromlist=['User']).User) else application.applicant_id
+        if should_notify(_n_user, "payment", 'in_app'):
+            db.session.add(Notification(
+            user_id=application.applicant_id,
+            notification_title=f"Maya payment {local_status}",
+            notification_message=(
+            f"Maya sandbox payment {payment.payment_reference} is {local_status} "
+            f"({maya_status or 'no status'}). Source: {source}."
+            ),
+            notification_type="payment",
+            read_status="unread",
+            created_date=now,
+            ))
         db.session.commit()
         return local_status, None
 

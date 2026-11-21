@@ -4,20 +4,44 @@
 {% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
 {% block content %}
 <div class="dash-page site-width">
-    <section class="dash-section" aria-labelledby="applications-heading">
-        <p class="dash-kicker">Your requests</p>
-        <h1 id="applications-heading">My applications</h1>
+    <section class="dash-section citizen-list-page" aria-labelledby="applications-heading">
+        <div class="citizen-list-head">
+            <div>
+                <p class="dash-kicker">Your requests</p>
+                <h1 id="applications-heading">My applications</h1>
+                <p class="citizen-list-sub">View, search, and filter all applications submitted with your account.</p>
+            </div>
+            <div class="citizen-list-count"><strong>{{ filtered_count }}</strong><span>{{ 'result' if filtered_count == 1 else 'results' }}</span></div>
+        </div>
+
+        <form class="citizen-filter-bar" method="get" role="search" aria-label="Filter applications">
+            <label class="citizen-filter-search">
+                <span class="visually-hidden">Search applications</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>
+                <input type="search" name="q" value="{{ q }}" placeholder="Search by tracking number, service, or department">
+            </label>
+            <label class="citizen-filter-select">
+                <span class="visually-hidden">Filter by status</span>
+                <select name="status">
+                    <option value="">All statuses</option>
+                    {% for key, label in status_options %}<option value="{{ key }}" {% if selected_status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+            </label>
+            <button class="citizen-filter-btn" type="submit">Search</button>
+            {% if q or selected_status %}<a class="citizen-filter-clear" href="{{ url_for('citizen.applications') }}">Clear</a>{% endif %}
+        </form>
+
         {% if applications %}
-        <div class="table-wrap">
-            <table class="app-table">
+        <div class="table-wrap citizen-table-wrap">
+            <table class="app-table citizen-app-table">
                 <caption class="visually-hidden">Applications submitted on your account</caption>
                 <thead>
                     <tr>
                         <th scope="col">Application ID</th>
-                        <th scope="col">Service name</th>
+                        <th scope="col">Service</th>
                         <th scope="col">Department</th>
                         <th scope="col">Date submitted</th>
-                        <th scope="col">Current status</th>
+                        <th scope="col">Status</th>
                         <th scope="col">Payment</th>
                         <th scope="col">Action</th>
                     </tr>
@@ -25,20 +49,30 @@
                 <tbody>
                     {% for application in applications %}
                     <tr>
-                        <td data-label="Application ID">{{ application.tracking_number }}</td>
-                        <td data-label="Service name">{{ application.service.service_name }}</td>
+                        <td data-label="Application ID"><span class="citizen-mono">{{ application.tracking_number }}</span></td>
+                        <td data-label="Service"><strong>{{ application.service.service_name }}</strong></td>
                         <td data-label="Department">{{ application.department.department_name }}</td>
                         <td data-label="Date submitted">{{ application.submission_date.strftime("%d %b %Y") }}</td>
-                        <td data-label="Current status">{% set labels = status_labels_for(application.service, application) %}{% with status=application.application_status, labels=labels %}{% include "applications/_status.html" %}{% endwith %}</td>
-                        <td data-label="Payment">{% if application.payment_status %}{% with status=application.payment_status, labels=payment_status_labels %}{% include "applications/_status.html" %}{% endwith %}{% else %}No payment recorded{% endif %}</td>
-                        <td data-label="Action">{% if application.application_status == 'draft' %}<a href="{{ url_for('citizen.application_continue', application_id=application.application_id) }}">Continue</a>{% else %}<a href="{{ url_for('citizen.application_detail', application_id=application.application_id) }}">View details</a>{% endif %}</td>
+                        <td data-label="Status">{% set labels = status_labels_for(application.service, application) %}{% with status=application.application_status, labels=labels %}{% include "applications/_status.html" %}{% endwith %}</td>
+                        <td data-label="Payment">{% if application.payment_status %}{% with status=application.payment_status, labels=payment_status_labels %}{% include "applications/_status.html" %}{% endwith %}{% else %}<span class="citizen-muted">No payment</span>{% endif %}</td>
+                        <td data-label="Action">{% if application.application_status == 'draft' %}<a class="citizen-row-action" href="{{ url_for('citizen.application_continue', application_id=application.application_id) }}">Continue</a>{% else %}<a class="citizen-row-action" href="{{ url_for('citizen.application_detail', application_id=application.application_id) }}">View details <span aria-hidden="true">→</span></a>{% endif %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        {% elif total_count > 0 %}
+        <div class="citizen-empty-state">
+            <h2>No applications found</h2>
+            <p>Try adjusting your search or status filter.</p>
+            <a class="citizen-filter-clear" href="{{ url_for('citizen.applications') }}">Clear filters</a>
+        </div>
         {% else %}
-        <p class="empty-state" role="status">You have not submitted any applications yet.</p>
+        <div class="citizen-empty-state">
+            <h2>No applications yet</h2>
+            <p>You have not submitted any applications. Start by browsing available services.</p>
+            <a class="citizen-filter-btn" href="{{ url_for('citizen.services') }}">Browse services</a>
+        </div>
         {% endif %}
     </section>
 </div>
