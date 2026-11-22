@@ -5,7 +5,7 @@
 {% set can_manage_services = is_admin_console_user or 'services.manage' in (current_user.admin_permissions or []) %}
 {% set can_review_applications = is_admin_console_user or 'applications.review' in (current_user.admin_permissions or []) %}
 {% set admin_home = 'admin.dashboard' %}
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
 <aside id="citizen-sidebar" class="dash-sidebar shell-sidebar" aria-label="Administrator navigation">
     <a class="dash-brand sidebar-brand" href="{{ url_for(admin_home) }}">
         <span class="brand-mark">

@@ -1,9 +1,13 @@
+import csv
+import io
+import json
 import re
 import secrets
 import string
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, send_file, url_for
+from flask import Blueprint, Response, abort, flash, redirect, render_template, request, send_file, url_for
 from flask_login import current_user
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
@@ -17,16 +21,19 @@ from app.models.application import (
     ApplicationRequirement,
 )
 from app.models.department import Department
+from app.models.audit_log import AuditLog
 from app.models.notification import Notification
 from app.models.payment import Payment
 from app.models.service import Service
 from app.models.user import AccountActivityLog, User
 from app.services.application_service import absolute_upload, field_map
 from app.utils.access import (
+    is_admin_console_user,
     is_department_admin,
     is_system_admin,
     managed_account_query,
     visible_application_query,
+    visible_notification_query,
     visible_payment_query,
     visible_service_query,
 )
@@ -369,111 +376,392 @@ def _account_form_values(user=None):
     }
 
 
+def _dashboard_range(now=None):
+    now = now or datetime.now()
+    today = now.date()
+    preset = clean_text(request.args.get("range")) or "this_month"
+    start = end = None
+    label = "This Month"
+    if preset == "today":
+        start = datetime.combine(today, time.min)
+        end = datetime.combine(today, time.max)
+        label = "Today"
+    elif preset == "this_week":
+        start = datetime.combine(today - timedelta(days=today.weekday()), time.min)
+        end = now
+        label = "This Week"
+    elif preset == "this_year":
+        start = datetime(now.year, 1, 1)
+        end = now
+        label = "This Year"
+    elif preset == "custom":
+        raw_start = clean_text(request.args.get("start"))
+        raw_end = clean_text(request.args.get("end"))
+        try:
+            ds = datetime.strptime(raw_start, "%Y-%m-%d") if raw_start else None
+            de = datetime.strptime(raw_end, "%Y-%m-%d") if raw_end else None
+        except Exception:
+            ds = de = None
+        if ds:
+            start = datetime.combine(ds.date(), time.min)
+        if de:
+            end = datetime.combine(de.date(), time.max)
+        label = "Custom Range" if start or end else "This Month"
+        preset = "custom"
+    if preset != "custom":
+        # default this_month
+        if preset not in {"today","this_week","this_year"}:
+            preset = "this_month"
+            label = "This Month"
+        if preset == "this_month":
+            start = datetime(now.year, now.month, 1)
+            end = now
+    prev_start = prev_end = None
+    if start and end:
+        delta = end - start
+        if delta.total_seconds() <= 0:
+            delta = timedelta(days=1)
+        prev_end = start - timedelta(seconds=1)
+        prev_start = prev_end - delta
+    return {"preset": preset, "label": label, "start": start, "end": end, "prev_start": prev_start, "prev_end": prev_end}
+
+
+def _pct_change(current, previous):
+    try:
+        current = float(current or 0)
+        previous = float(previous or 0)
+    except Exception:
+        return None
+    if previous == 0:
+        return 100.0 if current > 0 else None
+    return ((current - previous) / previous) * 100.0
+
+
+def _safe_app_details(application):
+    details = application.application_details or {}
+    if isinstance(details, str):
+        try: details = json.loads(details)
+        except Exception: details = {}
+    return details if isinstance(details, dict) else {}
+
+
+def _delivery_snapshot(application):
+    details = _safe_app_details(application)
+    admin_tracking = details.get("admin_tracking") if isinstance(details.get("admin_tracking"), dict) else {}
+    delivery = admin_tracking.get("delivery") if isinstance(admin_tracking.get("delivery"), dict) else {}
+    citizen_delivery = details.get("delivery") if isinstance(details.get("delivery"), dict) else {}
+    status = clean_text(delivery.get("status"))
+    label = {
+        "courier_assigned":"Courier Assigned","picked_up":"Picked Up","out_for_delivery":"Out for Delivery","delivered":"Delivered"
+    }.get(status)
+    method = clean_text(citizen_delivery.get("method") or citizen_delivery.get("fulfillment_method") or delivery.get("method"))
+    pickup_ready = bool(delivery.get("ready_for_pickup") or citizen_delivery.get("ready_for_pickup") or (method == "pickup" and application.application_status == "ready_for_release"))
+    pickup_completed = bool(delivery.get("pickup_completed") or citizen_delivery.get("pickup_completed"))
+    dispatch_loc = clean_text(citizen_delivery.get("origin_address") or citizen_delivery.get("dispatch_location") or delivery.get("origin_address") or delivery.get("dispatch_location"))
+    if not dispatch_loc:
+        spec = {}
+        try:
+            from app.services.application_forms import specification_for
+            spec = specification_for(application.service, field_map(application)) or {}
+        except Exception:
+            spec = {}
+        dispatch_loc = clean_text(((spec.get("delivery") or {}).get("fixed_origin") or {}).get("address"))
+    return {
+        "status": status,
+        "label": label,
+        "method": method,
+        "pickup_ready": pickup_ready and not pickup_completed,
+        "pickup_completed": pickup_completed,
+        "dispatch_location": dispatch_loc or "—",
+        "updated_at": clean_text(delivery.get("updated_at")) or None,
+    }
+
+
 @admin_bp.route("/admin/dashboard")
 @admin_console_required
 def dashboard():
     now = datetime.now()
-    start = datetime.combine(now.date() - timedelta(days=6), time.min)
-    weekly_rows = db.session.execute(
-        visible_application_query(
-            db.select(func.date(Application.submission_date), func.count(Application.application_id))
-            .where(Application.submission_date >= start, Application.application_status != "draft")
-            .group_by(func.date(Application.submission_date))
-        )
-    ).all()
-    weekly_counts = {str(day): count for day, count in weekly_rows}
-    weekly_activity = [
-        {
-            "label": (now.date() - timedelta(days=offset)).strftime("%a"),
-            "date": now.date() - timedelta(days=offset),
-            "count": weekly_counts.get((now.date() - timedelta(days=offset)).isoformat(), 0),
-        }
-        for offset in range(6, -1, -1)
-    ]
-    max_daily = max((item["count"] for item in weekly_activity), default=0) or 1
+    rng = _dashboard_range(now)
+    start, end = rng["start"], rng["end"]
+    prev_start, prev_end = rng["prev_start"], rng["prev_end"]
 
-    recent_events = db.session.scalars(
-        visible_application_query(
-            db.select(ApplicationEvent)
-            .join(Application, ApplicationEvent.application_id == Application.application_id)
-            .options(joinedload(ApplicationEvent.application).joinedload(Application.service))
-            .order_by(ApplicationEvent.recorded_at.desc(), ApplicationEvent.tracking_id.desc())
-            .limit(8)
-        )
-    ).unique().all()
-    activity_user_ids = {event.updated_by for event in recent_events if event.updated_by}
-    activity_users = (
-        {
-            user.user_id: user.full_name
-            for user in db.session.scalars(
-                db.select(User).where(User.user_id.in_(activity_user_ids))
-            ).all()
-        }
-        if activity_user_ids
-        else {}
-    )
-    service_rows = db.session.execute(
-        visible_service_query(
-            db.select(Service, func.count(Application.application_id))
-            .outerjoin(Application, Application.service_id == Service.service_id)
-            .group_by(Service.service_id)
-            .order_by(Service.service_name)
-        )
-    ).all()
+    def app_query():
+        return visible_application_query(db.select(Application).where(Application.application_status != "draft"))
+    def pay_query():
+        return visible_payment_query(db.select(Payment))
+
+    def in_range(q, col, s, e):
+        if s: q = q.where(col >= s)
+        if e: q = q.where(col <= e)
+        return q
+
+    # Base datasets (scoped)
+    apps_all = db.session.scalars(app_query().options(joinedload(Application.service), joinedload(Application.department), joinedload(Application.payments))).unique().all()
+    apps_all = [a for a in apps_all if not _is_archived_application(a)]
+    apps_in_range = [a for a in apps_all if (not start or a.submission_date >= start) and (not end or a.submission_date <= end)]
+    apps_prev = [a for a in apps_all if prev_start and prev_end and a.submission_date and prev_start <= a.submission_date <= prev_end]
+
+    payments_all = db.session.scalars(pay_query().options(joinedload(Payment.application).joinedload(Application.service))).unique().all()
+    payments_in_range = [p for p in payments_all if (not start or (p.transaction_date or getattr(p.application,'submission_date',None)) and (start <= (p.transaction_date or p.application.submission_date) <= (end or now)))]
+    # simpler range check
+    def pay_in(p,s,e):
+        dt = p.transaction_date or (p.application.submission_date if p.application else None)
+        return bool(dt and (not s or dt >= s) and (not e or dt <= e))
+    payments_in_range = [p for p in payments_all if pay_in(p,start,end)]
+    payments_prev = [p for p in payments_all if prev_start and prev_end and pay_in(p,prev_start,prev_end)]
+
+    total_citizens = db.session.scalar(managed_account_query(db.select(func.count(User.user_id)).where(User.role == User.ROLE_CITIZEN, User.account_status == "active"))) or 0
+    total_applications = len(apps_in_range)
+    pending_applications = sum(1 for a in apps_in_range if a.application_status in PENDING_STATUSES)
+    processing_applications = sum(1 for a in apps_in_range if a.application_status in {"processing","scheduled","ready_for_release","approved","for_biometrics","with_hit"})
+    approved_applications = sum(1 for a in apps_in_range if a.application_status in {"approved","ready_for_release"})
+    completed_applications = sum(1 for a in apps_in_range if a.application_status == "completed")
+    total_revenue = sum(Decimal(str(p.amount or 0)) for p in payments_in_range if p.payment_status == "paid")
+    active_staff = db.session.scalar(managed_account_query(db.select(func.count(User.user_id)).where(User.role.in_([User.ROLE_DEPARTMENT_STAFF, User.ROLE_DEPARTMENT_SUPERVISOR, User.ROLE_SYSTEM_ADMIN]), User.account_status == "active"))) or 0
+    if not is_system_admin():
+        active_staff = db.session.scalar(db.select(func.count(User.user_id)).where(User.department_id == current_user.department_id, User.role.in_([User.ROLE_DEPARTMENT_STAFF, User.ROLE_DEPARTMENT_SUPERVISOR]), User.account_status == "active")) or 0
+
+    prev_stats = {
+        "total_citizens": None,
+        "total_applications": len(apps_prev) if prev_start else None,
+        "pending_applications": sum(1 for a in apps_prev if a.application_status in PENDING_STATUSES) if prev_start else None,
+        "processing_applications": sum(1 for a in apps_prev if a.application_status in {"processing","scheduled","ready_for_release","approved","for_biometrics","with_hit"}) if prev_start else None,
+        "approved_applications": sum(1 for a in apps_prev if a.application_status in {"approved","ready_for_release"}) if prev_start else None,
+        "completed_applications": sum(1 for a in apps_prev if a.application_status == "completed") if prev_start else None,
+        "total_revenue": float(sum(Decimal(str(p.amount or 0)) for p in payments_prev if p.payment_status == "paid")) if prev_start else None,
+        "active_staff": None,
+    }
+    stat_cards = [
+        {"key":"total_citizens","label":"Total Citizens","value":total_citizens,"icon":"citizens","tone":"blue","url":url_for('admin.accounts', role='citizen'),"sub":"Registered citizen accounts","cmp":_pct_change(total_citizens, prev_stats['total_citizens']),"good":"up"},
+        {"key":"total_applications","label":"Total Applications","value":total_applications,"icon":"apps","tone":"teal","url":url_for('admin.applications'),"sub":"Submitted in selected period","cmp":_pct_change(total_applications, prev_stats['total_applications']),"good":"up"},
+        {"key":"pending_applications","label":"Pending Applications","value":pending_applications,"icon":"pending","tone":"amber","url":url_for('admin.applications', status='submitted'),"sub":"Awaiting review/action","cmp":_pct_change(pending_applications, prev_stats['pending_applications']),"good":"down"},
+        {"key":"processing_applications","label":"Processing Applications","value":processing_applications,"icon":"processing","tone":"violet","url":url_for('admin.applications', status='processing'),"sub":"Currently being processed","cmp":_pct_change(processing_applications, prev_stats['processing_applications']),"good":"neutral"},
+        {"key":"approved_applications","label":"Approved Applications","value":approved_applications,"icon":"approved","tone":"green","url":url_for('admin.applications', status='approved'),"sub":"Approved/ready records","cmp":_pct_change(approved_applications, prev_stats['approved_applications']),"good":"up"},
+        {"key":"completed_applications","label":"Completed Applications","value":completed_applications,"icon":"completed","tone":"emerald","url":url_for('admin.applications', status='completed'),"sub":"Successfully completed","cmp":_pct_change(completed_applications, prev_stats['completed_applications']),"good":"up"},
+        {"key":"total_revenue","label":"Total Revenue","value":f"₱{total_revenue:,.2f}","icon":"revenue","tone":"pink","url":url_for('admin_portal.payments'),"sub":"Successful payments only","cmp":_pct_change(float(total_revenue), prev_stats['total_revenue']),"good":"up"},
+        {"key":"active_staff","label":"Active Staff","value":active_staff,"icon":"staff","tone":"slate","url":url_for('admin.accounts'),"sub":"Active admin accounts","cmp":_pct_change(active_staff, prev_stats['active_staff']),"good":"up"},
+    ]
+
+    # charts
+    trend_labels=[]; trend_new=[]; trend_completed=[]
+    if rng['preset']=='today':
+        buckets=[datetime.combine(now.date(), time.min)+timedelta(hours=h) for h in range(0,24,3)]
+        for b in buckets:
+            b2=b+timedelta(hours=3)
+            trend_labels.append(b.strftime('%I%p').lstrip('0'))
+            trend_new.append(sum(1 for a in apps_all if a.submission_date and b<=a.submission_date<b2 and (not start or a.submission_date>=start) and (not end or a.submission_date<=end)))
+            trend_completed.append(sum(1 for a in apps_all if a.application_status=='completed' and a.last_updated and b<=a.last_updated<b2 and (not start or a.last_updated>=start) and (not end or a.last_updated<=end)))
+    elif rng['preset'] in {'this_week','this_month','custom'}:
+        days = 7 if rng['preset']=='this_week' else 30
+        if rng['preset']=='custom' and start and end:
+            days = max(1, min((end.date()-start.date()).days+1, 31))
+        base = (end.date() if end else now.date())
+        for i in range(days-1,-1,-1):
+            d = base - timedelta(days=i)
+            d1=datetime.combine(d,time.min); d2=datetime.combine(d,time.max)
+            trend_labels.append(d.strftime('%d %b'))
+            trend_new.append(sum(1 for a in apps_all if a.submission_date and d1<=a.submission_date<=d2))
+            trend_completed.append(sum(1 for a in apps_all if a.application_status=='completed' and a.last_updated and d1<=a.last_updated<=d2))
+    else:
+        for m in range(1,13):
+            trend_labels.append(datetime(now.year,m,1).strftime('%b'))
+            trend_new.append(sum(1 for a in apps_all if a.submission_date and a.submission_date.year==now.year and a.submission_date.month==m))
+            trend_completed.append(sum(1 for a in apps_all if a.application_status=='completed' and a.last_updated and a.last_updated.year==now.year and a.last_updated.month==m))
+
+    service_order = [
+        'PSA Birth Certificate','PSA CENOMAR','PhilSys National ID','NBI Clearance',
+        'SSS Number Registration / MySSS Card','LGU Barangay Clearance','LGU Certificate of Residency','LGU Senior Citizen ID'
+    ]
+    def canonical_service(name):
+        n=(name or '').lower()
+        if 'birth' in n: return 'PSA Birth Certificate'
+        if 'cenomar' in n: return 'PSA CENOMAR'
+        if 'philsys' in n or 'national id' in n: return 'PhilSys National ID'
+        if 'nbi' in n: return 'NBI Clearance'
+        if 'sss' in n: return 'SSS Number Registration / MySSS Card'
+        if 'barangay' in n: return 'LGU Barangay Clearance'
+        if 'residency' in n: return 'LGU Certificate of Residency'
+        if 'senior' in n: return 'LGU Senior Citizen ID'
+        return name or 'Other'
+    by_service = {k:0 for k in service_order}
+    for a in apps_in_range:
+        k=canonical_service(a.service.service_name if a.service else '')
+        by_service[k]=by_service.get(k,0)+1
+    service_chart = [{"label":k,"count":by_service.get(k,0)} for k in service_order]
+
+    status_dist_keys = ['submitted','under_review','pending_documents','for_payment','paid','scheduled','processing','ready_for_release','completed','rejected','cancelled','approved','for_biometrics','with_hit']
+    status_dist = [{"label": STATUS_LABELS.get(k,k.replace('_',' ').title()), "key":k, "count": sum(1 for a in apps_in_range if a.application_status==k)} for k in status_dist_keys]
+
+    recent_apps = sorted(apps_in_range, key=lambda a: (a.submission_date or datetime.min), reverse=True)[:8]
+    recent_rows=[]
+    for a in recent_apps:
+        applicant = db.session.get(User, a.applicant_id)
+        assigned = '—'
+        events = db.session.scalars(db.select(ApplicationEvent).where(ApplicationEvent.application_id==a.application_id).order_by(ApplicationEvent.recorded_at.desc())).first()
+        if events and events.updated_by:
+            u=db.session.get(User, events.updated_by)
+            assigned=u.full_name if u else '—'
+        recent_rows.append({"app":a,"citizen":applicant.full_name if applicant else 'Unknown',"service":a.service.service_name if a.service else '—','submitted':a.submission_date,'status':a.application_status,'assigned':assigned})
+
+    payment_stats = {
+        'successful': sum(1 for p in payments_in_range if p.payment_status=='paid'),
+        'pending': sum(1 for p in payments_in_range if p.payment_status=='pending'),
+        'failed': sum(1 for p in payments_in_range if p.payment_status=='failed'),
+        'refunded': sum(1 for p in payments_in_range if p.payment_status=='refunded'),
+        'revenue': sum(Decimal(str(p.amount or 0)) for p in payments_in_range if p.payment_status=='paid'),
+    }
+    daily_rev_labels=[]; daily_rev=[]
+    for i in range(6,-1,-1):
+        d=(end.date() if end else now.date())-timedelta(days=i)
+        d1=datetime.combine(d,time.min); d2=datetime.combine(d,time.max)
+        daily_rev_labels.append(d.strftime('%d %b'))
+        daily_rev.append(float(sum(Decimal(str(p.amount or 0)) for p in payments_all if p.payment_status=='paid' and (p.transaction_date or (p.application.submission_date if p.application else None)) and d1 <= (p.transaction_date or p.application.submission_date) <= d2)))
+    monthly_rev_labels=[]; monthly_rev=[]
+    for i in range(5,-1,-1):
+        m_index=now.month-1-i; y=now.year+(m_index//12); m=(m_index%12)+1
+        monthly_rev_labels.append(datetime(y,m,1).strftime('%b %Y'))
+        monthly_rev.append(float(sum(Decimal(str(p.amount or 0)) for p in payments_all if p.payment_status=='paid' and (p.transaction_date or (p.application.submission_date if p.application else None)) and (p.transaction_date or p.application.submission_date).year==y and (p.transaction_date or p.application.submission_date).month==m)))
+    rev_by_service = {k:0.0 for k in service_order}
+    for p in payments_in_range:
+        if p.payment_status!='paid' or not p.application: continue
+        k=canonical_service(p.application.service.service_name if p.application.service else '')
+        rev_by_service[k]=rev_by_service.get(k,0.0)+float(p.amount or 0)
+    pay_method = {}
+    for p in payments_in_range:
+        if p.payment_status!='paid': continue
+        k=(p.payment_method or 'unknown').replace('_',' ').title()
+        pay_method[k]=pay_method.get(k,0)+1
+    recent_payments = sorted(payments_in_range, key=lambda p: (p.transaction_date or (p.application.submission_date if p.application else datetime.min) or datetime.min), reverse=True)[:8]
+    recent_payment_rows=[]
+    for p in recent_payments:
+        a=p.application; citizen=db.session.get(User,a.applicant_id) if a else None
+        recent_payment_rows.append({'payment':p,'application':a,'citizen':citizen.full_name if citizen else '—','service':a.service.service_name if a and a.service else '—'})
+
+    # delivery monitoring
+    delivery_counts={'awaiting':0,'processing':0,'ready_dispatch':0,'dispatched':0,'out_for_delivery':0,'delivered':0,'ready_pickup':0,'exceptions':0}
+    delivery_rows=[]
+    for a in apps_in_range:
+        snap=_delivery_snapshot(a)
+        ds = snap['status']
+        if ds in {'failed','returned','cancelled'} or a.application_status in {'rejected','cancelled'}:
+            delivery_counts['exceptions'] += 1
+        elif ds == 'delivered' or a.application_status == 'completed':
+            delivery_counts['delivered'] += 1
+        elif snap['pickup_ready']:
+            delivery_counts['ready_pickup'] += 1
+        elif ds in {'picked_up','out_for_delivery'}:
+            delivery_counts['out_for_delivery'] += 1
+        elif ds == 'courier_assigned':
+            delivery_counts['dispatched'] += 1
+        elif a.application_status == 'ready_for_release':
+            delivery_counts['ready_dispatch'] += 1
+        elif a.application_status in {'processing','approved','scheduled','for_biometrics','with_hit'}:
+            delivery_counts['processing'] += 1
+        elif a.application_status in {'submitted','paid','for_payment','under_review','pending_documents'}:
+            delivery_counts['awaiting'] += 1
+        if ds or snap['pickup_ready'] or a.application_status in {'ready_for_release','completed','rejected','cancelled'}:
+            citizen = db.session.get(User, a.applicant_id)
+            status_label = 'Ready for Pickup' if snap['pickup_ready'] else (snap['label'] or STATUS_LABELS.get(a.application_status, a.application_status))
+            delivery_rows.append({'app':a,'citizen':citizen.full_name if citizen else '—','document':a.service.service_name if a.service else 'Document','dispatch':snap['dispatch_location'],'status':status_label,'updated':a.last_updated})
+    delivery_rows = sorted(delivery_rows, key=lambda r: (r['updated'] or datetime.min), reverse=True)[:8]
+
+    # service performance
+    service_perf=[]
+    for label in service_order:
+        rows=[a for a in apps_in_range if canonical_service(a.service.service_name if a.service else '')==label]
+        service_obj = next((a.service for a in rows if a.service), None)
+        service_id = service_obj.service_id if service_obj else None
+        if not service_id:
+            svc=db.session.scalar(visible_service_query(db.select(Service).where(Service.service_name.ilike(f"%{label.split()[-1]}%"))))
+            service_id=svc.service_id if svc else None
+        service_perf.append({
+            'label':label,'service_id':service_id,'total':len(rows),
+            'pending':sum(1 for a in rows if a.application_status in PENDING_STATUSES),
+            'processing':sum(1 for a in rows if a.application_status in {'processing','scheduled','ready_for_release','approved','for_biometrics','with_hit'}),
+            'approved':sum(1 for a in rows if a.application_status in {'approved','ready_for_release'}),
+            'completed':sum(1 for a in rows if a.application_status=='completed'),
+            'rejected':sum(1 for a in rows if a.application_status=='rejected'),
+        })
+
+    # staff performance
+    staff_q = db.select(User).where(User.account_status!='suspended', User.role.in_([User.ROLE_DEPARTMENT_STAFF, User.ROLE_DEPARTMENT_SUPERVISOR, User.ROLE_SYSTEM_ADMIN]))
+    if not is_system_admin():
+        staff_q = staff_q.where(User.department_id==current_user.department_id)
+    staff_users = db.session.scalars(staff_q.order_by(User.full_name)).all()
+    staff_rows=[]; active_staff_count=0; inactive_staff_count=0; staff_processing_count=0
+    # efficient staff metrics
+    staff_ids=[u.user_id for u in staff_users]
+    assigned_counts={uid:0 for uid in staff_ids}; processing_counts={uid:0 for uid in staff_ids}; completed_counts={uid:0 for uid in staff_ids}; pending_counts={uid:0 for uid in staff_ids}
+    if staff_ids:
+        ev_rows=db.session.execute(db.select(ApplicationEvent.updated_by, ApplicationEvent.application_id).where(ApplicationEvent.updated_by.in_(staff_ids)).group_by(ApplicationEvent.updated_by, ApplicationEvent.application_id)).all()
+        app_by_id={a.application_id:a for a in apps_all}
+        per_staff={}
+        for uid, aid in ev_rows:
+            per_staff.setdefault(uid,set()).add(aid)
+        for uid,aids in per_staff.items():
+            objs=[app_by_id.get(aid) for aid in aids if app_by_id.get(aid)]
+            assigned_counts[uid]=len(objs)
+            processing_counts[uid]=sum(1 for a in objs if a.application_status in {'processing','scheduled','ready_for_release','approved','for_biometrics','with_hit'})
+            completed_counts[uid]=sum(1 for a in objs if a.application_status=='completed')
+            pending_counts[uid]=sum(1 for a in objs if a.application_status in PENDING_STATUSES)
+    for u in staff_users:
+        is_active=u.account_status=='active'
+        active_staff_count += 1 if is_active else 0
+        inactive_staff_count += 0 if is_active else 1
+        if processing_counts.get(u.user_id,0)>0: staff_processing_count+=1
+        staff_rows.append({'user':u,'role':u.role_label,'assigned':assigned_counts.get(u.user_id,0),'processing':processing_counts.get(u.user_id,0),'completed':completed_counts.get(u.user_id,0),'pending':pending_counts.get(u.user_id,0)})
+
+    # recent activities / notifications
+    try:
+        from app.routes.audit import _scope_query as _audit_scope
+        activities = db.session.scalars(_audit_scope(db.select(AuditLog)).order_by(AuditLog.created_at.desc(), AuditLog.id.desc()).limit(8)).all()
+    except Exception:
+        activities = []
+
+    notif_q=visible_notification_query(db.select(Notification).order_by(Notification.created_date.desc(), Notification.notification_id.desc()).limit(8))
+    notifications = db.session.scalars(notif_q).all()
+    unread_notifications = db.session.scalar(visible_notification_query(db.select(func.count(Notification.notification_id)).where(Notification.read_status=='unread'))) or 0
+
+    if request.args.get('export') == 'csv':
+        out=io.StringIO(); w=csv.writer(out)
+        w.writerow(['OneGov PH Admin Dashboard Report']); w.writerow(['Generated', now.strftime('%Y-%m-%d %H:%M:%S')]); w.writerow(['Range', rng['label']]); w.writerow([])
+        w.writerow(['Metric','Value'])
+        for c in stat_cards: w.writerow([c['label'], c['value']])
+        w.writerow([]); w.writerow(['Service','Total','Pending','Processing','Approved','Completed','Rejected'])
+        for r in service_perf: w.writerow([r['label'],r['total'],r['pending'],r['processing'],r['approved'],r['completed'],r['rejected']])
+        return Response(out.getvalue(), mimetype='text/csv', headers={'Content-Disposition':'attachment; filename=admin-dashboard-report.csv'})
+
     return render_template(
         "admin/dashboard.html",
-        page_title="Admin dashboard",
-        total_citizens=db.session.scalar(
-            managed_account_query(
-                db.select(func.count(User.user_id)).where(User.role == User.ROLE_CITIZEN)
-            )
-        )
-        or 0,
-        total_services=db.session.scalar(
-            visible_service_query(db.select(func.count(Service.service_id)))
-        )
-        or 0,
-        total_applications=db.session.scalar(
-            visible_application_query(db.select(func.count(Application.application_id)))
-        )
-        or 0,
-        pending_applications=db.session.scalar(
-            visible_application_query(
-                db.select(func.count(Application.application_id)).where(
-                    Application.application_status.in_(PENDING_STATUSES)
-                )
-            )
-        )
-        or 0,
-        completed_applications=db.session.scalar(
-            visible_application_query(
-                db.select(func.count(Application.application_id)).where(
-                    Application.application_status == "completed"
-                )
-            )
-        )
-        or 0,
-        total_payments=db.session.scalar(
-            visible_payment_query(db.select(func.count(Payment.payment_id)))
-        )
-        or 0,
-        paid_amount=db.session.scalar(
-            visible_payment_query(
-                db.select(func.coalesce(func.sum(Payment.amount), 0)).where(
-                    Payment.payment_status == "paid"
-                )
-            )
-        )
-        or 0,
-        weekly_activity=weekly_activity,
-        max_daily=max_daily,
-        recent_events=recent_events,
-        activity_users=activity_users,
-        service_rows=service_rows,
+        now=now,
+        rng=rng,
+        stat_cards=stat_cards,
+        trend_labels=trend_labels,
+        trend_new=trend_new,
+        trend_completed=trend_completed,
+        service_chart=service_chart,
+        status_dist=status_dist,
+        recent_rows=recent_rows,
+        payment_stats=payment_stats,
+        daily_rev_labels=daily_rev_labels,
+        daily_rev=daily_rev,
+        monthly_rev_labels=monthly_rev_labels,
+        monthly_rev=monthly_rev,
+        rev_by_service=[{"label":k,"amount":rev_by_service.get(k,0.0)} for k in service_order],
+        pay_method=[{"label":k,"count":v} for k,v in pay_method.items()] or [{"label":"No paid payments","count":0}],
+        recent_payment_rows=recent_payment_rows,
+        delivery_counts=delivery_counts,
+        delivery_rows=delivery_rows,
+        service_perf=service_perf,
+        staff_rows=staff_rows,
+        staff_totals={"total":len(staff_users),"active":active_staff_count,"inactive":inactive_staff_count,"processing":staff_processing_count},
+        activities=activities,
+        notifications=notifications,
+        unread_notifications=unread_notifications,
         status_labels=STATUS_LABELS,
-        current_date=now,
+        can_manage_accounts=is_admin_console_user(),
+        is_system_admin=is_system_admin(),
     )
-
 
 @admin_bp.route("/admin/services")
 @role_required(User.ROLE_SYSTEM_ADMIN, User.ROLE_DEPARTMENT_STAFF, User.ROLE_DEPARTMENT_SUPERVISOR)

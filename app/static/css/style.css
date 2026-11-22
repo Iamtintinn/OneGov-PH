@@ -22,7 +22,7 @@ body {
     flex-direction: column;
     color: var(--text);
     background: var(--page);
-    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-family: "Poppins", "Segoe UI", Arial, sans-serif;
     font-size: 1.0625rem;
     line-height: 1.5;
 }

@@ -3,7 +3,7 @@
 {% else %}
 {% set page = request.endpoint %}
 {% set is_system_admin = current_user.role == 'system_admin' %}
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
 <aside id="citizen-sidebar" class="dash-sidebar shell-sidebar" aria-label="{% if is_system_admin %}Admin and citizen navigation{% else %}Citizen navigation{% endif %}">
     <a class="dash-brand sidebar-brand" href="{{ url_for('citizen.dashboard') }}">
         <span class="brand-mark">

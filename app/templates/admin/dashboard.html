@@ -1,102 +1,1358 @@
 {% extends "base.html" %}
-{% block title %}Admin dashboard · OneGov PH{% endblock %}
+{% block title %}Admin Dashboard · OneGov PH{% endblock %}
 {% block body_class %}citizen-dashboard admin-dashboard{% endblock %}
 {% block site_header %}{% include "admin/_header.html" %}{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
 {% block content %}
-<div class="admin-main">
-    <header class="admin-page-heading">
-        <div>
-            <p class="admin-eyebrow">OVERVIEW / SYSTEM</p>
-            <h1>Good day, {{ current_user.first_name }}</h1>
-            <p>Here’s the latest activity across OneGov PH services.</p>
+<div class="admin-main adm-dash">
+  <header class="adm-dash-header">
+    <div>
+      <p class="admin-eyebrow">CENTRALIZED OPERATIONS</p>
+      <h1>Admin Dashboard</h1>
+      <p class="adm-dash-welcome">Welcome back, {{ current_user.full_name or current_user.first_name }}. Monitor applications, payments, delivery, staff, and system activity.</p>
+      <div class="adm-dash-date"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span>{{ now.strftime('%A, %B %d, %Y') }}</span></div>
+    </div>
+    <div class="adm-dash-actions">
+      <form class="adm-filter-form" method="get" action="{{ url_for('admin.dashboard') }}">
+        <label class="adm-filter-field"><span>Date Filter</span>
+          <select name="range" id="adm-range" onchange="document.getElementById('adm-custom-range').style.display=this.value==='custom'?'flex':'none'">
+            <option value="today" {% if rng.preset=='today' %}selected{% endif %}>Today</option>
+            <option value="this_week" {% if rng.preset=='this_week' %}selected{% endif %}>This Week</option>
+            <option value="this_month" {% if rng.preset=='this_month' %}selected{% endif %}>This Month</option>
+            <option value="this_year" {% if rng.preset=='this_year' %}selected{% endif %}>This Year</option>
+            <option value="custom" {% if rng.preset=='custom' %}selected{% endif %}>Custom Range</option>
+          </select>
+        </label>
+        <div id="adm-custom-range" class="adm-custom-range" style="display:{% if rng.preset=='custom' %}flex{% else %}none{% endif %}">
+          <label class="adm-filter-field"><span>Start</span><input type="date" name="start" value="{{ request.args.get('start','') }}"></label>
+          <label class="adm-filter-field"><span>End</span><input type="date" name="end" value="{{ request.args.get('end','') }}"></label>
         </div>
-        <span class="admin-date">{{ current_date.strftime("%A, %d %B %Y") }}</span>
-    </header>
+        <button class="cset-btn cset-btn-primary" type="submit">Apply</button>
+      </form>
+      <a class="cset-btn cset-btn-ghost" href="{{ url_for('admin.dashboard', range=rng.preset, start=request.args.get('start',''), end=request.args.get('end',''), export='csv') }}">Export Report</a>
+    </div>
+  </header>
 
-    <section class="admin-stat-grid" aria-label="Platform statistics">
-        <article class="admin-stat-card">
-            <span class="admin-stat-icon admin-icon-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span>
-            <span class="admin-stat-label">Total citizens</span><strong>{{ "{:,}".format(total_citizens) }}</strong><small>Registered citizen accounts</small>
+  <section class="adm-stats-group" aria-label="Overview statistics">
+    {% for card in stat_cards %}
+    {% set is_good = (card.good == 'neutral') or (card.good == 'up' and card.cmp is not none and card.cmp >= 0) or (card.good == 'down' and card.cmp is not none and card.cmp < 0) or (card.good == 'up' and card.cmp is none) %}
+    <a class="adm-stat-cell adm-tone-{{ card.tone }}" href="{{ card.url }}">
+      <div class="adm-stat-label-row">
+        <span class="adm-stat-icon">{% if card.icon=='citizens' %}<svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>{% elif card.icon=='apps' %}<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8"/></svg>{% elif card.icon=='pending' %}<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>{% elif card.icon=='processing' %}<svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>{% elif card.icon=='approved' %}<svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>{% elif card.icon=='completed' %}<svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>{% elif card.icon=='revenue' %}<svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>{% else %}<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>{% endif %}</span>
+        <span class="adm-stat-label">{{ card.label }}</span>
+      </div>
+      <div class="adm-stat-value">{{ card.value }}</div>
+      {% if card.cmp is not none %}
+      <div class="adm-stat-delta {% if card.good == 'neutral' %}is-neutral{% elif is_good %}is-good{% else %}is-bad{% endif %}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">{% if card.cmp >= 0 %}<path d="M7 17L17 7M7 7h10v10"/>{% else %}<path d="M7 7l10 10M17 7v10H7"/>{% endif %}</svg>
+        <span>{{ '%+.1f'|format(card.cmp) }}%</span>
+        <span class="adm-stat-delta-label">vs prev period</span>
+      </div>
+      {% endif %}
+      <div class="adm-stat-sub">{{ card.sub }}</div>
+    </a>
+    {% endfor %}
+  </section>
+
+  <section class="adm-panel adm-chart-panel">
+    <div class="adm-panel-head"><div class="adm-panel-title"><span class="adm-panel-icon adm-icon-blue"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 9l-5 5-4-4-4 4"/></svg></span><div><p class="admin-eyebrow">APPLICATION ANALYTICS</p><h2>Operational Trends</h2></div></div><span class="adm-pill">{{ rng.label }}</span></div>
+    <div class="adm-charts-grid">
+      <div class="adm-chart-card adm-chart-line9">
+        <div class="adm-chart-title">Applications Overview</div>
+        <div class="l9-head"><span class="l9-eyebrow">Total Applications</span><div class="l9-value-row"><strong class="l9-value" id="l9TrendTotal">0</strong><span class="l9-trend" id="l9TrendChange">0%</span><span class="l9-muted">vs first day</span></div></div>
+        <div class="l9-stats"><span>High <b class="l9-sky" id="l9TrendHigh">0</b></span><span>Low <b class="l9-amber" id="l9TrendLow">0</b></span><span>Change <b class="l9-delta" id="l9TrendDelta">0%</b></span></div>
+        <canvas id="chartTrend"></canvas>
+      </div>
+      <div class="adm-chart-card adm-chart-pareto">
+        <div class="adm-chart-title">Applications by Government Service</div>
+        <div class="adm-chart-subtitle">Applications per service, cumulative share, and the 80% service-level threshold</div>
+        <div class="adm-pareto-wrap" id="serviceChartWrap">
+          <div class="adm-pareto-scroll" id="serviceChartScroll">
+            <div class="adm-pareto-canvas">
+              <canvas id="chartService"></canvas>
+            </div>
+          </div>
+          <div class="adm-pareto-tip" id="serviceChartTip" role="tooltip" aria-live="polite"></div>
+        </div>
+        <div class="adm-pareto-legend">
+          <span class="adm-pl-item"><i class="adm-pl-swatch adm-pl-bar"></i>Applications</span>
+          <span class="adm-pl-item"><i class="adm-pl-swatch adm-pl-line"></i>Cumulative %</span>
+          <span class="adm-pl-item"><i class="adm-pl-swatch adm-pl-threshold"></i>80% Threshold</span>
+        </div>
+      </div>
+      <div class="adm-chart-card adm-chart-pie">
+        <div class="adm-chart-title">Application Status Distribution</div>
+        <div class="adm-pie-wrap" id="statusChartWrap">
+          <canvas id="chartStatus"></canvas>
+          <div class="adm-pie-tip" id="statusChartTip" role="tooltip" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="adm-chart-card adm-chart-line9">
+        <div class="adm-chart-title">New Applications vs Completed</div>
+        <div class="l9-head"><span class="l9-eyebrow">New Applications</span><div class="l9-value-row"><strong class="l9-value" id="l9CompareTotal">0</strong><span class="l9-trend" id="l9CompareChange">0%</span><span class="l9-muted">vs first day</span></div></div>
+        <div class="l9-stats"><span>High <b class="l9-sky" id="l9CompareHigh">0</b></span><span>Low <b class="l9-amber" id="l9CompareLow">0</b></span><span>Change <b class="l9-delta" id="l9CompareDelta">0%</b></span></div>
+        <canvas id="chartCompare"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <section class="adm-panel">
+    <div class="adm-panel-head"><div class="adm-panel-title"><span class="adm-panel-icon adm-icon-teal"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></svg></span><div><p class="admin-eyebrow">APPLICATION MONITORING</p><h2>Recent Applications</h2></div></div><a class="cset-btn cset-btn-ghost" href="{{ url_for('admin.applications') }}">View All Applications</a></div>
+    <div class="adm-table-wrap adm-table-scroll-5"><table class="adm-table adm-table-compact adm-tx-table"><thead><tr><th>Application ID</th><th>Citizen</th><th>Service</th><th>Submitted</th><th>Status</th><th>Assigned</th><th>Action</th></tr></thead><tbody>
+      {% for row in recent_rows %}
+      <tr>
+        <td><span class="adm-mono">{{ row.app.tracking_number }}</span></td>
+        <td>{{ row.citizen }}</td><td>{{ row.service }}</td>
+        <td>{{ row.submitted.strftime('%d %b %Y') if row.submitted else '—' }}</td>
+        <td><span class="adm-status adm-status-{{ row.status }}">{{ status_labels.get(row.status, row.status.replace('_',' ')|title) }}</span></td>
+        <td>{{ row.assigned }}</td>
+        <td><div class="adm-actions"><a class="adm-icon-btn" href="{{ url_for('admin.application_detail', application_id=row.app.application_id) }}" title="View"><svg viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><span>View</span></a><a class="adm-icon-btn adm-icon-btn-primary" href="{{ url_for('admin.application_detail', application_id=row.app.application_id) }}" title="Review"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5Z"/></svg><span>Review</span></a></div></td>
+      </tr>
+      {% else %}<tr><td colspan="7" class="adm-empty">No applications found for the selected period.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <section class="adm-panel">
+    <div class="adm-panel-head"><div class="adm-panel-title"><span class="adm-panel-icon adm-icon-pink"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><div><p class="admin-eyebrow">PAYMENT OVERVIEW</p><h2>Financial Monitoring</h2></div></div><a class="cset-btn cset-btn-ghost" href="{{ url_for('admin_portal.payments') }}">View Payments</a></div>
+    <div class="adm-mini-stats">
+      <div class="adm-mini-stat"><span>Total Successful Payments</span><strong>{{ payment_stats.successful }}</strong></div>
+      <div class="adm-mini-stat"><span>Pending Payments</span><strong>{{ payment_stats.pending }}</strong></div>
+      <div class="adm-mini-stat"><span>Failed Payments</span><strong>{{ payment_stats.failed }}</strong></div>
+      <div class="adm-mini-stat"><span>Refunded Payments</span><strong>{{ payment_stats.refunded }}</strong></div>
+      <div class="adm-mini-stat adm-mini-stat-accent"><span>Total Collected Revenue</span><strong>₱{{ '{:,.2f}'.format(payment_stats.revenue) }}</strong></div>
+    </div>
+    <div class="adm-charts-grid adm-charts-grid-2">
+      <div class="adm-chart-card adm-chart-pareto">
+        <div class="adm-chart-title">Daily Revenue</div>
+        <div class="adm-chart-subtitle">Revenue per day with cumulative share and the 80% cumulative threshold</div>
+        <div class="adm-pareto-wrap" id="dailyRevWrap">
+          <div class="adm-pareto-scroll" id="dailyRevScroll">
+            <div class="adm-pareto-canvas">
+              <canvas id="chartDailyRev"></canvas>
+            </div>
+          </div>
+          <div class="adm-pareto-tip" id="dailyRevTip" role="tooltip" aria-live="polite"></div>
+        </div>
+        <div class="adm-pareto-legend">
+          <span class="adm-pl-item"><i class="adm-pl-swatch adm-pl-bar"></i>Revenue</span>
+          <span class="adm-pl-item"><i class="adm-pl-swatch adm-pl-line"></i>Cumulative %</span>
+          <span class="adm-pl-item"><i class="adm-pl-swatch adm-pl-threshold"></i>80% Threshold</span>
+        </div>
+      </div>
+      <div class="adm-chart-card adm-chart-line9">
+        <div class="adm-chart-title">Monthly Revenue</div>
+        <div class="l9-head"><span class="l9-eyebrow">Total Revenue</span><div class="l9-value-row"><strong class="l9-value" id="l9RevenueTotal">₱0</strong><span class="l9-trend" id="l9RevenueChange">0%</span><span class="l9-muted">vs first month</span></div></div>
+        <div class="l9-stats"><span>High <b class="l9-sky" id="l9RevenueHigh">₱0</b></span><span>Low <b class="l9-amber" id="l9RevenueLow">₱0</b></span><span>Change <b class="l9-delta" id="l9RevenueDelta">0%</b></span></div>
+        <canvas id="chartMonthlyRev"></canvas>
+      </div>
+      <div class="adm-chart-card adm-chart-radar">
+        <div class="adm-chart-title">Revenue by Government Service</div>
+        <div class="adm-chart-subtitle">Revenue distribution across government services</div>
+        <div class="adm-radar-wrap" id="revRadarWrap">
+          <div class="adm-radar-canvas">
+            <canvas id="chartRevService"></canvas>
+          </div>
+          <div class="adm-pareto-tip adm-radar-tip" id="revRadarTip" role="tooltip" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="adm-chart-card adm-chart-pie adm-chart-donut3d">
+        <div class="adm-chart-title">Payment Method Distribution</div>
+        <div class="adm-chart-subtitle">Where payments come from</div>
+        <div class="adm-pie-wrap" id="payChartWrap">
+          <canvas id="chartPayMethod"></canvas>
+          <div class="adm-pie-tip adm-donut-tip" id="payChartTip" role="tooltip" aria-live="polite"></div>
+        </div>
+      </div>
+    </div>
+    <div class="adm-subhead"><span class="adm-subhead-icon"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></span><h3>Recent Transactions</h3></div>
+    <div class="adm-table-wrap adm-table-scroll-5"><table class="adm-table adm-table-compact adm-tx-table"><thead><tr><th>Transaction ID</th><th>Application ID</th><th>Citizen</th><th>Service</th><th>Amount</th><th>Method</th><th>Status</th><th>Date</th></tr></thead><tbody>
+      {% for row in recent_payment_rows %}
+      <tr>
+        <td><span class="adm-mono">{{ row.payment.payment_reference }}</span></td>
+        <td><span class="adm-mono">{{ row.application.tracking_number if row.application else '—' }}</span></td>
+        <td>{{ row.citizen }}</td><td>{{ row.service }}</td>
+        <td>₱{{ '{:,.2f}'.format(row.payment.amount or 0) }}</td>
+        <td>{{ (row.payment.payment_method or '').replace('_',' ')|title }}</td>
+        <td><span class="adm-status adm-pay-{{ row.payment.payment_status }}">{{ row.payment.payment_status|title }}</span></td>
+        <td>{{ row.payment.transaction_date.strftime('%d %b %Y, %I:%M %p') if row.payment.transaction_date else '—' }}</td>
+      </tr>
+      {% else %}<tr><td colspan="8" class="adm-empty">No payment transactions found for the selected period.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <section class="adm-panel">
+    <div class="adm-panel-head"><div class="adm-panel-title"><span class="adm-panel-icon adm-icon-amber"><svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></span><div><p class="admin-eyebrow">DOCUMENT & DELIVERY MONITORING</p><h2>Processing & Delivery</h2></div></div></div>
+    <div class="adm-delivery-stats">
+      <div class="adm-mini-stat"><span>Awaiting Processing</span><strong>{{ delivery_counts.awaiting }}</strong></div>
+      <div class="adm-mini-stat"><span>Being Processed</span><strong>{{ delivery_counts.processing }}</strong></div>
+      <div class="adm-mini-stat"><span>Ready for Dispatch</span><strong>{{ delivery_counts.ready_dispatch }}</strong></div>
+      <div class="adm-mini-stat"><span>Dispatched</span><strong>{{ delivery_counts.dispatched }}</strong></div>
+      <div class="adm-mini-stat"><span>Out for Delivery</span><strong>{{ delivery_counts.out_for_delivery }}</strong></div>
+      <div class="adm-mini-stat"><span>Successfully Delivered</span><strong>{{ delivery_counts.delivered }}</strong></div>
+      <div class="adm-mini-stat"><span>Ready for Pickup</span><strong>{{ delivery_counts.ready_pickup }}</strong></div>
+      <div class="adm-mini-stat"><span>Delivery Exceptions</span><strong>{{ delivery_counts.exceptions }}</strong></div>
+    </div>
+    <div class="adm-table-wrap adm-table-scroll-5"><table class="adm-table adm-table-compact"><thead><tr><th>Document</th><th>Application ID</th><th>Citizen</th><th>Dispatch Location</th><th>Status</th><th>Updated</th><th>Action</th></tr></thead><tbody>
+      {% for row in delivery_rows %}
+      <tr>
+        <td class="adm-cell-wrap"><strong>{{ row.document }}</strong></td><td><span class="adm-mono">{{ row.app.tracking_number }}</span></td><td class="adm-cell-wrap">{{ row.citizen }}</td><td class="adm-cell-wrap">{{ row.dispatch }}</td>
+        <td><span class="adm-status">{{ row.status }}</span></td>
+        <td>{{ row.updated.strftime('%d %b %Y, %I:%M %p') if row.updated else '—' }}</td>
+        <td><a class="adm-icon-btn" href="{{ url_for('admin.application_detail', application_id=row.app.application_id) }}" title="View"><svg viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><span>View</span></a></td>
+      </tr>
+      {% else %}<tr><td colspan="7" class="adm-empty">No delivery records found for the selected period.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <section class="adm-panel">
+    <div class="adm-panel-head"><div class="adm-panel-title"><span class="adm-panel-icon adm-icon-violet"><svg viewBox="0 0 24 24"><path d="M3 22h18"/><path d="M6 18V11M10 18V11M14 18V11M18 18V11"/><path d="M2 9l10-7 10 7v2H2z"/></svg></span><div><p class="admin-eyebrow">GOVERNMENT SERVICES PERFORMANCE</p><h2>Service Workload</h2></div></div><a class="cset-btn cset-btn-ghost" href="{{ url_for('admin.services') }}">Manage Services</a></div>
+    <div class="adm-table-wrap adm-table-scroll-5"><table class="adm-table adm-table-compact adm-tx-table"><thead><tr><th>Government Service</th><th>Total</th><th>Pending</th><th>Processing</th><th>Approved</th><th>Completed</th><th>Rejected</th><th>Action</th></tr></thead><tbody>
+      {% for row in service_perf %}
+      <tr>
+        <td><strong>{{ row.label }}</strong></td><td>{{ row.total }}</td><td>{{ row.pending }}</td><td>{{ row.processing }}</td><td>{{ row.approved }}</td><td>{{ row.completed }}</td><td>{{ row.rejected }}</td>
+        <td>{% if row.service_id %}<a class="adm-icon-btn" href="{{ url_for('admin.applications', service=row.service_id) }}" title="View"><svg viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><span>View</span></a>{% else %}<span class="adm-muted">—</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <section class="adm-panel">
+    <div class="adm-panel-head"><div class="adm-panel-title"><span class="adm-panel-icon adm-icon-slate"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div><p class="admin-eyebrow">STAFF ACTIVITY & PERFORMANCE</p><h2>Administrative Team</h2></div></div>{% if can_manage_accounts %}<a class="cset-btn cset-btn-ghost" href="{{ url_for('admin.accounts') }}">Manage Accounts</a>{% endif %}</div>
+    <div class="adm-mini-stats">
+      <div class="adm-mini-stat"><span>Total Administrative Accounts</span><strong>{{ staff_totals.total }}</strong></div>
+      <div class="adm-mini-stat"><span>Active Staff</span><strong>{{ staff_totals.active }}</strong></div>
+      <div class="adm-mini-stat"><span>Inactive Staff</span><strong>{{ staff_totals.inactive }}</strong></div>
+      <div class="adm-mini-stat"><span>Staff Currently Processing</span><strong>{{ staff_totals.processing }}</strong></div>
+    </div>
+    <div class="adm-table-wrap"><table class="adm-table"><thead><tr><th>Staff Name</th><th>Assigned Role</th><th>Assigned Applications</th><th>Processing Applications</th><th>Completed Applications</th><th>Pending Applications</th><th>Action</th></tr></thead><tbody>
+      {% for row in staff_rows %}
+      <tr>
+        <td>{{ row.user.full_name }}</td><td>{{ row.role }}</td><td>{{ row.assigned }}</td><td>{{ row.processing }}</td><td>{{ row.completed }}</td><td>{{ row.pending }}</td>
+        <td>{% if can_manage_accounts %}<a class="adm-icon-btn" href="{{ url_for('admin.account_detail', user_id=row.user.user_id) }}" title="View"><svg viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><span>View</span></a>{% else %}<span class="adm-muted">Restricted</span>{% endif %}</td>
+      </tr>
+      {% else %}<tr><td colspan="7" class="adm-empty">No staff records available.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <div class="adm-bottom-grid">
+    <section class="adm-panel">
+      <div class="adm-panel-head"><div class="adm-panel-title"><span class="adm-panel-icon adm-icon-green"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span><div><p class="admin-eyebrow">RECENT SYSTEM ACTIVITIES</p><h2>Activity Timeline</h2></div></div><a class="cset-btn cset-btn-ghost" href="{{ url_for('admin_audit.index') }}">View Audit Trail</a></div>
+      <div class="adm-timeline">
+        {% for a in activities %}
+        <article class="adm-timeline-item">
+          <div class="adm-timeline-dot adm-timeline-{{ a.activity_status|lower }}"></div>
+          <div class="adm-timeline-body">
+            <div class="adm-timeline-top"><strong>{{ a.user_name_snapshot }}</strong><span>{{ a.user_role }}</span><time>{{ a.created_at.strftime('%d %b %Y, %I:%M %p') if a.created_at else '' }}</time></div>
+            <p>{{ a.description }}</p>
+            <div class="adm-timeline-meta"><span>{{ a.module }}</span><span class="adm-status adm-status-{{ a.activity_status|lower }}">{{ a.activity_status }}</span></div>
+          </div>
         </article>
-        <article class="admin-stat-card">
-            <span class="admin-stat-icon admin-icon-violet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18"></path><path d="M5 21V7l7-4 7 4v14"></path><path d="M9 21v-6h6v6"></path></svg></span>
-            <span class="admin-stat-label">Government services</span><strong>{{ "{:,}".format(total_services) }}</strong><small>Configured services</small>
-        </article>
-        <article class="admin-stat-card">
-            <span class="admin-stat-icon admin-icon-teal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h8"></path></svg></span>
-            <span class="admin-stat-label">Applications</span><strong>{{ "{:,}".format(total_applications) }}</strong><small>All recorded requests</small>
-        </article>
-        <article class="admin-stat-card">
-            <span class="admin-stat-icon admin-icon-amber"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg></span>
-            <span class="admin-stat-label">Pending requests</span><strong>{{ "{:,}".format(pending_applications) }}</strong><small>Awaiting action</small>
-        </article>
-        <article class="admin-stat-card">
-            <span class="admin-stat-icon admin-icon-green"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><path d="m9 11 3 3L22 4"></path></svg></span>
-            <span class="admin-stat-label">Completed</span><strong>{{ "{:,}".format(completed_applications) }}</strong><small>Completed applications</small>
-        </article>
-        <article class="admin-stat-card">
-            <span class="admin-stat-icon admin-icon-pink"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"></rect><path d="M2 10h20"></path></svg></span>
-            <span class="admin-stat-label">Payments</span><strong>{{ "{:,}".format(total_payments) }}</strong><small>₱{{ "{:,.2f}".format(paid_amount) }} recorded as paid</small>
-        </article>
+        {% else %}<p class="adm-empty">No system activities recorded yet.</p>{% endfor %}
+      </div>
     </section>
 
-    <div class="admin-dashboard-grid">
-        <section class="admin-panel admin-chart-panel">
-            <div class="admin-panel-heading">
-                <div><p class="admin-eyebrow">LAST 7 DAYS</p><h2>Application activity</h2></div>
-                <a class="admin-text-link" href="{{ url_for('admin.applications') }}">View applications <span aria-hidden="true">→</span></a>
+    <section class="adm-panel">
+      <div class="adm-panel-head"><div class="adm-panel-title"><span class="adm-panel-icon adm-icon-red"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 7-3 7h18s-3 0-3-7"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span><div><p class="admin-eyebrow">NOTIFICATIONS & ALERTS</p><h2>Operational Alerts</h2></div></div><span class="adm-pill">{{ unread_notifications }} unread</span></div>
+      <div class="adm-notif-list">
+        {% for n in notifications %}
+        {% set msg = (n.notification_message or '')|lower %}
+        {% set pr = 'critical' if ('fail' in msg or 'unusual' in msg or 'denied' in msg) else ('warning' if ('pending' in msg or 'delay' in msg or 'required' in msg) else ('success' if ('approved' in msg or 'completed' in msg or 'verified' in msg) else 'info')) %}
+        <article class="adm-notif adm-notif-{{ pr }} {% if n.read_status!='read' %}is-unread{% endif %}">
+          <div class="adm-notif-priority"></div>
+          <div class="adm-notif-body">
+            <div class="adm-notif-top"><strong>{{ n.notification_title }}</strong><time>{{ n.created_date.strftime('%d %b %Y, %I:%M %p') if n.created_date else '' }}</time></div>
+            <p>{{ n.notification_message }}</p>
+            <div class="adm-notif-actions">
+              <span class="adm-priority-badge">{{ pr|title }}</span>
+              {% if n.read_status != 'read' and n.user_id == current_user.user_id %}
+              <form method="post" action="{{ url_for('citizen.notification_read', notification_id=n.notification_id) }}" class="adm-inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ url_for('admin.dashboard', range=rng.preset, start=request.args.get('start',''), end=request.args.get('end','')) }}"><button type="submit" class="adm-link-btn">Mark as Read</button></form>
+              {% endif %}
+              <a class="adm-link-btn" href="{{ url_for('admin_portal.notifications') }}">View Details</a>
             </div>
-            <div class="admin-chart" role="img" aria-label="Submitted applications during the last seven days">
-                {% for day in weekly_activity %}
-                <div class="admin-chart-column">
-                    <span class="admin-chart-value">{{ day.count }}</span>
-                    <div class="admin-chart-track"><i style="height: {{ (day.count / max_daily * 100)|round|int }}%"></i></div>
-                    <span class="admin-chart-label">{{ day.label }}</span>
-                </div>
-                {% endfor %}
-            </div>
-        </section>
+          </div>
+        </article>
+        {% else %}<p class="adm-empty">No notifications available.</p>{% endfor %}
+      </div>
+    </section>
+  </div>
 
-        <section class="admin-panel admin-quick-panel">
-            <div class="admin-panel-heading"><div><p class="admin-eyebrow">SHORTCUTS</p><h2>Quick actions</h2></div></div>
-            <a class="admin-quick-link" href="{{ url_for('admin.applications', status='submitted') }}"><span class="admin-quick-icon admin-icon-amber">◷</span><span><strong>Review new requests</strong><small>{{ pending_applications }} pending requests</small></span><b>→</b></a>
-            <a class="admin-quick-link" href="{{ url_for('admin.services') }}"><span class="admin-quick-icon admin-icon-violet">▦</span><span><strong>Manage services</strong><small>Review service availability</small></span><b>→</b></a>
-            <a class="admin-quick-link" href="{{ url_for('admin.accounts') }}"><span class="admin-quick-icon admin-icon-blue">♙</span><span><strong>Manage accounts</strong><small>Citizens and staff accounts</small></span><b>→</b></a>
-        </section>
+  <section class="adm-panel">
+    <div class="adm-panel-head"><div class="adm-panel-title"><span class="adm-panel-icon adm-icon-blue"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg></span><div><p class="admin-eyebrow">QUICK ACTIONS</p><h2>Administrator Shortcuts</h2></div></div></div>
+    <div class="adm-quick-grid">
+      {% if is_system_admin %}<a class="adm-quick adm-quick-blue" href="{{ url_for('admin.account_creation') }}"><span class="adm-quick-icon"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg></span><span>Create Staff Account</span></a>{% endif %}
+      {% if can_manage_accounts %}<a class="adm-quick adm-quick-teal" href="{{ url_for('admin.accounts') }}"><span class="adm-quick-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span>Manage Citizen Accounts</span></a>{% endif %}
+      <a class="adm-quick adm-quick-amber" href="{{ url_for('admin.applications') }}"><span class="adm-quick-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg></span><span>Review Applications</span></a>
+      <a class="adm-quick adm-quick-green" href="{{ url_for('admin_portal.payments') }}"><span class="adm-quick-icon"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></span><span>Verify Payments</span></a>
+      <a class="adm-quick adm-quick-violet" href="{{ url_for('admin.services') }}"><span class="adm-quick-icon"><svg viewBox="0 0 24 24"><path d="M3 22h18"/><path d="M6 18V11M10 18V11M14 18V11M18 18V11"/><path d="M2 9l10-7 10 7v2H2z"/></svg></span><span>Manage Government Services</span></a>
+      <a class="adm-quick adm-quick-slate" href="{{ url_for('admin_audit.index') }}"><span class="adm-quick-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span><span>View Audit Trail</span></a>
+      <a class="adm-quick adm-quick-pink" href="{{ url_for('admin.dashboard', range=rng.preset, start=request.args.get('start',''), end=request.args.get('end',''), export='csv') }}"><span class="adm-quick-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></span><span>Generate Reports</span></a>
     </div>
-
-    <div class="admin-dashboard-grid admin-dashboard-grid--lower">
-        <section class="admin-panel">
-            <div class="admin-panel-heading"><div><p class="admin-eyebrow">LATEST UPDATES</p><h2>Recent activity</h2></div><a class="admin-text-link" href="{{ url_for('admin.applications') }}">All activity <span aria-hidden="true">→</span></a></div>
-            {% if recent_events %}
-            <div class="admin-activity-list">
-                {% for event in recent_events %}
-                <a class="admin-activity-row" href="{{ url_for('admin.application_detail', application_id=event.application_id) }}">
-                    <span class="admin-activity-dot"></span>
-                    <span class="admin-activity-copy"><strong>{{ event.application.service.service_name }} · {{ event.application.tracking_number }}</strong><small>{{ event.update_description }}{% if event.updated_by %} · {{ activity_users.get(event.updated_by, "Staff") }}{% endif %}</small></span>
-                    <time>{{ event.recorded_at.strftime("%d %b, %H:%M") }}</time>
-                </a>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p class="admin-empty">No application activity has been recorded yet.</p>
-            {% endif %}
-        </section>
-
-        <section class="admin-panel">
-            <div class="admin-panel-heading"><div><p class="admin-eyebrow">SERVICE DIRECTORY</p><h2>Government services</h2></div><a class="admin-text-link" href="{{ url_for('admin.services') }}">Manage <span aria-hidden="true">→</span></a></div>
-            <div class="admin-service-list">
-                {% for service, application_count in service_rows %}
-                <a class="admin-service-row" href="{{ url_for('admin.applications', service=service.service_id) }}">
-                    <span class="admin-service-mark">{{ service.service_name[:1]|upper }}</span>
-                    <span><strong>{{ service.service_name }}</strong><small>{{ application_count }} application{% if application_count != 1 %}s{% endif %}</small></span>
-                    <i class="admin-status-dot admin-status-dot--{{ service.service_status }}"></i>
-                </a>
-                {% else %}
-                <p class="admin-empty">No services are configured in the database.</p>
-                {% endfor %}
-            </div>
-        </section>
-    </div>
+  </section>
 </div>
+
+<script>
+(() => {
+  const trendLabels = {{ trend_labels|tojson }};
+  const trendNew = {{ trend_new|tojson }};
+  const trendCompleted = {{ trend_completed|tojson }};
+  const serviceChart = ({{ service_chart|tojson }}).slice().sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0));
+  const statusDist = {{ status_dist|tojson }};
+  const dailyRevLabels = {{ daily_rev_labels|tojson }};
+  const dailyRev = {{ daily_rev|tojson }};
+  const monthlyRevLabels = {{ monthly_rev_labels|tojson }};
+  const monthlyRev = {{ monthly_rev|tojson }};
+  const revByService = {{ rev_by_service|tojson }};
+  const payMethod = {{ pay_method|tojson }};
+  const palette = ['#2563EB','#16A34A','#F59E0B','#DC2626','#8B5CF6','#06B6D4','#F97316','#64748B','#0EA5E9','#14B8A6','#EF4444','#A855F7','#84CC16','#475569'];
+  const grid = 'rgba(148,163,184,.2)';
+  const tick = '#64748B';
+  Chart.defaults.font.family = 'Poppins, Segoe UI, Arial, sans-serif';
+  const isDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
+  const themeTick = () => isDark() ? '#94A3B8' : tick;
+  const themeGrid = () => isDark() ? 'rgba(148,163,184,.16)' : grid;
+  const themeMuted = () => isDark() ? '#94A3B8' : '#64748B';
+  const themeCard = () => isDark() ? '#1F2937' : '#FFFFFF';
+  const themeCardBorder = () => isDark() ? '#334155' : '#E5E7EB';
+  const themeTitle = () => isDark() ? '#F1F5F9' : '#0F172A';
+  const themeBody = () => isDark() ? '#CBD5E1' : '#334155';
+  Chart.defaults.color = themeTick();
+  const baseOpts = {responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{boxWidth:10,usePointStyle:true,color:themeTick()}}}, scales:{x:{grid:{display:false},ticks:{color:themeTick()}}, y:{beginAtZero:true,grid:{color:themeGrid()},ticks:{color:themeTick()}}}};
+  const l9Violet = '#8B5CF6';
+  const l9Emerald = '#10B981';
+  const l9Ink = '#0F172A';
+  const l9Muted = '#94A3B8';
+  const l9Hex = (hex, a) => { const h = hex.replace('#',''); const n = parseInt(h,16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; };
+  const l9Gradient = (color, top = 0.22) => (context) => {
+    const {ctx, chartArea} = context.chart;
+    if (!chartArea) return l9Hex(color, top);
+    const g = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+    g.addColorStop(0, l9Hex(color, top));
+    g.addColorStop(1, l9Hex(color, 0));
+    return g;
+  };
+  const l9DotGrid = {
+    id: 'l9DotGrid',
+    beforeDatasetsDraw(chart) {
+      const {ctx, chartArea} = chart;
+      if (!chartArea) return;
+      ctx.save();
+      ctx.fillStyle = 'rgba(100,116,139,.16)';
+      for (let x = chartArea.left + 8; x <= chartArea.right; x += 20) {
+        for (let y = chartArea.top + 8; y <= chartArea.bottom; y += 20) {
+          ctx.beginPath(); ctx.arc(x, y, 1, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+  };
+  const l9DashGrid = {
+    id: 'l9DashGrid',
+    beforeDatasetsDraw(chart) {
+      const {ctx, chartArea, scales} = chart;
+      if (!chartArea || !scales.y) return;
+      ctx.save();
+      ctx.setLineDash([4, 8]);
+      ctx.strokeStyle = isDark() ? 'rgba(148,163,184,.18)' : 'rgba(100,116,139,.28)';
+      ctx.lineWidth = 1;
+      scales.y.ticks.forEach((t, i) => {
+        const py = scales.y.getPixelForTick(i);
+        if (py < chartArea.top - 1 || py > chartArea.bottom + 1) return;
+        ctx.beginPath(); ctx.moveTo(chartArea.left, py); ctx.lineTo(chartArea.right, py); ctx.stroke();
+      });
+      ctx.restore();
+    }
+  };
+  const l9RefLine = {
+    id: 'l9RefLine',
+    afterDatasetsDraw(chart) {
+      const {ctx, chartArea, scales} = chart;
+      if (!chartArea || !scales.x || !chart.data.labels.length) return;
+      const idx = Math.floor((chart.data.labels.length - 1) * 0.6);
+      const px = scales.x.getPixelForValue(idx);
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = isDark() ? 'rgba(167,139,250,.55)' : 'rgba(139,92,246,.5)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(px, chartArea.top); ctx.lineTo(px, chartArea.bottom); ctx.stroke();
+      ctx.restore();
+    }
+  };
+  const l9Pct = (items) => {
+    try {
+      const c = Array.isArray(items) ? items[0] : items;
+      if (!c || !c.dataset || !Array.isArray(c.dataset.data)) return null;
+      const arr = c.dataset.data; const i = c.dataIndex;
+      if (i < 1) return null;
+      const prev = Number(arr[i-1]); const cur = Number(arr[i]);
+      if (!isFinite(prev) || prev === 0) return null;
+      return ((cur - prev) / prev) * 100;
+    } catch (e) { return null; }
+  };
+  const l9Tooltip = () => ({
+    backgroundColor: themeCard(),
+    borderColor: themeCardBorder(),
+    borderWidth: 1,
+    cornerRadius: 10,
+    padding: 12,
+    displayColors: true,
+    boxWidth: 8,
+    boxHeight: 8,
+    usePointStyle: true,
+    titleColor: l9Muted,
+    titleFont: {size: 11, weight: '600'},
+    bodyColor: l9Ink,
+    bodyFont: {size: 13, weight: '700'},
+    footerColor: (items) => { const f = l9Pct(items); return f !== null && f < 0 ? '#E11D48' : l9Emerald; },
+    footerFont: {size: 11, weight: '600'},
+    callbacks: {
+      label: (c) => ` ${c.dataset.label}: ${Number(c.parsed.y).toLocaleString()}`,
+      footer: (items) => {
+        const f = l9Pct(items);
+        if (f === null) return '';
+        return `${f >= 0 ? '+' : ''}${f.toFixed(1)}% vs previous`;
+      }
+    }
+  });
+  const l9Peso = (v) => '₱' + Number(v).toLocaleString(undefined, {maximumFractionDigits: 2});
+  const l9PesoCompact = (v) => '₱' + Number(v).toLocaleString(undefined, {notation: 'compact', maximumFractionDigits: 1});
+  const l9PesoTooltip = () => {
+    const cfg = l9Tooltip();
+    cfg.callbacks = {...cfg.callbacks, label: (c) => ` ${c.dataset.label}: ${l9Peso(c.parsed.y)}`};
+    return cfg;
+  };
+  const l9Scales = () => ({
+    x: {grid: {display: false}, border: {display: false}, ticks: {color: themeMuted(), font: {size: 11}, maxRotation: 0, autoSkip: true, maxTicksLimit: 6, padding: 8}},
+    y: {beginAtZero: true, grid: {display: false}, border: {display: false}, ticks: {color: themeMuted(), font: {size: 11}, padding: 10, precision: 0}}
+  });
+  const l9Stats = (prefix, data, formatter) => {
+    const nums = (data || []).map(Number);
+    const fmt = formatter || ((v) => v.toLocaleString());
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    const total = nums.reduce((a, b) => a + b, 0);
+    const high = nums.length ? Math.max(...nums) : 0;
+    const low = nums.length ? Math.min(...nums) : 0;
+    const first = nums.length ? nums[0] : 0;
+    const last = nums.length ? nums[nums.length - 1] : 0;
+    const change = first ? ((last - first) / first) * 100 : 0;
+    set(prefix + 'Total', fmt(total));
+    set(prefix + 'High', fmt(high));
+    set(prefix + 'Low', fmt(low));
+    set(prefix + 'Delta', `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`);
+    const badge = document.getElementById(prefix + 'Change');
+    if (badge) {
+      badge.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`;
+      badge.classList.toggle('is-up', change >= 0);
+      badge.classList.toggle('is-down', change < 0);
+    }
+  };
+
+  l9Stats('l9Trend', trendNew);
+  new Chart(document.getElementById('chartTrend'), {
+    type: 'line',
+    data: {labels: trendLabels, datasets: [{
+      label: 'New Applications',
+      data: trendNew,
+      borderColor: l9Violet,
+      backgroundColor: l9Gradient(l9Violet),
+      fill: true,
+      tension: 0.4,
+      cubicInterpolationMode: 'monotone',
+      borderWidth: 2,
+      pointRadius: (ctx) => {
+        const d = ctx.dataset.data;
+        if (!d || !d.length) return 0;
+        if (ctx.dataIndex === 0 || ctx.dataIndex === d.length - 1) return 5;
+        const v = Number(d[ctx.dataIndex]);
+        return (v === Math.max(...d) || v === Math.min(...d)) ? 5 : 0;
+      },
+      pointHoverRadius: 6,
+      pointBackgroundColor: l9Violet,
+      pointBorderColor: '#FFFFFF',
+      pointBorderWidth: 2,
+      pointHoverBackgroundColor: l9Violet,
+      pointHoverBorderColor: '#FFFFFF',
+      pointHoverBorderWidth: 2
+    }]},
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {mode: 'index', intersect: false},
+      layout: {padding: {top: 8, right: 8}},
+      plugins: {legend: {display: false}, tooltip: l9Tooltip()},
+      scales: l9Scales()
+    },
+    plugins: [l9DotGrid, l9DashGrid, l9RefLine]
+  });
+  const serviceCounts = serviceChart.map(x => Number(x.count) || 0);
+  const serviceTotal = serviceCounts.reduce((a, b) => a + b, 0);
+  const serviceShares = serviceCounts.map(v => serviceTotal ? (v / serviceTotal) * 100 : 0);
+  const serviceCumulative = [];
+  serviceCounts.reduce((acc, v, i) => { const c = acc + v; serviceCumulative[i] = serviceTotal ? (c / serviceTotal) * 100 : 0; return c; }, 0);
+  const serviceThreshold = serviceChart.map(() => 80);
+  const serviceAxisMax = serviceTotal > 0 ? serviceTotal * 1.08 : 1;
+  const servicePctMax = 108;
+  const serviceAxisStep = serviceTotal > 0 ? serviceTotal / 5 : 1;
+  const serviceTip = document.getElementById('serviceChartTip');
+  const serviceWrap = document.getElementById('serviceChartWrap');
+  const serviceEsc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const serviceTipHtml = (label, count, share, cum) => `<div class="pt-title"><span class="adm-pareto-dot"></span>${serviceEsc(label)}</div>
+      <div class="pt-row"><span>Applications</span><b>${count.toLocaleString()}</b></div>
+      <div class="pt-row"><span>Share of total</span><b>${share.toFixed(1)}%</b></div>
+      <div class="pt-row"><span>Cumulative</span><b>${cum.toFixed(1)}%</b></div>`;
+  const serviceExternalTip = (context) => {
+    const {tooltip} = context;
+    if (!serviceTip || !serviceWrap) return;
+    if (!tooltip || tooltip.opacity === 0 || !tooltip.dataPoints || !tooltip.dataPoints.length) {
+      serviceTip.classList.remove('is-visible');
+      return;
+    }
+    const idx = tooltip.dataPoints[0].dataIndex;
+    const label = (serviceChart[idx] && serviceChart[idx].label) || '';
+    serviceTip.innerHTML = serviceTipHtml(label, serviceCounts[idx] || 0, serviceShares[idx] || 0, serviceCumulative[idx] || 0);
+    serviceTip.classList.add('is-visible');
+    const pad = 10;
+    const cRect = context.chart.canvas.getBoundingClientRect();
+    const wRect = serviceWrap.getBoundingClientRect();
+    const originX = cRect.left - wRect.left;
+    const originY = cRect.top - wRect.top;
+    const tipX = originX + tooltip.caretX;
+    const tipY = originY + tooltip.caretY;
+    const w = serviceTip.offsetWidth, h = serviceTip.offsetHeight;
+    let left = tipX + 16;
+    let top = tipY - h / 2;
+    if (left + w > serviceWrap.clientWidth - pad) left = tipX - w - 16;
+    if (left < pad) left = pad;
+    if (top < pad) top = pad;
+    if (top + h > serviceWrap.clientHeight - pad) top = serviceWrap.clientHeight - h - pad;
+    serviceTip.style.left = left + 'px';
+    serviceTip.style.top = top + 'px';
+  };
+  const serviceShort = {
+    'PSA Birth Certificate': ['PSA Birth', 'Cert.'],
+    'PSA CENOMAR': ['PSA', 'CENOMAR'],
+    'PhilSys National ID': ['PhilSys', 'National ID'],
+    'NBI Clearance': ['NBI', 'Clearance'],
+    'SSS Number Registration / MySSS Card': ['SSS', 'MySSS Card'],
+    'LGU Barangay Clearance': ['Barangay', 'Clearance'],
+    'LGU Certificate of Residency': ['LGU Cert.', 'Residency'],
+    'LGU Senior Citizen ID': ['Senior', 'Citizen ID']
+  };
+  const serviceWrapLabel = (label) => {
+    if (serviceShort[label]) return serviceShort[label];
+    const words = String(label || '').split(' ').filter(Boolean);
+    if (words.length < 2) return label;
+    const mid = Math.ceil(words.length / 2);
+    return [words.slice(0, mid).join(' '), words.slice(mid).join(' ')];
+  };
+  const serviceTooltipPlugin = {
+    enabled: false,
+    external: serviceExternalTip,
+    mode: 'index',
+    intersect: false
+  };
+  new Chart(document.getElementById('chartService'), {
+    data: {
+      labels: serviceChart.map(x => x.label),
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Applications',
+          data: serviceCounts,
+          backgroundColor: '#BBF7D0',
+          hoverBackgroundColor: '#86EFAC',
+          borderRadius: 5,
+          borderSkipped: false,
+          maxBarThickness: 34,
+          categoryPercentage: 0.72,
+          barPercentage: 0.72,
+          order: 2,
+          yAxisID: 'y'
+        },
+        {
+          type: 'line',
+          label: 'Cumulative %',
+          data: serviceCumulative,
+          borderColor: '#173B72',
+          backgroundColor: '#173B72',
+          borderWidth: 2.5,
+          tension: 0.35,
+          pointRadius: 4,
+          pointHoverRadius: 8,
+          pointHitRadius: 18,
+          pointBackgroundColor: '#173B72',
+          pointBorderColor: '#FFFFFF',
+          pointBorderWidth: 2,
+          pointHoverBorderWidth: 4,
+          pointHoverBackgroundColor: '#173B72',
+          order: 1,
+          fill: false,
+          yAxisID: 'pct'
+        },
+        {
+          type: 'line',
+          label: '80% Threshold',
+          data: serviceThreshold,
+          borderColor: '#94A3B8',
+          borderDash: [6, 6],
+          borderWidth: 1.5,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          order: 3,
+          fill: false,
+          yAxisID: 'pct'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {duration: 220, easing: 'easeOutQuart'},
+      transitions: {active: {animation: {duration: 180, easing: 'easeOutQuart'}}},
+      interaction: {mode: 'nearest', intersect: false},
+      layout: {padding: {top: 4, right: 2, left: 2, bottom: 0}},
+      plugins: {
+        legend: {display: false},
+        tooltip: serviceTooltipPlugin
+      },
+      scales: {
+        x: {
+          grid: {display: false},
+          border: {display: false},
+          ticks: {
+            color: '#64748B',
+            font: {size: 9, weight: '500'},
+            maxRotation: 0,
+            minRotation: 0,
+            autoSkip: false,
+            align: 'center',
+            padding: 6,
+            callback: function(value) { return serviceWrapLabel(this.getLabelForValue(value)); }
+          }
+        },
+        y: {
+          beginAtZero: true,
+          max: serviceAxisMax,
+          position: 'left',
+          grid: {display: false},
+          border: {display: false},
+          ticks: {color: themeMuted(), font: {size: 10}, precision: 0, padding: 6, stepSize: serviceAxisStep}
+        },
+        pct: {
+          beginAtZero: true,
+          max: servicePctMax,
+          position: 'right',
+          grid: {display: false},
+          border: {display: false},
+          ticks: {color: themeMuted(), font: {size: 10}, padding: 6, stepSize: 20, callback: (v) => v + '%'}
+        }
+      }
+    },
+    plugins: [l9DashGrid]
+  });
+  const piePalette = ['#2563EB', '#F97316', '#14B8A6', '#8B5CF6', '#64748B'];
+  const statusItems = statusDist.filter(x => Number(x.count) > 0);
+  const statusLabels = statusItems.map(x => x.label);
+  const statusCounts = statusItems.map(x => Number(x.count) || 0);
+  const statusTotal = statusCounts.reduce((a, b) => a + b, 0);
+  const statusShares = statusCounts.map(v => statusTotal ? (v / statusTotal) * 100 : 0);
+  const statusColors = statusLabels.map((_, i) => piePalette[i % piePalette.length]);
+  const statusDeepen = (hex, amt) => {
+    const h = hex.replace('#', ''); const n = parseInt(h, 16);
+    const r = Math.max(0, Math.min(255, ((n >> 16) & 255) + amt));
+    const g = Math.max(0, Math.min(255, ((n >> 8) & 255) + amt));
+    const b = Math.max(0, Math.min(255, (n & 255) + amt));
+    return `rgb(${r},${g},${b})`;
+  };
+  const statusMutedColors = statusColors.map(c => {
+    const h = c.replace('#', ''); const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},.42)`;
+  });
+  const statusStrongColors = statusColors.map(c => statusDeepen(c, -20));
+  let statusHoverIndex = null;
+  let statusLockedIndex = null;
+  let statusUpdateQueued = false;
+  const statusActiveIndex = () => statusHoverIndex !== null ? statusHoverIndex : statusLockedIndex;
+  const statusTip = document.getElementById('statusChartTip');
+  const statusWrap = document.getElementById('statusChartWrap');
+  const statusEsc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const statusTipHtml = (i) => `<div class="pt-title"><span class="adm-pie-dot" style="background:${statusColors[i]}"></span>${statusEsc(statusLabels[i] || '')}</div>
+      <div class="pt-row"><span>Applications</span><b>${(statusCounts[i] || 0).toLocaleString()}</b></div>
+      <div class="pt-row"><span>Share</span><b>${(statusShares[i] || 0).toFixed(1)}%</b></div>`;
+  const statusExternalTip = (context) => {
+    const { tooltip } = context;
+    if (!statusTip || !statusWrap) return;
+    if (!tooltip || tooltip.opacity === 0 || !tooltip.dataPoints || !tooltip.dataPoints.length) {
+      statusTip.classList.remove('is-visible');
+      return;
+    }
+    const idx = tooltip.dataPoints[0].dataIndex;
+    statusTip.innerHTML = statusTipHtml(idx);
+    statusTip.classList.add('is-visible');
+    let px = tooltip.caretX, py = tooltip.caretY;
+    try {
+      const el = tooltip.dataPoints[0].element;
+      if (el && isFinite(el.startAngle) && isFinite(el.endAngle)) {
+        const mid = (el.startAngle + el.endAngle) / 2;
+        const radius = (el.innerRadius + el.outerRadius) / 2 + 12;
+        px = el.x + Math.cos(mid) * radius;
+        py = el.y + Math.sin(mid) * radius;
+      }
+    } catch (e) {}
+    statusPlaceTip(px, py);
+  };
+  function statusPlaceTip(px, py) {
+    if (!statusTip || !statusWrap) return;
+    const pad = 10;
+    const w = statusTip.offsetWidth, h = statusTip.offsetHeight;
+    let left = px + 16, top = py - h / 2;
+    if (left + w > statusWrap.clientWidth - pad) left = px - w - 16;
+    if (left < pad) left = pad;
+    if (top < pad) top = pad;
+    if (top + h > statusWrap.clientHeight - pad) top = statusWrap.clientHeight - h - pad;
+    statusTip.style.left = left + 'px';
+    statusTip.style.top = top + 'px';
+  }
+  function statusShowTip(chart, idx) {
+    const meta = chart.getDatasetMeta(0);
+    const el = meta && meta.data && meta.data[idx];
+    if (!el || !statusTip) return;
+    statusTip.innerHTML = statusTipHtml(idx);
+    statusTip.classList.add('is-visible');
+    const mid = (el.startAngle + el.endAngle) / 2;
+    const radius = (el.innerRadius + el.outerRadius) / 2 + 12;
+    statusPlaceTip(el.x + Math.cos(mid) * radius, el.y + Math.sin(mid) * radius);
+  }
+  const statusApply = (chart) => {
+    const ds = chart.data.datasets[0];
+    const active = statusActiveIndex();
+    ds.backgroundColor = statusColors.map((c, i) => active === null ? c : (i === active ? statusStrongColors[i] : statusMutedColors[i]));
+    ds.offset = statusColors.map((_, i) => (i === active ? 12 : 0));
+    ds.borderWidth = statusColors.map((_, i) => (i === active ? 4 : 2));
+    chart.update();
+  };
+  const statusSchedule = (chart) => {
+    if (statusUpdateQueued) return;
+    statusUpdateQueued = true;
+    requestAnimationFrame(() => { statusUpdateQueued = false; statusApply(chart); });
+  };
+  const statusDotGrid = {
+    id: 'statusDotGrid',
+    beforeDatasetsDraw(chart) {
+      const { ctx, chartArea } = chart;
+      if (!chartArea) return;
+      ctx.save();
+      ctx.fillStyle = 'rgba(100,116,139,.14)';
+      for (let x = chartArea.left + 8; x <= chartArea.right; x += 18) {
+        for (let y = chartArea.top + 8; y <= chartArea.bottom; y += 18) {
+          ctx.beginPath(); ctx.arc(x, y, 1, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+  };
+  const statusEmpty = {
+    id: 'statusEmpty',
+    afterDatasetsDraw(chart) {
+      if (chart.data.labels && chart.data.labels.length) return;
+      const opts = (chart.options.plugins && chart.options.plugins.statusEmpty) || {};
+      const { ctx, width, height } = chart;
+      ctx.save();
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '600 12px Poppins, Segoe UI, Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(opts.text || 'No applications for this period', width / 2, height / 2);
+      ctx.restore();
+    }
+  };
+  const statusChart = new Chart(document.getElementById('chartStatus'), {
+    type: 'pie',
+    data: { labels: statusLabels, datasets: [{
+      data: statusCounts,
+      backgroundColor: statusColors.slice(),
+      hoverBackgroundColor: statusStrongColors.slice(),
+      borderColor: '#FFFFFF',
+      borderWidth: 2,
+      spacing: 3,
+      offset: statusColors.map(() => 0)
+    }]},
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: {padding: 6},
+      animation: {duration: 240, easing: 'easeOutQuart'},
+      plugins: {
+        legend: {position: 'top', labels: {usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 12, color: themeBody(), font: {size: 10.5}}},
+        tooltip: {enabled: false, external: statusExternalTip}
+      },
+      onHover: (event, elements) => {
+        const next = elements.length ? elements[0].index : null;
+        if (next !== statusHoverIndex) { statusHoverIndex = next; statusSchedule(statusChart); }
+        if (next === null && statusTip) statusTip.classList.remove('is-visible');
+      },
+      onClick: (event, elements) => {
+        if (!elements.length) return;
+        statusLockedIndex = elements[0].index;
+        statusHoverIndex = elements[0].index;
+        statusSchedule(statusChart);
+        statusShowTip(statusChart, elements[0].index);
+      }
+    },
+    plugins: [statusDotGrid, statusEmpty]
+  });
+  l9Stats('l9Compare', trendNew);
+  new Chart(document.getElementById('chartCompare'), {
+    type: 'line',
+    data: {labels: trendLabels, datasets: [
+      {label: 'New Applications', data: trendNew, borderColor: l9Violet, backgroundColor: l9Gradient(l9Violet, 0.16), fill: true, tension: 0.4, cubicInterpolationMode: 'monotone', borderWidth: 2, pointRadius: 0, pointHoverRadius: 6, pointHoverBackgroundColor: l9Violet, pointHoverBorderColor: '#FFFFFF', pointHoverBorderWidth: 2},
+      {label: 'Completed', data: trendCompleted, borderColor: l9Emerald, backgroundColor: l9Gradient(l9Emerald, 0.14), fill: true, tension: 0.4, cubicInterpolationMode: 'monotone', borderWidth: 2, pointRadius: 0, pointHoverRadius: 6, pointHoverBackgroundColor: l9Emerald, pointHoverBorderColor: '#FFFFFF', pointHoverBorderWidth: 2}
+    ]},
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {mode: 'index', intersect: false},
+      layout: {padding: {top: 8, right: 8}},
+      plugins: {
+        legend: {position: 'bottom', labels: {color: l9Muted, usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 16, font: {size: 11}}},
+        tooltip: l9Tooltip()
+      },
+      scales: l9Scales()
+    },
+    plugins: [l9DotGrid, l9DashGrid]
+  });
+  const dailyTotal = dailyRev.reduce((a, b) => a + (Number(b) || 0), 0);
+  const dailyShares = dailyRev.map(v => dailyTotal ? ((Number(v) || 0) / dailyTotal) * 100 : 0);
+  const dailyCumulative = [];
+  dailyRev.reduce((acc, v, i) => { const c = acc + (Number(v) || 0); dailyCumulative[i] = dailyTotal ? (c / dailyTotal) * 100 : 0; return c; }, 0);
+  const dailyThreshold = dailyRev.map(() => 80);
+  const dailyAxisMax = dailyTotal > 0 ? dailyTotal * 1.08 : 1;
+  const dailyPctMax = 108;
+  const dailyAxisStep = dailyTotal > 0 ? dailyTotal / 5 : 1;
+  const dailyTip = document.getElementById('dailyRevTip');
+  const dailyWrap = document.getElementById('dailyRevWrap');
+  const dailyEsc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const dailyTipHtml = (label, revenue, share, cum) => `<div class="pt-title"><span class="adm-pareto-dot"></span>${dailyEsc(label)}</div>
+      <div class="pt-row"><span>Revenue</span><b>${l9Peso(revenue)}</b></div>
+      <div class="pt-row"><span>Share of total</span><b>${share.toFixed(1)}%</b></div>
+      <div class="pt-row"><span>Cumulative</span><b>${cum.toFixed(1)}%</b></div>`;
+  const dailyExternalTip = (context) => {
+    const {tooltip} = context;
+    if (!dailyTip || !dailyWrap) return;
+    if (!tooltip || tooltip.opacity === 0 || !tooltip.dataPoints || !tooltip.dataPoints.length) {
+      dailyTip.classList.remove('is-visible');
+      return;
+    }
+    const idx = tooltip.dataPoints[0].dataIndex;
+    dailyTip.innerHTML = dailyTipHtml(dailyRevLabels[idx] || '', dailyRev[idx] || 0, dailyShares[idx] || 0, dailyCumulative[idx] || 0);
+    dailyTip.classList.add('is-visible');
+    const pad = 10;
+    const cRect = context.chart.canvas.getBoundingClientRect();
+    const wRect = dailyWrap.getBoundingClientRect();
+    const originX = cRect.left - wRect.left;
+    const originY = cRect.top - wRect.top;
+    const tipX = originX + tooltip.caretX;
+    const tipY = originY + tooltip.caretY;
+    const w = dailyTip.offsetWidth, h = dailyTip.offsetHeight;
+    let left = tipX + 16;
+    let top = tipY - h / 2;
+    if (left + w > dailyWrap.clientWidth - pad) left = tipX - w - 16;
+    if (left < pad) left = pad;
+    if (top < pad) top = pad;
+    if (top + h > dailyWrap.clientHeight - pad) top = dailyWrap.clientHeight - h - pad;
+    dailyTip.style.left = left + 'px';
+    dailyTip.style.top = top + 'px';
+  };
+  new Chart(document.getElementById('chartDailyRev'), {
+    data: {
+      labels: dailyRevLabels,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Revenue',
+          data: dailyRev,
+          backgroundColor: '#BBF7D0',
+          hoverBackgroundColor: '#86EFAC',
+          borderRadius: 5,
+          borderSkipped: false,
+          maxBarThickness: 34,
+          categoryPercentage: 0.72,
+          barPercentage: 0.72,
+          order: 2,
+          yAxisID: 'y'
+        },
+        {
+          type: 'line',
+          label: 'Cumulative %',
+          data: dailyCumulative,
+          borderColor: '#173B72',
+          backgroundColor: '#173B72',
+          borderWidth: 2.5,
+          tension: 0.35,
+          pointRadius: 4,
+          pointHoverRadius: 8,
+          pointHitRadius: 18,
+          pointBackgroundColor: '#173B72',
+          pointBorderColor: '#FFFFFF',
+          pointBorderWidth: 2,
+          pointHoverBorderWidth: 4,
+          pointHoverBackgroundColor: '#173B72',
+          order: 1,
+          fill: false,
+          yAxisID: 'pct'
+        },
+        {
+          type: 'line',
+          label: '80% Threshold',
+          data: dailyThreshold,
+          borderColor: '#94A3B8',
+          borderDash: [6, 6],
+          borderWidth: 1.5,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          order: 3,
+          fill: false,
+          yAxisID: 'pct'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {duration: 220, easing: 'easeOutQuart'},
+      transitions: {active: {animation: {duration: 180, easing: 'easeOutQuart'}}},
+      interaction: {mode: 'nearest', intersect: false},
+      layout: {padding: {top: 4, right: 2, left: 2, bottom: 0}},
+      plugins: {
+        legend: {display: false},
+        tooltip: {enabled: false, external: dailyExternalTip, mode: 'index', intersect: false}
+      },
+      scales: {
+        x: {
+          grid: {display: false},
+          border: {display: false},
+          ticks: {color: themeMuted(), font: {size: 10, weight: '500'}, maxRotation: 0, minRotation: 0, autoSkip: false, align: 'center', padding: 6}
+        },
+        y: {
+          beginAtZero: true,
+          max: dailyAxisMax,
+          position: 'left',
+          grid: {display: false},
+          border: {display: false},
+          ticks: {color: themeMuted(), font: {size: 10}, padding: 6, stepSize: dailyAxisStep, callback: (v) => l9PesoCompact(v)}
+        },
+        pct: {
+          beginAtZero: true,
+          max: dailyPctMax,
+          position: 'right',
+          grid: {display: false},
+          border: {display: false},
+          ticks: {color: themeMuted(), font: {size: 10}, padding: 6, stepSize: 20, callback: (v) => v + '%'}
+        }
+      }
+    },
+    plugins: [l9DashGrid]
+  });
+  const pesoTick = v => '₱' + Number(v).toLocaleString();
+  const pesoTooltip = {callbacks:{label:(ctx)=>` ${ctx.dataset.label}: ₱${Number(ctx.raw||0).toLocaleString()}`}};
+  l9Stats('l9Revenue', monthlyRev, l9Peso);
+  const revScales = l9Scales();
+  revScales.y.ticks.maxTicksLimit = 5;
+  revScales.y.ticks.callback = (v) => l9PesoCompact(v);
+  new Chart(document.getElementById('chartMonthlyRev'), {
+    type: 'line',
+    data: {labels: monthlyRevLabels, datasets: [{
+      label: 'Revenue',
+      data: monthlyRev,
+      borderColor: l9Emerald,
+      backgroundColor: l9Gradient(l9Emerald),
+      fill: true,
+      tension: 0.4,
+      cubicInterpolationMode: 'monotone',
+      borderWidth: 2,
+      pointRadius: (ctx) => {
+        const d = ctx.dataset.data;
+        if (!d || !d.length) return 0;
+        if (ctx.dataIndex === 0 || ctx.dataIndex === d.length - 1) return 5;
+        const v = Number(d[ctx.dataIndex]);
+        return (v === Math.max(...d) || v === Math.min(...d)) ? 5 : 0;
+      },
+      pointHoverRadius: 6,
+      pointBackgroundColor: l9Emerald,
+      pointBorderColor: '#FFFFFF',
+      pointBorderWidth: 2,
+      pointHoverBackgroundColor: l9Emerald,
+      pointHoverBorderColor: '#FFFFFF',
+      pointHoverBorderWidth: 2
+    }]},
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {mode: 'index', intersect: false},
+      layout: {padding: {top: 8, right: 8}},
+      plugins: {legend: {display: false}, tooltip: l9PesoTooltip()},
+      scales: revScales
+    },
+    plugins: [l9DotGrid, l9DashGrid, l9RefLine]
+  });
+  (() => {
+    const revLabels = revByService.map(x => x.label);
+    const revVals = revByService.map(x => Number(x.amount) || 0);
+    const revTotal = revVals.reduce((a, b) => a + b, 0);
+    const revMax = Math.max(1, ...revVals);
+    const revColor = '#F28482';
+    const revFill = 'rgba(242,132,130,0.24)';
+    const revFillStrong = 'rgba(242,132,130,0.38)';
+    const revGrid = () => isDark() ? 'rgba(148,163,184,0.18)' : 'rgba(148,163,184,0.28)';
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let revActive = null;
+    let revReady = false;
+    const revWrap = document.getElementById('revRadarWrap');
+    const revTip = document.getElementById('revRadarTip');
+    const revEsc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const revTipHtml = (i) => {
+      const share = revTotal ? (revVals[i] / revTotal * 100) : 0;
+      return `<div class="pt-title"><span class="adm-pie-dot" style="background:${revColor}"></span>${revEsc(revLabels[i] || '')}</div>
+        <div class="pt-row"><span>Revenue</span><b>${l9Peso(revVals[i] || 0)}</b></div>
+        <div class="pt-row"><span>Share</span><b>${share.toFixed(1)}%</b></div>`;
+    };
+    const revPlaceTip = (px, py) => {
+      if (!revTip || !revWrap) return;
+      const pad = 10, w = revTip.offsetWidth, h = revTip.offsetHeight;
+      let left = px + 14, top = py - h / 2;
+      if (left + w > revWrap.clientWidth - pad) left = px - w - 14;
+      if (left < pad) left = pad;
+      if (top < pad) top = pad;
+      if (top + h > revWrap.clientHeight - pad) top = revWrap.clientHeight - h - pad;
+      revTip.style.left = left + 'px';
+      revTip.style.top = top + 'px';
+    };
+    const revShowTip = (chart, i) => {
+      if (!revTip || i === null || i === undefined) return;
+      const meta = chart.getDatasetMeta(0);
+      const el = meta && meta.data && meta.data[i];
+      if (!el) return;
+      revTip.innerHTML = revTipHtml(i);
+      revTip.classList.add('is-visible');
+      revPlaceTip(el.x, el.y);
+    };
+    const revHideTip = () => { if (revTip) revTip.classList.remove('is-visible'); };
+    const revHighlight = {
+      id: 'revHighlight',
+      afterDatasetsDraw(chart) {
+        const meta = chart.getDatasetMeta(0);
+        const el = meta && meta.data && meta.data[revActive];
+        if (!el || !chart.scales.r) return;
+        const scale = chart.scales.r;
+        const {ctx} = chart;
+        const n = meta.data.length;
+        const prev = meta.data[(revActive - 1 + n) % n];
+        const next = meta.data[(revActive + 1) % n];
+        ctx.save();
+        ctx.fillStyle = 'rgba(242,132,130,0.16)';
+        ctx.beginPath();
+        ctx.moveTo(scale.xCenter, scale.yCenter);
+        ctx.lineTo(prev.x, prev.y);
+        ctx.lineTo(el.x, el.y);
+        ctx.lineTo(next.x, next.y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        ctx.save();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = revColor;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(el.x, el.y, 5.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+    };
+    const revChart = new Chart(document.getElementById('chartRevService'), {
+      type: 'radar',
+      data: {
+        labels: revLabels,
+        datasets: [{
+          label: 'Revenue',
+          data: revVals.map(() => 0),
+          borderColor: revColor,
+          backgroundColor: revFill,
+          borderWidth: 2,
+          fill: true,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          pointHitRadius: 14,
+          tension: 0.05
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: reducedMotion ? false : {duration: 1800, easing: 'easeOutCubic'},
+        layout: {padding: 12},
+        plugins: {
+          legend: {display: false},
+          tooltip: {enabled: false}
+        },
+        scales: {
+          r: {
+            beginAtZero: true,
+            suggestedMax: revMax * 1.15,
+            angleLines: {color: revGrid(), lineWidth: 1},
+            grid: {color: revGrid(), lineWidth: 1, circular: true},
+            pointLabels: {
+              color: '#475569',
+              font: {size: 10.5, weight: '500'},
+              padding: 10,
+              callback: function(label) {
+                const s = String(label || '');
+                if (s.length <= 14) return s;
+                const words = s.split(' ');
+                if (words.length < 2) return s;
+                const mid = Math.ceil(words.length / 2);
+                return [words.slice(0, mid).join(' '), words.slice(mid).join(' ')];
+              }
+            },
+            ticks: {display: false, stepSize: revMax / 4}
+          }
+        },
+        onHover: (event, elements, chart) => {
+          if (!revReady) return;
+          const rect = chart.canvas.getBoundingClientRect();
+          const x = (event.native ? event.native.clientX : event.x) - rect.left;
+          const y = (event.native ? event.native.clientY : event.y) - rect.top;
+          const scale = chart.scales.r;
+          const dx = x - scale.xCenter;
+          const dy = y - scale.yCenter;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          if (dist < 8 || dist > scale.drawingArea + 40) {
+            if (revActive !== null) { revActive = null; chart.draw(); revHideTip(); }
+            return;
+          }
+          let angle = Math.atan2(dy, dx);
+          const step = (Math.PI * 2) / revLabels.length;
+          let idx = Math.round((angle - (-Math.PI / 2)) / step);
+          idx = ((idx % revLabels.length) + revLabels.length) % revLabels.length;
+          if (idx !== revActive) {
+            revActive = idx;
+            chart.draw();
+            revShowTip(chart, idx);
+          } else {
+            revShowTip(chart, idx);
+          }
+        },
+        onClick: (event, elements, chart) => {
+          if (!revReady) return;
+          const rect = chart.canvas.getBoundingClientRect();
+          const x = (event.native ? event.native.clientX : event.x) - rect.left;
+          const y = (event.native ? event.native.clientY : event.y) - rect.top;
+          const scale = chart.scales.r;
+          const dx = x - scale.xCenter;
+          const dy = y - scale.yCenter;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          if (dist < 8 || dist > scale.drawingArea + 40) return;
+          let angle = Math.atan2(dy, dx);
+          const step = (Math.PI * 2) / revLabels.length;
+          let idx = Math.round((angle - (-Math.PI / 2)) / step);
+          idx = ((idx % revLabels.length) + revLabels.length) % revLabels.length;
+          revActive = idx;
+          chart.draw();
+          revShowTip(chart, idx);
+        }
+      },
+      plugins: [revHighlight]
+    });
+    if (revWrap) {
+      revWrap.addEventListener('mouseleave', () => { revActive = null; revChart.draw(); revHideTip(); });
+    }
+    const reveal = () => {
+      if (revReady) return;
+      revReady = true;
+      revChart.data.datasets[0].data = revVals;
+      revChart.update();
+    };
+    if (reducedMotion) {
+      reveal();
+    } else if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver((entries) => {
+        if (entries.some(e => e.isIntersecting)) { reveal(); io.disconnect(); }
+      }, {threshold: 0.25});
+      io.observe(revWrap || revChart.canvas);
+    } else {
+      reveal();
+    }
+  })();
+  const payItems = payMethod.filter(x => Number(x.count) > 0);
+  const payLabels = payItems.map(x => x.label);
+  const payCounts = payItems.map(x => Number(x.count) || 0);
+  const payTotal = payCounts.reduce((a, b) => a + b, 0);
+  const payShares = payCounts.map(v => payTotal ? (v / payTotal) * 100 : 0);
+  const payBase = ['#173B72','#2563EB','#0EA5E9','#14B8A6','#F59E0B','#64748B'];
+  const payColors = payLabels.map((_, i) => payBase[i % payBase.length]);
+  const payGradients = payColors.map(c => {
+    const h = c.replace('#',''); const n=parseInt(h,16);
+    const r=(n>>16)&255,g=(n>>8)&255,b=n&255;
+    return (ctx) => {
+      const chart = ctx.chart; const area = chart.chartArea;
+      if (!area) return c;
+      const grad = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+      grad.addColorStop(0, `rgba(${r},${g},${b},1)`);
+      grad.addColorStop(1, `rgba(${Math.max(0,r-24)},${Math.max(0,g-24)},${Math.max(0,b-24)},0.82)`);
+      return grad;
+    };
+  });
+  const payMutedGradients = payColors.map(c => {
+    const h=c.replace('#',''); const n=parseInt(h,16);
+    return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},0.35)`;
+  });
+  let payHoverIndex = null;
+  let payLockedIndex = null;
+  let payUpdateQueued = false;
+  const payActiveIndex = () => payHoverIndex !== null ? payHoverIndex : payLockedIndex;
+  const payTip = document.getElementById('payChartTip');
+  const payWrap = document.getElementById('payChartWrap');
+  const payEsc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const payTipHtml = (i) => `<div class="pt-title"><span class="adm-pie-dot" style="background:${payColors[i]}"></span>${payEsc(payLabels[i] || '')}</div>
+      <div class="pt-row"><span>Payments</span><b>${(payCounts[i] || 0).toLocaleString()}</b></div>
+      <div class="pt-row"><span>Share</span><b>${(payShares[i] || 0).toFixed(1)}%</b></div>`;
+  const payExternalTip = (context) => {
+    const { tooltip } = context;
+    if (!payTip || !payWrap) return;
+    if (!tooltip || tooltip.opacity === 0 || !tooltip.dataPoints || !tooltip.dataPoints.length) { payTip.classList.remove('is-visible'); return; }
+    const idx = tooltip.dataPoints[0].dataIndex;
+    payTip.innerHTML = payTipHtml(idx);
+    payTip.classList.add('is-visible');
+    let px = tooltip.caretX, py = tooltip.caretY;
+    try {
+      const el = tooltip.dataPoints[0].element;
+      if (el && isFinite(el.startAngle) && isFinite(el.endAngle)) {
+        const mid = (el.startAngle + el.endAngle) / 2;
+        const radius = (el.innerRadius + el.outerRadius) / 2 + 14;
+        px = el.x + Math.cos(mid) * radius;
+        py = el.y + Math.sin(mid) * radius;
+      }
+    } catch (e) {}
+    payPlaceTip(px, py);
+  };
+  function payPlaceTip(px, py) {
+    if (!payTip || !payWrap) return;
+    const pad = 10, w = payTip.offsetWidth, h = payTip.offsetHeight;
+    let left = px + 14, top = py - h / 2;
+    if (left + w > payWrap.clientWidth - pad) left = px - w - 14;
+    if (left < pad) left = pad; if (top < pad) top = pad;
+    if (top + h > payWrap.clientHeight - pad) top = payWrap.clientHeight - h - pad;
+    payTip.style.left = left + 'px'; payTip.style.top = top + 'px';
+  }
+  function payShowTip(chart, idx) {
+    const meta = chart.getDatasetMeta(0);
+    const el = meta && meta.data && meta.data[idx];
+    if (!el || !payTip) return;
+    payTip.innerHTML = payTipHtml(idx);
+    payTip.classList.add('is-visible');
+    const mid = (el.startAngle + el.endAngle) / 2;
+    const radius = (el.innerRadius + el.outerRadius) / 2 + 14;
+    payPlaceTip(el.x + Math.cos(mid) * radius, el.y + Math.sin(mid) * radius);
+  }
+  const payApply = (chart) => {
+    const ds = chart.data.datasets[0];
+    const active = payActiveIndex();
+    ds.backgroundColor = payColors.map((c, i) => active === null ? payGradients[i] : (i === active ? payGradients[i] : payMutedGradients[i]));
+    ds.offset = payColors.map((_, i) => (i === active ? 10 : 0));
+    ds.borderWidth = payColors.map((_, i) => (i === active ? 4 : 3));
+    chart.update();
+  };
+  const paySchedule = (chart) => {
+    if (payUpdateQueued) return;
+    payUpdateQueued = true;
+    requestAnimationFrame(() => { payUpdateQueued = false; payApply(chart); });
+  };
+  const payShadow = {
+    id: 'payShadow',
+    beforeDatasetsDraw(chart) {
+      const {ctx} = chart;
+      ctx.save();
+      ctx.shadowColor = 'rgba(15,23,42,0.18)';
+      ctx.shadowBlur = 18;
+      ctx.shadowOffsetY = 10;
+      ctx.shadowOffsetX = 0;
+    },
+    afterDatasetsDraw(chart) { chart.ctx.restore(); }
+  };
+  const payCenter = {
+    id: 'payCenter',
+    afterDraw(chart) {
+      const meta = chart.getDatasetMeta(0);
+      const arc = meta && meta.data && meta.data[0];
+      if (!arc) return;
+      const {ctx} = chart;
+      const x = arc.x, y = arc.y;
+      const active = payActiveIndex();
+      const value = active !== null ? (payCounts[active] || 0) : payTotal;
+      const label = active !== null ? (payLabels[active] || 'Payments') : 'Total Payments';
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = isDark() ? '#F1F5F9' : '#0F172A';
+      ctx.font = '700 30px Poppins, Segoe UI, Arial, sans-serif';
+      ctx.fillText(value.toLocaleString(), x, y - 8);
+      ctx.fillStyle = isDark() ? '#94A3B8' : '#64748B';
+      ctx.font = '500 12px Poppins, Segoe UI, Arial, sans-serif';
+      ctx.fillText(label, x, y + 18);
+      ctx.restore();
+    }
+  };
+  const payChart = new Chart(document.getElementById('chartPayMethod'), {
+    type: 'doughnut',
+    data: { labels: payLabels, datasets: [{
+      data: payCounts,
+      backgroundColor: payGradients,
+      hoverBackgroundColor: payGradients,
+      borderColor: '#FFFFFF',
+      borderWidth: 3,
+      spacing: 4,
+      borderRadius: 8,
+      offset: payColors.map(() => 0),
+      cutout: '68%'
+    }]},
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: {padding: 14},
+      animation: {animateRotate: true, animateScale: false, duration: 900, easing: 'easeOutQuart'},
+      plugins: {
+        legend: {position: 'bottom', labels: {usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 14, color: themeBody(), font: {size: 11, weight: '500'}}},
+        tooltip: {enabled: false, external: payExternalTip},
+        statusEmpty: {text: 'No payments for this period'}
+      },
+      onHover: (event, elements) => {
+        const next = elements.length ? elements[0].index : null;
+        if (next !== payHoverIndex) { payHoverIndex = next; paySchedule(payChart); }
+        if (next === null && payTip) payTip.classList.remove('is-visible');
+      },
+      onClick: (event, elements) => {
+        if (!elements.length) return;
+        payLockedIndex = elements[0].index;
+        payHoverIndex = elements[0].index;
+        paySchedule(payChart);
+        payShowTip(payChart, elements[0].index);
+      }
+    },
+    plugins: [payShadow, statusDotGrid, payCenter, statusEmpty]
+  });
+
+  const _admCharts = Chart.instances ? Object.values(Chart.instances) : [];
+  document.querySelectorAll('[data-theme-toggle]').forEach(btn => btn.addEventListener('click', () => {
+    setTimeout(() => {
+      Chart.defaults.color = themeTick();
+      Object.values(Chart.instances || {}).forEach(c => {
+        try { c.options.scales && Object.values(c.options.scales).forEach(s => { if(s.ticks) s.ticks.color = themeTick(); if(s.grid && s.grid.color !== undefined && s.grid.display!==false) s.grid.color = s.grid.circular ? (isDark()?'rgba(148,163,184,.18)':'rgba(148,163,184,0.28)') : themeGrid(); if(s.angleLines) s.angleLines.color = isDark()?'rgba(148,163,184,.18)':'rgba(148,163,184,0.28)'; if(s.pointLabels) s.pointLabels.color = themeBody(); }); } catch(e){}
+        try { c.options.plugins.legend.labels.color = themeBody(); } catch(e){}
+        try { if(c.config.type==='doughnut'||c.config.type==='pie'){ c.data.datasets.forEach(d=>{ d.borderColor = isDark()?'#111827':'#FFFFFF'; }); } } catch(e){}
+        try { c.update('none'); } catch(e){}
+      });
+    }, 30);
+  }));
+})();
+</script>
 {% endblock %}
