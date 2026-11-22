@@ -1,52 +1,156 @@
 {% extends "base.html" %}
-{% block title %}Account management · OneGov PH{% endblock %}
+{% block title %}Account Management · OneGov PH{% endblock %}
 {% block body_class %}citizen-dashboard admin-dashboard{% endblock %}
 {% block site_header %}{% include "admin/_header.html" %}{% endblock %}
 {% block content %}
-<div class="admin-main">
-    <header class="admin-page-heading">
-        <div><p class="admin-eyebrow">ADMINISTRATION / ACCESS CONTROL</p><h1>Account management</h1><p>Search citizen and staff accounts, review their access, and manage account status.</p></div>
-        {% if is_system_admin %}<a class="admin-button admin-button--primary" href="{{ url_for('admin.create_account') }}">＋ Create staff account</a>{% endif %}
-    </header>
-    <section class="admin-panel admin-filter-panel">
-        <form class="admin-filter-form" method="get">
-            <label class="admin-search-field"><span class="visually-hidden">Search accounts</span><input type="search" name="q" value="{{ search }}" placeholder="Name, email, or contact number"></label>
-            <label><span class="visually-hidden">Filter by role</span><select name="role"><option value="">All roles</option>{% for role in roles %}<option value="{{ role }}" {% if selected_role == role %}selected{% endif %}>{{ role_labels[role] }}</option>{% endfor %}</select></label>
-            <label><span class="visually-hidden">Filter by status</span><select name="status"><option value="">All statuses</option>{% for status in account_statuses %}<option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ status|title }}</option>{% endfor %}</select></label>
-            <button class="admin-button admin-button--primary" type="submit">Search</button>
-            {% if search or selected_role or selected_status %}<a class="admin-button admin-button--quiet" href="{{ url_for('admin.accounts') }}">Clear</a>{% endif %}
-        </form>
-    </section>
-    <section class="admin-panel admin-table-panel">
-        <div class="admin-panel-heading"><div><p class="admin-eyebrow">REGISTERED USERS</p><h2>Accounts</h2></div><span class="admin-count-chip">{{ users|length }} shown</span></div>
-        {% if users %}
-        <div class="admin-table-scroll">
-            <table class="admin-table">
-                <thead><tr><th>Account</th><th>Role</th><th>Department</th><th>Registered</th><th>Status</th><th></th></tr></thead>
-                <tbody>{% for user in users %}
-                    <tr>
-                        <td><span class="admin-account-cell"><span class="admin-avatar">{{ user.first_name[:1]|upper }}</span><span><strong>{{ user.full_name }}</strong><small>{{ user.email }}</small></span></span></td>
-                        <td>{{ department_role_label(user) }}</td>
-                        <td>{{ user.department.department_name if user.department else "—" }}</td>
-                        <td>{{ user.date_registered.strftime("%d %b %Y") }}</td>
-                        <td><span class="admin-status-pill admin-status-pill--{{ user.account_status }}">{{ user.account_status|title }}</span></td>
-                        <td>
-                            <a class="admin-row-action" href="{{ url_for('admin.account_detail', user_id=user.user_id) }}">Manage <span aria-hidden="true">→</span></a>
-                            {% if user.account_status == 'active' and user.user_id != current_user.user_id %}
-                            <form method="post" action="{{ url_for('admin.account_detail', user_id=user.user_id) }}" style="display:inline-block;margin-left:0.5rem;" onsubmit="return confirm('Deactivate this user account? They will no longer be able to sign in.');">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="hidden" name="action" value="deactivate">
-                                <input type="hidden" name="next" value="accounts">
-                                <button class="admin-row-action" type="submit" style="background:none;border:none;padding:0;cursor:pointer;color:inherit;text-decoration:underline;">Deactivate</button>
-                            </form>
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% endfor %}</tbody>
-            </table>
-        </div>
-        {% else %}<p class="admin-empty">No accounts match your search.</p>{% endif %}
-        {% if users|length >= 300 %}<p class="admin-table-note">Showing the most recent 300 matching accounts. Refine your search to find older records.</p>{% endif %}
-    </section>
+{% set ns = namespace(active=0,inactive=0,staff=0) %}
+{% for u in users %}
+  {% if u.account_status == 'active' %}{% set ns.active = ns.active + 1 %}{% endif %}
+  {% if u.account_status in ['inactive','deactivated','suspended'] %}{% set ns.inactive = ns.inactive + 1 %}{% endif %}
+  {% if u.role != 'citizen' %}{% set ns.staff = ns.staff + 1 %}{% endif %}
+{% endfor %}
+<div class="adm-dash">
+  <section class="adm-dash-header">
+    <div>
+      <p class="admin-eyebrow">ADMINISTRATION / ACCESS CONTROL</p>
+      <h1>Account Management</h1>
+      <p class="adm-dash-welcome">Search citizen and staff accounts, review access, and manage account status.</p>
+      <div class="adm-dash-date">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span>{{ users|length }} account{{ '' if users|length == 1 else 's' }} shown</span>
+      </div>
+    </div>
+    <div class="adm-dash-actions">
+      {% if is_system_admin %}<a class="cset-btn cset-btn-primary" href="{{ url_for('admin.create_account') }}">+ Create staff account</a>{% endif %}
+    </div>
+  </section>
+
+  <section class="adm-stats-group" aria-label="Account summary">
+    <div class="adm-stat-cell"><div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="adm-stat-label">Shown</span></div><div class="adm-stat-value">{{ users|length }}</div><div class="adm-stat-hint">Matching current filters</div></div>
+    <div class="adm-stat-cell"><div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-green"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span><span class="adm-stat-label">Active</span></div><div class="adm-stat-value">{{ ns.active }}</div><div class="adm-stat-hint">Can sign in</div></div>
+    <div class="adm-stat-cell"><div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-amber"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg></span><span class="adm-stat-label">Inactive</span></div><div class="adm-stat-value">{{ ns.inactive }}</div><div class="adm-stat-hint">Deactivated/suspended</div></div>
+    <div class="adm-stat-cell"><div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-violet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span><span class="adm-stat-label">Staff/Admin</span></div><div class="adm-stat-value">{{ ns.staff }}</div><div class="adm-stat-hint">Non-citizen accounts</div></div>
+  </section>
+
+  <section class="adm-panel">
+    <div class="adm-panel-head">
+      <div class="adm-panel-title"><span class="adm-panel-icon adm-icon-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></span><div><p class="admin-eyebrow">REGISTERED USERS</p><h2>Accounts</h2></div></div>
+      <span class="adm-pill">{{ users|length }} shown</span>
+    </div>
+
+    <form class="adm-filter-form adm-acct-filters" method="get">
+      <label class="adm-filter-field adm-filter-grow"><span>Search</span><input type="search" name="q" value="{{ search }}" placeholder="Name, email, or contact number"></label>
+      <label class="adm-filter-field"><span>Role</span><select name="role"><option value="">All roles</option>{% for role in roles %}<option value="{{ role }}" {% if selected_role == role %}selected{% endif %}>{{ role_labels[role] }}</option>{% endfor %}</select></label>
+      <label class="adm-filter-field"><span>Status</span><select name="status"><option value="">All statuses</option>{% for status in account_statuses %}<option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ status|title }}</option>{% endfor %}</select></label>
+      <button class="cset-btn cset-btn-primary" type="submit">Search</button>
+      {% if search or selected_role or selected_status %}<a class="cset-btn cset-btn-ghost" href="{{ url_for('admin.accounts') }}">Clear</a>{% endif %}
+    </form>
+
+    {% if users %}
+    <div class="adm-table-wrap adm-table-scroll-lg">
+      <table class="adm-table adm-table-compact adm-tx-table">
+        <thead><tr><th>Account</th><th>Role</th><th>Department</th><th>Registered</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for user in users %}
+          <tr>
+            <td class="adm-cell-wrap"><div class="adm-account-cell"><span class="adm-account-avatar">{{ user.first_name[:1]|upper }}</span><div><strong>{{ user.full_name }}</strong><div class="adm-cell-sub">{{ user.email }}</div></div></div></td>
+            <td>{{ department_role_label(user) }}</td>
+            <td class="adm-cell-wrap">{{ user.department.department_name if user.department else "—" }}</td>
+            <td>{{ user.date_registered.strftime("%d %b %Y") if user.date_registered else '—' }}</td>
+            <td><span class="adm-status adm-status-{{ 'completed' if user.account_status == 'active' else 'cancelled' }}">{{ user.account_status|title }}</span></td>
+            <td>
+              <div class="adm-row-actions">
+                <button type="button" class="adm-icon-btn adm-icon-btn-primary adm-acct-view" title="View"
+                  data-user-id="{{ user.user_id }}"
+                  data-name="{{ user.full_name|e }}"
+                  data-email="{{ user.email|e }}"
+                  data-role="{{ department_role_label(user)|e }}"
+                  data-department="{{ (user.department.department_name if user.department else '—')|e }}"
+                  data-contact="{{ (user.contact_number or '—')|e }}"
+                  data-address="{{ (user.address or '—')|e }}"
+                  data-registered="{{ user.date_registered.strftime('%d %b %Y') if user.date_registered else '—' }}"
+                  data-status="{{ user.account_status|e }}"
+                  data-action-url="{{ url_for('admin.account_detail', user_id=user.user_id) }}"
+                  data-can-toggle="{{ '1' if user.user_id != current_user.user_id else '0' }}">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <span>View</span>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if users|length >= 300 %}<p class="adm-table-note">Showing the most recent 300 matching accounts. Refine your search to find older records.</p>{% endif %}
+    {% else %}
+    <p class="adm-empty">No accounts match your search.</p>
+    {% endif %}
+  </section>
+
+<div class="adm-modal" id="acct-modal" hidden aria-hidden="true">
+  <div class="adm-modal-backdrop" data-acct-close></div>
+  <div class="adm-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="acct-modal-title">
+    <div class="adm-modal-head">
+      <div><p class="admin-eyebrow">ACCOUNT DETAILS</p><h2 id="acct-modal-title">Account</h2></div>
+      <button type="button" class="adm-modal-close" data-acct-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="adm-modal-body">
+      <div class="adm-acct-detail-grid">
+        <div class="adm-acct-detail"><span>Full name</span><strong id="am-name"></strong></div>
+        <div class="adm-acct-detail"><span>Email</span><strong id="am-email"></strong></div>
+        <div class="adm-acct-detail"><span>Role</span><strong id="am-role"></strong></div>
+        <div class="adm-acct-detail"><span>Department</span><strong id="am-department"></strong></div>
+        <div class="adm-acct-detail"><span>Contact number</span><strong id="am-contact"></strong></div>
+        <div class="adm-acct-detail"><span>Registered</span><strong id="am-registered"></strong></div>
+        <div class="adm-acct-detail adm-acct-detail-span"><span>Address</span><strong id="am-address"></strong></div>
+        <div class="adm-acct-detail"><span>Status</span><strong id="am-status"></strong></div>
+      </div>
+    </div>
+    <div class="adm-modal-foot">
+      <form method="post" id="am-toggle-form" class="adm-inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" id="am-action">
+        <input type="hidden" name="next" value="accounts">
+        <button type="submit" class="cset-btn" id="am-toggle-btn"></button>
+      </form>
+      <button type="button" class="cset-btn cset-btn-ghost" data-acct-close>Close</button>
+    </div>
+  </div>
 </div>
+</div>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+(function(){
+  var modal=document.getElementById('acct-modal'); if(!modal) return;
+  var form=document.getElementById('am-toggle-form');
+  function setText(id,val){var el=document.getElementById(id); if(el) el.textContent=val||'—';}
+  function open(btn){
+    setText('acct-modal-title', btn.dataset.name);
+    setText('am-name', btn.dataset.name);
+    setText('am-email', btn.dataset.email);
+    setText('am-role', btn.dataset.role);
+    setText('am-department', btn.dataset.department);
+    setText('am-contact', btn.dataset.contact);
+    setText('am-registered', btn.dataset.registered);
+    setText('am-address', btn.dataset.address);
+    setText('am-status', (btn.dataset.status||'').charAt(0).toUpperCase()+(btn.dataset.status||'').slice(1));
+    var active=btn.dataset.status==='active';
+    form.action=btn.dataset.actionUrl||'';
+    document.getElementById('am-action').value=active?'deactivate':'activate';
+    var tbtn=document.getElementById('am-toggle-btn');
+    tbtn.textContent=active?'Deactivate account':'Activate account';
+    tbtn.className='cset-btn '+(active?'cset-btn-danger':'cset-btn-primary');
+    tbtn.onclick=function(){return confirm(active?'Deactivate this user account? They will no longer be able to sign in.':'Activate this user account?');};
+    form.style.display=btn.dataset.canToggle==='1'?'':'none';
+    modal.hidden=false; modal.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden';
+  }
+  function close(){ modal.hidden=true; modal.setAttribute('aria-hidden','true'); document.body.style.overflow=''; }
+  document.querySelectorAll('.adm-acct-view').forEach(function(b){ b.addEventListener('click',function(){ open(b); }); });
+  modal.querySelectorAll('[data-acct-close]').forEach(function(b){ b.addEventListener('click',close); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape' && !modal.hidden) close(); });
+})();
+</script>
 {% endblock %}

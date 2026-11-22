@@ -1,46 +1,102 @@
 {% extends "base.html" %}
-{% block title %}Government services · OneGov PH{% endblock %}
+{% block title %}Government Services · OneGov PH{% endblock %}
 {% block body_class %}citizen-dashboard admin-dashboard{% endblock %}
 {% block site_header %}{% include "admin/_header.html" %}{% endblock %}
 {% block content %}
-<div class="admin-main">
-    <header class="admin-page-heading">
-        <div><p class="admin-eyebrow">ADMINISTRATION / SERVICES</p><h1>Government services</h1><p>Manage availability and review requests by service.</p></div>
-        <span class="admin-count-chip">{{ service_rows|length }} configured</span>
-    </header>
-    <section class="admin-panel admin-filter-panel">
-        <form class="admin-filter-form" method="get">
-            <label class="admin-search-field"><span class="visually-hidden">Search government services</span><input type="search" name="q" value="{{ search }}" placeholder="Service name, department, or description"></label>
-            <button class="admin-button admin-button--primary" type="submit">Search</button>
-            {% if search %}<a class="admin-button admin-button--quiet" href="{{ url_for('admin.services') }}">Clear</a>{% endif %}
-        </form>
-    </section>
-    <section class="admin-service-cards" aria-label="Government services">
-        {% for service, application_count in service_rows %}
-        <article class="admin-panel admin-service-card">
-            <div class="admin-service-card-top">
-                <span class="admin-service-mark admin-service-mark--large">{{ service.service_name[:1]|upper }}</span>
-                <span class="admin-status-pill admin-status-pill--{{ service.service_status }}">{{ service.service_status|title }}</span>
-            </div>
-            <p class="admin-eyebrow">{{ service.department.department_name if service.department else "Government service" }}</p>
-            <h2>{{ service.service_name }}</h2>
-            <p class="admin-service-description">{{ service.description or "No service description has been added." }}</p>
-            <div class="admin-service-meta">
-                <span><strong>{{ application_count }}</strong> applications</span>
-                <span>{% if service.processing_fee %}₱{{ "{:,.2f}".format(service.processing_fee) }}{% else %}No listed fee{% endif %}</span>
-            </div>
-            <div class="admin-service-actions">
-                <a class="admin-button admin-button--primary" href="{{ url_for('admin.applications', service=service.service_id) }}">View applications</a>
-                <form method="post" action="{{ url_for('admin.service_status', service_id=service.service_id) }}" onsubmit="return confirm('Change availability for {{ service.service_name|e }}?');">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="service_status" value="{{ 'inactive' if service.service_status == 'active' else 'active' }}">
-                    <button class="admin-button admin-button--quiet" type="submit">{{ "Deactivate" if service.service_status == "active" else "Activate" }}</button>
-                </form>
-            </div>
-        </article>
-        {% else %}
-        <div class="admin-panel"><p class="admin-empty">{% if search %}No government services match your search.{% else %}No government services are configured in the database.{% endif %}</p></div>
-        {% endfor %}
-    </section>
+{% set total_services = service_rows|length %}
+{% set active_services = service_rows|selectattr('0.service_status', 'equalto', 'active')|list|length %}
+{% set inactive_services = total_services - active_services %}
+{% set total_apps = service_rows|sum(attribute='1') %}
+<div class="adm-dash">
+  <section class="adm-dash-header">
+    <div>
+      <p class="admin-eyebrow">ADMINISTRATION / SERVICES</p>
+      <h1>Government Services</h1>
+      <p class="adm-dash-welcome">Manage service availability, review workload, and keep the catalog aligned with the admin dashboard.</p>
+      <div class="adm-dash-date">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span>{{ total_services }} configured service{{ '' if total_services == 1 else 's' }}</span>
+      </div>
+    </div>
+    <div class="adm-dash-actions">
+      <form class="adm-filter-form" method="get">
+        <label class="adm-filter-field">
+          <span>Search</span>
+          <input type="search" name="q" value="{{ search }}" placeholder="Service, department, or description">
+        </label>
+        <button class="cset-btn cset-btn-primary" type="submit">Search</button>
+        {% if search %}<a class="cset-btn cset-btn-ghost" href="{{ url_for('admin.services') }}">Clear</a>{% endif %}
+      </form>
+    </div>
+  </section>
+
+  <section class="adm-stats-group" aria-label="Service summary">
+    <div class="adm-stat-cell">
+      <div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 22h18"/><path d="M6 18V11M10 18V11M14 18V11M18 18V11"/><path d="M2 9l10-7 10 7v2H2z"/></svg></span><span class="adm-stat-label">Total Services</span></div>
+      <div class="adm-stat-value">{{ total_services }}</div>
+      <div class="adm-stat-hint">Configured in catalog</div>
+    </div>
+    <div class="adm-stat-cell">
+      <div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-green"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span><span class="adm-stat-label">Active</span></div>
+      <div class="adm-stat-value">{{ active_services }}</div>
+      <div class="adm-stat-hint">Available to citizens</div>
+    </div>
+    <div class="adm-stat-cell">
+      <div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-amber"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg></span><span class="adm-stat-label">Inactive</span></div>
+      <div class="adm-stat-value">{{ inactive_services }}</div>
+      <div class="adm-stat-hint">Hidden from catalog</div>
+    </div>
+    <div class="adm-stat-cell">
+      <div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-violet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/></svg></span><span class="adm-stat-label">Applications</span></div>
+      <div class="adm-stat-value">{{ total_apps }}</div>
+      <div class="adm-stat-hint">Across listed services</div>
+    </div>
+  </section>
+
+  <section class="adm-panel">
+    <div class="adm-panel-head">
+      <div class="adm-panel-title">
+        <span class="adm-panel-icon adm-icon-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 22h18"/><path d="M6 18V11M10 18V11M14 18V11M18 18V11"/><path d="M2 9l10-7 10 7v2H2z"/></svg></span>
+        <div><p class="admin-eyebrow">SERVICE CATALOG</p><h2>Configured Services</h2></div>
+      </div>
+      {% if search %}<span class="adm-pill">Filtered: {{ search }}</span>{% endif %}
+    </div>
+
+    <div class="adm-svc-grid">
+      {% for service, application_count in service_rows %}
+      <article class="adm-svc-card">
+        <div class="adm-svc-top">
+          <div class="adm-svc-mark">{{ service.service_name[:1]|upper }}</div>
+          <span class="adm-status adm-status-{{ 'completed' if service.service_status == 'active' else 'cancelled' }}">{{ service.service_status|title }}</span>
+        </div>
+        <p class="adm-svc-dept">{{ service.department.department_name if service.department else "Government service" }}</p>
+        <h3 class="adm-svc-name">{{ service.service_name }}</h3>
+        <p class="adm-svc-desc">{{ service.description or "No service description has been added." }}</p>
+        <div class="adm-svc-meta">
+          <div><span class="adm-svc-meta-label">Applications</span><strong>{{ application_count }}</strong></div>
+          <div><span class="adm-svc-meta-label">Processing Fee</span><strong>{% if service.processing_fee %}₱{{ "{:,.2f}".format(service.processing_fee) }}{% else %}No listed fee{% endif %}</strong></div>
+        </div>
+        <div class="adm-svc-actions">
+          <a class="adm-icon-btn adm-icon-btn-primary" href="{{ url_for('admin.applications', service=service.service_id) }}" title="View applications">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>View applications</span>
+          </a>
+          <form method="post" action="{{ url_for('admin.service_status', service_id=service.service_id) }}" class="adm-inline-form" onsubmit="return confirm('Change availability for {{ service.service_name|e }}?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="service_status" value="{{ 'inactive' if service.service_status == 'active' else 'active' }}">
+            <button class="adm-icon-btn" type="submit" title="{{ 'Deactivate' if service.service_status == 'active' else 'Activate' }}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
+              <span>{{ "Deactivate" if service.service_status == "active" else "Activate" }}</span>
+            </button>
+          </form>
+        </div>
+      </article>
+      {% else %}
+      <div class="adm-svc-empty">
+        <p class="adm-empty">{% if search %}No government services match your search.{% else %}No government services are configured in the database.{% endif %}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
 </div>
 {% endblock %}

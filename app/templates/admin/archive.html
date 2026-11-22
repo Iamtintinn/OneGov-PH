@@ -3,40 +3,103 @@
 {% block body_class %}citizen-dashboard admin-dashboard{% endblock %}
 {% block site_header %}{% include "admin/_header.html" %}{% endblock %}
 {% block content %}
-<div class="admin-main">
-  <header class="admin-page-heading"><div><p class="admin-eyebrow">WORKSPACE / ARCHIVE</p><h1>Archived Applications</h1><p>Deleted applications are stored here. Restore or permanently delete them.</p></div></header>
-  <section class="admin-panel admin-filter-panel">
-    <form class="admin-filter-form" method="get">
-      <label class="admin-search-field"><span class="visually-hidden">Search archive</span><input type="search" name="q" value="{{ search }}" placeholder="Tracking number or citizen name"></label>
-      <label><span class="visually-hidden">Status</span><select name="status"><option value="">All statuses</option>{% for s in statuses %}<option value="{{ s }}" {% if selected_status==s %}selected{% endif %}>{{ status_labels.get(s,s) }}</option>{% endfor %}</select></label>
-      <button class="admin-button admin-button--primary" type="submit">Filter</button>
-      {% if search or selected_status %}<a class="admin-button admin-button--quiet" href="{{ url_for('admin.archive') }}">Clear</a>{% endif %}
-    </form>
+<div class="adm-dash">
+  <section class="adm-dash-header">
+    <div>
+      <p class="admin-eyebrow">WORKSPACE / ARCHIVE</p>
+      <h1>Archived Applications</h1>
+      <p class="adm-dash-welcome">Deleted applications are stored here. Restore them or permanently delete archived records.</p>
+      <div class="adm-dash-date">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span>{{ applications|length }} archived record{{ '' if applications|length == 1 else 's' }} shown</span>
+      </div>
+    </div>
+    <div class="adm-dash-actions">
+      <form class="adm-filter-form" method="get">
+        <label class="adm-filter-field">
+          <span>Search</span>
+          <input type="search" name="q" value="{{ search }}" placeholder="Tracking number or citizen name">
+        </label>
+        <label class="adm-filter-field">
+          <span>Status</span>
+          <select name="status">
+            <option value="">All statuses</option>
+            {% for s in statuses %}<option value="{{ s }}" {% if selected_status==s %}selected{% endif %}>{{ status_labels.get(s,s) }}</option>{% endfor %}
+          </select>
+        </label>
+        <button class="cset-btn cset-btn-primary" type="submit">Filter</button>
+        {% if search or selected_status %}<a class="cset-btn cset-btn-ghost" href="{{ url_for('admin.archive') }}">Clear</a>{% endif %}
+      </form>
+    </div>
   </section>
-  <section class="admin-panel admin-table-panel">
-    <div class="admin-panel-heading"><div><p class="admin-eyebrow">ARCHIVED RECORDS</p><h2>Archived requests</h2></div><span class="admin-count-chip">{{ applications|length }} shown</span></div>
+
+  <section class="adm-stats-group" aria-label="Archive summary">
+    <div class="adm-stat-cell">
+      <div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-amber"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7.5h15v11a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z"/><path d="M3.5 5.5h17v2h-17z"/><path d="M9 11.5h6"/></svg></span><span class="adm-stat-label">Archived</span></div>
+      <div class="adm-stat-value">{{ applications|length }}</div>
+      <div class="adm-stat-hint">Matching current filters</div>
+    </div>
+    <div class="adm-stat-cell">
+      <div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="adm-stat-label">Restore</span></div>
+      <div class="adm-stat-value">Available</div>
+      <div class="adm-stat-hint">Authorized admins only</div>
+    </div>
+  </section>
+
+  <section class="adm-panel">
+    <div class="adm-panel-head">
+      <div class="adm-panel-title">
+        <span class="adm-panel-icon adm-icon-amber"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7.5h15v11a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z"/><path d="M3.5 5.5h17v2h-17z"/><path d="M9 11.5h6"/></svg></span>
+        <div><p class="admin-eyebrow">ARCHIVED RECORDS</p><h2>Archived Requests</h2></div>
+      </div>
+      <span class="adm-pill">{{ applications|length }} shown</span>
+    </div>
+
     {% if applications %}
-    <div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Tracking number</th><th>Citizen</th><th>Service</th><th>Submitted</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-      {% for application in applications %}{% set applicant = applicants.get(application.applicant_id) %}
-      <tr>
-        <td><strong class="admin-mono">{{ application.tracking_number }}</strong></td>
-        <td>{{ applicant.full_name if applicant else 'Unknown account' }}<small>{{ applicant.email if applicant else '' }}</small></td>
-        <td>{{ application.service.service_name }}</td>
-        <td>{{ application.submission_date.strftime('%d %b %Y') }}</td>
-        <td><span class="admin-status-pill admin-status-pill--{{ application.application_status }}">{{ status_labels.get(application.application_status, application.application_status) }}</span></td>
-        <td><div class="admin-row-actions">
-          {% if current_user.role in ['system_admin','department_supervisor'] %}
-          <form method="post" action="{{ url_for('admin.restore_application', application_id=application.application_id) }}" class="admin-inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="admin-row-action">Restore</button></form>
-          <form method="post" action="{{ url_for('admin.delete_application_permanent', application_id=application.application_id) }}" class="admin-inline-form" onsubmit="return confirm('Permanently delete {{ application.tracking_number }}? This cannot be undone.');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="admin-row-action admin-row-action--danger">Delete permanently</button></form>
-          {% else %}
-          <span class="citizen-muted">No actions</span>
-          {% endif %}
-        </div></td>
-      </tr>
-      {% endfor %}
-    </tbody></table></div>
+    <div class="adm-table-wrap adm-table-scroll-lg">
+      <table class="adm-table adm-table-compact adm-tx-table">
+        <thead><tr><th>Tracking Number</th><th>Citizen</th><th>Service</th><th>Submitted</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for application in applications %}
+          {% set applicant = applicants.get(application.applicant_id) %}
+          <tr>
+            <td><span class="adm-mono">{{ application.tracking_number }}</span></td>
+            <td class="adm-cell-wrap">
+              <strong>{{ applicant.full_name if applicant else 'Unknown account' }}</strong>
+              <div class="adm-cell-sub">{{ applicant.email if applicant else '' }}</div>
+            </td>
+            <td class="adm-cell-wrap">{{ application.service.service_name }}</td>
+            <td>{{ application.submission_date.strftime('%d %b %Y') if application.submission_date else '—' }}</td>
+            <td><span class="adm-status adm-status-{{ application.application_status }}">{{ status_labels.get(application.application_status, application.application_status) }}</span></td>
+            <td>
+              <div class="adm-row-actions">
+                {% if current_user.role in ['system_admin','department_supervisor'] %}
+                <form method="post" action="{{ url_for('admin.restore_application', application_id=application.application_id) }}" class="adm-inline-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="adm-icon-btn" title="Restore">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                    <span>Restore</span>
+                  </button>
+                </form>
+                <form method="post" action="{{ url_for('admin.delete_application_permanent', application_id=application.application_id) }}" class="adm-inline-form" onsubmit="return confirm('Permanently delete {{ application.tracking_number }}? This cannot be undone.');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="adm-icon-btn adm-icon-btn-danger" title="Delete permanently">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                    <span>Delete</span>
+                  </button>
+                </form>
+                {% else %}
+                <span class="adm-cell-sub">No actions</span>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% else %}
-    <p class="admin-empty">No archived applications found.</p>
+    <p class="adm-empty">No archived applications found.</p>
     {% endif %}
   </section>
 </div>

@@ -20,9 +20,6 @@ PHT = timezone(timedelta(hours=8))
 
 MODULES = ["Authentication", "Accounts", "Citizens", "Applications", "Payments", "Documents", "Delivery", "System", "Audit"]
 STATUSES = ["Success", "Failed", "Denied"]
-ROLES = ["Citizen", "Department staff", "Department administrator", "System administrator", "system"]
-
-
 def _scope_query(query):
     if is_system_admin():
         return query
@@ -124,7 +121,7 @@ def _stats(scoped_base):
     return {
         "total": count(),
         "today": count(AuditLog.created_at >= today_utc_start),
-        "admin_actions": count(AuditLog.user_role.in_(["System administrator", "Department administrator"])),
+        "admin_actions": count(or_(AuditLog.user_role == "System administrator", AuditLog.user_role.ilike("%Administrator%"))),
         "staff_actions": count(AuditLog.user_role == "Department staff"),
         "failed": count(AuditLog.activity_status == "Failed"),
         "security": count(AuditLog.module.in_(["Authentication", "Accounts"])),
@@ -142,9 +139,19 @@ def index():
     page = max(request.args.get("page", 1, type=int) or 1, 1)
     per_page = 20
     pagination = db.paginate(q, page=page, per_page=per_page, error_out=False)
-    types = [r[0] for r in db.session.execute(_scope_query(db.select(AuditLog.activity_type).distinct().order_by(AuditLog.activity_type))).all() if r[0]]
+    type_rows = db.session.execute(_scope_query(db.select(AuditLog.activity_type).distinct().order_by(AuditLog.activity_type))).all()
+    types = [r[0] for r in type_rows if r[0]]
+    role_rows = db.session.execute(_scope_query(db.select(AuditLog.user_role).distinct().order_by(AuditLog.user_role))).all()
+    db_roles = [r[0] for r in role_rows if r[0] and r[0] != "system"]
+    from app.models.user import User
+    dept_admin_roles = [f"{d} Administrator" for d in User.DEPARTMENT_ADMIN_DEPARTMENTS]
+    base_roles = ["Citizen", "System administrator", "Department administrator"]
+    roles = []
+    for r in base_roles + dept_admin_roles + sorted(db_roles, key=lambda x: x.lower()):
+        if r and r not in roles and (r in base_roles or r in dept_admin_roles or "administrator" in r.lower() or r == "Citizen"):
+            roles.append(r)
     return render_template("admin/audit_trail.html", logs=pagination.items, pagination=pagination, stats=stats, filters=f,
-                           modules=MODULES, statuses=STATUSES, roles=ROLES, activity_types=types, to_pht=to_pht)
+                           modules=MODULES, statuses=STATUSES, roles=roles, activity_types=types, to_pht=to_pht)
 
 
 @audit_bp.route("/<int:log_id>")

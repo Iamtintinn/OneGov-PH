@@ -24,34 +24,33 @@
         <div class="admin-panel-heading"><div><p class="admin-eyebrow">ACCOUNT INFORMATION</p><h2>Profile and access</h2></div></div>
         <form class="admin-account-form" method="post" action="{{ url_for('admin.account_detail', user_id=account.user_id) if account else url_for('admin.create_account') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            {% if account %}<input type="hidden" name="action" value="update">{% endif %}
+            {% if account and not is_system_admin %}<input type="hidden" name="action" value="update">{% endif %}
+            {% set ro = account and is_system_admin %}
             <div class="admin-form-grid">
-                <label>First name<input name="first_name" value="{{ form.first_name }}" maxlength="80" required>{% if errors.first_name %}<small class="admin-field-error">{{ errors.first_name }}</small>{% endif %}</label>
-                <label>Middle name<input name="middle_name" value="{{ form.middle_name }}" maxlength="80">{% if errors.middle_name %}<small class="admin-field-error">{{ errors.middle_name }}</small>{% endif %}</label>
-                <label>Last name<input name="last_name" value="{{ form.last_name }}" maxlength="80" required>{% if errors.last_name %}<small class="admin-field-error">{{ errors.last_name }}</small>{% endif %}</label>
-                <label>Email address<input type="email" name="email" value="{{ form.email }}" maxlength="255" required>{% if errors.email %}<small class="admin-field-error">{{ errors.email }}</small>{% endif %}</label>
-                <label>Contact number<input type="tel" name="contact_number" value="{{ form.contact_number }}" maxlength="20">{% if errors.contact_number %}<small class="admin-field-error">{{ errors.contact_number }}</small>{% endif %}</label>
-                <label class="admin-form-span">Address<input name="address" value="{{ form.address }}" maxlength="500">{% if errors.address %}<small class="admin-field-error">{{ errors.address }}</small>{% endif %}</label>
+                <label>First name<input name="first_name" value="{{ form.first_name }}" maxlength="80" {% if ro %}disabled{% else %}required{% endif %}>{% if errors.first_name %}<small class="admin-field-error">{{ errors.first_name }}</small>{% endif %}</label>
+                <label>Middle name<input name="middle_name" value="{{ form.middle_name }}" maxlength="80" {% if ro %}disabled{% endif %}>{% if errors.middle_name %}<small class="admin-field-error">{{ errors.middle_name }}</small>{% endif %}</label>
+                <label>Last name<input name="last_name" value="{{ form.last_name }}" maxlength="80" {% if ro %}disabled{% else %}required{% endif %}>{% if errors.last_name %}<small class="admin-field-error">{{ errors.last_name }}</small>{% endif %}</label>
+                <label>Email address<input type="email" name="email" value="{{ form.email }}" maxlength="255" {% if ro %}disabled{% else %}required{% endif %}>{% if errors.email %}<small class="admin-field-error">{{ errors.email }}</small>{% endif %}</label>
+                <label>Contact number<input type="tel" name="contact_number" value="{{ form.contact_number }}" maxlength="20" {% if ro %}disabled{% endif %}>{% if errors.contact_number %}<small class="admin-field-error">{{ errors.contact_number }}</small>{% endif %}</label>
+                <label class="admin-form-span">Address<input name="address" value="{{ form.address }}" maxlength="500" {% if ro %}disabled{% endif %}>{% if errors.address %}<small class="admin-field-error">{{ errors.address }}</small>{% endif %}</label>
                 {% if is_system_admin %}
-                <label>Role<select name="role" id="account-role" required>{% for role in roles %}<option value="{{ role }}" {% if form.role == role %}selected{% endif %}>{{ role_labels[role] }}</option>{% endfor %}</select>{% if errors.role %}<small class="admin-field-error">{{ errors.role }}</small>{% endif %}</label>
+                <label>Role<input type="text" value="{{ role_labels.get(form.role, form.role) }}" disabled></label>
                 {% else %}
                 <label>Role<input type="text" value="{{ department_role_label(account) }}" disabled><input type="hidden" name="role" value="{{ account.role if account else 'citizen' }}"></label>
                 {% endif %}
-                <label>Account status<select name="account_status" required>{% for status in account_statuses %}<option value="{{ status }}" {% if form.account_status == status %}selected{% endif %}>{{ status|title }}</option>{% endfor %}</select>{% if errors.account_status %}<small class="admin-field-error">{{ errors.account_status }}</small>{% endif %}</label>
+                <label>Account status<input type="text" value="{{ form.account_status|title }}" disabled>{% if not ro %}<input type="hidden" name="account_status" value="{{ form.account_status }}">{% endif %}</label>
                 {% if is_system_admin %}
+                <label>Department<input type="text" value="{{ account.department.department_name if account and account.department else '—' }}" disabled></label>
+                {% elif is_system_admin %}
                 <label class="admin-staff-field">Department<select name="department_id"><option value="">Select a department</option>{% for department in departments %}<option value="{{ department.department_id }}" {% if form.department_id == department.department_id|string %}selected{% endif %}>{{ department.department_name }}</option>{% endfor %}</select>{% if errors.department_id %}<small class="admin-field-error">{{ errors.department_id }}</small>{% endif %}</label>
-                <fieldset class="admin-staff-field admin-permissions-field">
-                    <legend>Staff permissions</legend>
-                    <div class="admin-permission-grid">{% for key, label in permission_options %}<label><input type="checkbox" name="permissions" value="{{ key }}" {% if key in form.permissions %}checked{% endif %}> {{ label }}</label>{% endfor %}</div>
-                    {% if errors.permissions %}<small class="admin-field-error">{{ errors.permissions }}</small>{% endif %}
-                </fieldset>
                 {% endif %}
             </div>
-            <div class="admin-form-actions"><a class="admin-button admin-button--quiet" href="{{ url_for('admin.accounts') }}">Back to accounts</a><button class="admin-button admin-button--primary" type="submit" onclick="return confirm('{{ 'Save these account changes?' if account else 'Create this account?' }}');">{{ "Save account changes" if account else "Create account" }}</button></div>
+            <div class="admin-form-actions"><a class="admin-button admin-button--quiet" href="{{ url_for('admin.accounts') }}">Back to accounts</a>{% if not ro %}<button class="admin-button admin-button--primary" type="submit" onclick="return confirm('{{ 'Save these account changes?' if account else 'Create this account?' }}');">{{ "Save account changes" if account else "Create account" }}</button>{% endif %}</div>
         </form>
     </section>
 
     {% if account %}
+    {% if not is_system_admin %}
     <section class="admin-panel admin-password-panel">
         <div><p class="admin-eyebrow">CREDENTIALS</p><h2>Secure password reset</h2><p>Generate a new temporary password. The current password cannot be viewed.</p></div>
         <form method="post" action="{{ url_for('admin.account_detail', user_id=account.user_id) }}" onsubmit="return confirm('Reset this account password? The current password will stop working.');">
@@ -59,13 +58,14 @@
             <button class="admin-button admin-button--danger" type="submit">Reset password</button>
         </form>
     </section>
+    {% endif %}
 
-    {% if account.account_status == 'active' and account.user_id != current_user.user_id %}
+    {% if account.user_id != current_user.user_id %}
     <section class="admin-panel admin-password-panel">
-        <div><p class="admin-eyebrow">ACCOUNT STATUS</p><h2>Deactivate account</h2><p>Deactivate this user account to prevent sign-in. The account record and history are kept.</p></div>
-        <form method="post" action="{{ url_for('admin.account_detail', user_id=account.user_id) }}" onsubmit="return confirm('Deactivate this user account? They will no longer be able to sign in.');">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="deactivate">
-            <button class="admin-button admin-button--danger" type="submit">Deactivate account</button>
+        <div><p class="admin-eyebrow">ACCOUNT STATUS</p><h2>{{ 'Deactivate account' if account.account_status == 'active' else 'Activate account' }}</h2><p>{{ 'Deactivate this user account to prevent sign-in. The account record and history are kept.' if account.account_status == 'active' else 'Reactivate this user account to allow sign-in.' }}</p></div>
+        <form method="post" action="{{ url_for('admin.account_detail', user_id=account.user_id) }}" onsubmit="return confirm('{{ 'Deactivate this user account? They will no longer be able to sign in.' if account.account_status == 'active' else 'Activate this user account?' }}');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="{{ 'deactivate' if account.account_status == 'active' else 'activate' }}">
+            <button class="admin-button {{ 'admin-button--danger' if account.account_status == 'active' else 'admin-button--primary' }}" type="submit">{{ 'Deactivate account' if account.account_status == 'active' else 'Activate account' }}</button>
         </form>
     </section>
     {% endif %}

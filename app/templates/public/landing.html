@@ -1,0 +1,416 @@
+{% extends "base.html" %}
+{% block title %}OneGov PH · Government Services, Made Simple{% endblock %}
+{% block body_class %}public-landing-page{% endblock %}
+{% block head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css') }}">
+{% endblock %}
+{% block site_header %}
+<header class="lp-nav" id="lpNav">
+  <div class="lp-container lp-nav-inner">
+    <a class="lp-brand" href="{{ url_for('public.landing') }}" aria-label="OneGov PH home">
+      <img src="{{ url_for('static', filename='images/onegov-ph-logo-white.png') }}" data-logo-dark="{{ url_for('static', filename='images/onegov-ph-logo-white.png') }}" data-logo-light="{{ url_for('static', filename='images/onegov-ph-logo.png') }}" alt="OneGov PH logo" class="lp-brand-logo" width="44" height="44">
+      <span class="lp-brand-text"><strong>OneGov PH</strong><small>Government Services Portal</small></span>
+    </a>
+    <button class="lp-mobile-toggle" id="lpMobileToggle" aria-expanded="false" aria-controls="lpNavMenu" aria-label="Open menu">
+      <i data-lucide="menu"></i>
+    </button>
+    <nav class="lp-nav-menu" id="lpNavMenu" aria-label="Primary">
+      <a href="#home" class="lp-nav-link">Home</a>
+      <a href="#services" class="lp-nav-link">Government Services</a>
+      <a href="#how-it-works" class="lp-nav-link">How It Works</a>
+      <a href="#track" class="lp-nav-link">Track Application</a>
+      <a href="#about" class="lp-nav-link">About</a>
+      <div class="lp-nav-actions">
+        <a href="{{ url_for('auth.login') }}" class="lp-btn lp-btn-ghost">Login</a>
+        <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn-primary">Get Started</a>
+      </div>
+    </nav>
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="lp-page" id="home">
+  <!-- HERO -->
+  <section class="lp-hero">
+    <div class="lp-hero-bg" aria-hidden="true">
+      <div class="lp-hero-glow lp-hero-glow-a"></div>
+      <div class="lp-hero-glow lp-hero-glow-b"></div>
+      <div class="lp-hero-grid"></div>
+      <svg class="lp-hero-pattern" viewBox="0 0 1200 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M900 80l120 70v140l-120 70-120-70V150z" stroke="rgba(103,232,249,.12)" stroke-width="1.5"/>
+        <path d="M1060 250l80 46v92l-80 46-80-46v-92z" stroke="rgba(255,255,255,.08)" stroke-width="1.2"/>
+        <circle cx="980" cy="520" r="90" stroke="rgba(96,165,250,.10)" stroke-width="1.2"/>
+        <circle cx="980" cy="520" r="55" stroke="rgba(103,232,249,.08)" stroke-width="1"/>
+        <path d="M120 560c70-120 170-180 300-180s220 55 320 140" stroke="rgba(255,255,255,.06)" stroke-width="1.5"/>
+      </svg>
+    </div>
+    <div class="lp-container lp-hero-inner">
+      <div class="lp-hero-copy" data-reveal>
+        <p class="lp-eyebrow"><span class="lp-eyebrow-dot"></span>Independent Digital Government Service Platform</p>
+        <h1 class="lp-hero-title">Government Services, <span>Made Simple.</span></h1>
+        <p class="lp-hero-desc">Apply for essential government documents, complete online payments, and monitor your application progress — all in one convenient platform.</p>
+        <div class="lp-hero-actions">
+          <a href="#services" class="lp-btn lp-btn-primary lp-btn-lg"><i data-lucide="grid-2x2"></i>Explore Government Services</a>
+          <a href="#track" class="lp-btn lp-btn-outline lp-btn-lg"><i data-lucide="search"></i>Track Application</a>
+        </div>
+        <div class="lp-hero-trust">
+          <div class="lp-trust-item"><i data-lucide="shield-check"></i><span>Secure account protection</span></div>
+          <div class="lp-trust-item"><i data-lucide="clock-3"></i><span>Track progress in one place</span></div>
+          <div class="lp-trust-item"><i data-lucide="building-2"></i><span>Essential public services</span></div>
+        </div>
+      </div>
+
+      <div class="lp-hero-visual" data-reveal="delay">
+        <div class="lp-visual-stage">
+          <div class="lp-float-card lp-float-main">
+            <div class="lp-float-head">
+              <div><p class="lp-float-kicker">Application Dashboard</p><h3>My Applications</h3></div>
+              <span class="lp-pill lp-pill-blue">Live Preview</span>
+            </div>
+            <div class="lp-mock-stats">
+              <div class="lp-mock-stat"><span>Submitted</span><strong>12</strong></div>
+              <div class="lp-mock-stat"><span>In Progress</span><strong>4</strong></div>
+              <div class="lp-mock-stat"><span>Completed</span><strong>8</strong></div>
+            </div>
+            <div class="lp-mock-list">
+              <div class="lp-mock-row">
+                <div class="lp-mock-row-icon"><i data-lucide="file-text"></i></div>
+                <div class="lp-mock-row-copy"><strong>PSA Birth Certificate</strong><span>Ref: OG-2026-001284</span></div>
+                <span class="lp-pill lp-pill-green">Processing</span>
+              </div>
+              <div class="lp-mock-row">
+                <div class="lp-mock-row-icon"><i data-lucide="fingerprint"></i></div>
+                <div class="lp-mock-row-copy"><strong>NBI Clearance</strong><span>Ref: OG-2026-001301</span></div>
+                <span class="lp-pill lp-pill-cyan">Payment Verified</span>
+              </div>
+              <div class="lp-mock-row">
+                <div class="lp-mock-row-icon"><i data-lucide="id-card"></i></div>
+                <div class="lp-mock-row-copy"><strong>PhilSys National ID</strong><span>Ref: OG-2026-001319</span></div>
+                <span class="lp-pill lp-pill-amber">For Review</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="lp-float-card lp-float-progress">
+            <p class="lp-float-kicker">Tracking Progress</p>
+            <div class="lp-progress-track">
+              <div class="lp-progress-step is-done"><span class="lp-progress-dot"><i data-lucide="check"></i></span><div><strong>Submitted</strong><small>Application received</small></div></div>
+              <div class="lp-progress-step is-done"><span class="lp-progress-dot"><i data-lucide="check"></i></span><div><strong>Payment Verified</strong><small>Payment confirmed</small></div></div>
+              <div class="lp-progress-step is-active"><span class="lp-progress-dot"></span><div><strong>Processing</strong><small>Currently under review</small></div></div>
+              <div class="lp-progress-step"><span class="lp-progress-dot"></span><div><strong>Ready</strong><small>Awaiting completion</small></div></div>
+            </div>
+          </div>
+
+          <div class="lp-float-card lp-float-doc">
+            <div class="lp-doc-icon"><i data-lucide="file-badge-2"></i></div>
+            <div><strong>Digital Documents</strong><span>Organized records and status updates</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HIGHLIGHTS -->
+  <section class="lp-section lp-section-soft" id="highlights">
+    <div class="lp-container">
+      <div class="lp-highlights-grid">
+        <article class="lp-highlight-card" data-reveal>
+          <div class="lp-highlight-icon"><i data-lucide="layers"></i></div>
+          <h3>9 Essential Government Services</h3>
+          <p>Access commonly requested government document services through one organized digital portal.</p>
+        </article>
+        <article class="lp-highlight-card" data-reveal>
+          <div class="lp-highlight-icon"><i data-lucide="send"></i></div>
+          <h3>Convenient Online Applications</h3>
+          <p>Complete application steps, submit required information, and manage requests with a guided flow.</p>
+        </article>
+        <article class="lp-highlight-card" data-reveal>
+          <div class="lp-highlight-icon"><i data-lucide="credit-card"></i></div>
+          <h3>Secure Online Payments</h3>
+          <p>Pay applicable service fees through supported digital payment workflows with clear transaction records.</p>
+        </article>
+        <article class="lp-highlight-card" data-reveal>
+          <div class="lp-highlight-icon"><i data-lucide="route"></i></div>
+          <h3>Transparent Application Tracking</h3>
+          <p>Monitor application progress using a reference number and view status updates from submission onward.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- SERVICES -->
+  <section class="lp-section" id="services">
+    <div class="lp-container">
+      <div class="lp-section-head lp-section-head-center" data-reveal>
+        <p class="lp-eyebrow lp-eyebrow-dark"><span class="lp-eyebrow-dot"></span>Government Services</p>
+        <h2>Essential services, <span>one trusted platform.</span></h2>
+        <p>Explore supported government service requests designed for a clearer, more convenient application experience.</p>
+      </div>
+
+      {% set catalog = {
+        'DFA Passport': {'icon':'book-open','desc':'Apply for a Philippine passport application and monitor your request progress through your account.','meta':'DFA service request','action': url_for('auth.login', next=url_for('citizen.services'))},
+        'PSA Birth Certificate': {'icon':'file-text','desc':'Request a copy of a PSA birth certificate through a guided online application flow.','meta':'PSA service request','action': url_for('auth.login', next=url_for('citizen.services'))},
+        'CENOMAR': {'icon':'file-check-2','desc':'Apply for a Certificate of No Marriage Record with organized submission and tracking.','meta':'PSA service request','action': url_for('auth.login', next=url_for('citizen.services'))},
+        'PhilSys National ID': {'icon':'id-card','desc':'Access PhilSys-related assistance and monitor registration or concern progress in one place.','meta':'PhilSys assistance','action': url_for('auth.login', next=url_for('citizen.services'))},
+        'NBI Clearance': {'icon':'fingerprint','desc':'Submit an NBI clearance application request and monitor updates through your account.','meta':'NBI application request','action': url_for('auth.login', next=url_for('citizen.services'))},
+        'SSS Registration': {'icon':'user-round-check','desc':'Begin SSS registration assistance with clear requirements and application status monitoring.','meta':'SSS assistance request','action': url_for('auth.login', next=url_for('citizen.services'))},
+        'Barangay Clearance': {'icon':'building','desc':'Request barangay clearance with a streamlined digital submission and progress tracking.','meta':'LGU service request','action': url_for('auth.login', next=url_for('citizen.services'))},
+        'Certificate of Residency': {'icon':'house','desc':'Apply for a certificate of residency and keep your request details organized online.','meta':'LGU service request','action': url_for('auth.login', next=url_for('citizen.services'))},
+        'Senior Citizen ID': {'icon':'heart-handshake','desc':'Submit a senior citizen ID application request with transparent status monitoring.','meta':'LGU service request','action': url_for('auth.login', next=url_for('citizen.services'))}
+      } %}
+
+      <div class="lp-services-grid">
+        {% for name, item in catalog.items() %}
+        {% set ns = namespace(found=None) %}
+        {% for s in services %}
+          {% if name.lower() in s.service_name.lower() or s.service_name.lower() in name.lower() %}{% set ns.found = s %}{% endif %}
+          {% if name == 'DFA Passport' and 'passport' in s.service_name.lower() %}{% set ns.found = s %}{% endif %}
+          {% if name == 'PSA Birth Certificate' and 'birth certificate' in s.service_name.lower() %}{% set ns.found = s %}{% endif %}
+          {% if name == 'PhilSys National ID' and ('philsys' in s.service_name.lower() or 'national id' in s.service_name.lower()) %}{% set ns.found = s %}{% endif %}
+          {% if name == 'NBI Clearance' and 'nbi' in s.service_name.lower() %}{% set ns.found = s %}{% endif %}
+          {% if name == 'SSS Registration' and 'sss' in s.service_name.lower() %}{% set ns.found = s %}{% endif %}
+          {% if name == 'Barangay Clearance' and 'barangay clearance' in s.service_name.lower() %}{% set ns.found = s %}{% endif %}
+          {% if name == 'Certificate of Residency' and 'residency' in s.service_name.lower() %}{% set ns.found = s %}{% endif %}
+          {% if name == 'Senior Citizen ID' and 'senior citizen' in s.service_name.lower() %}{% set ns.found = s %}{% endif %}
+          {% if name == 'CENOMAR' and 'cenomar' in s.service_name.lower() %}{% set ns.found = s %}{% endif %}
+        {% endfor %}
+        <article class="lp-service-card" data-reveal>
+          <div class="lp-service-top">
+            <div class="lp-service-icon"><i data-lucide="{{ item.icon }}"></i></div>
+            <span class="lp-service-meta">{{ item.meta }}</span>
+          </div>
+          <h3>{{ name }}</h3>
+          <p>{{ item.desc }}</p>
+          <div class="lp-service-bottom">
+            <span class="lp-service-status">{% if ns.found %}Available online{% else %}Service information{% endif %}</span>
+            <a href="{{ url_for('auth.login', next=url_for('citizen.services')) }}" class="lp-service-link">View Service <i data-lucide="arrow-right"></i></a>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="lp-section lp-section-soft" id="how-it-works">
+    <div class="lp-container">
+      <div class="lp-section-head lp-section-head-center" data-reveal>
+        <p class="lp-eyebrow lp-eyebrow-dark"><span class="lp-eyebrow-dot"></span>How It Works</p>
+        <h2>A clear process from <span>application to completion.</span></h2>
+        <p>Four simple steps designed to make government service requests easier to understand and manage.</p>
+      </div>
+      <div class="lp-steps">
+        <article class="lp-step-card" data-reveal>
+          <div class="lp-step-num">01</div>
+          <div class="lp-step-icon"><i data-lucide="user-plus"></i></div>
+          <h3>Create Your Account</h3>
+          <p>Register securely to access your personal dashboard, applications, and notification history.</p>
+        </article>
+        <article class="lp-step-card" data-reveal>
+          <div class="lp-step-num">02</div>
+          <div class="lp-step-icon"><i data-lucide="layout-grid"></i></div>
+          <h3>Choose a Government Service</h3>
+          <p>Select the service you need and review the application requirements before you begin.</p>
+        </article>
+        <article class="lp-step-card" data-reveal>
+          <div class="lp-step-num">03</div>
+          <div class="lp-step-icon"><i data-lucide="file-up"></i></div>
+          <h3>Submit Your Application</h3>
+          <p>Provide the required details and documents through a guided and organized application flow.</p>
+        </article>
+        <article class="lp-step-card" data-reveal>
+          <div class="lp-step-num">04</div>
+          <div class="lp-step-icon"><i data-lucide="badge-check"></i></div>
+          <h3>Pay Online and Track</h3>
+          <p>Complete applicable payments and monitor your application status with a reference number.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRACKING -->
+  <section class="lp-section lp-track-section" id="track">
+    <div class="lp-container lp-track-grid">
+      <div class="lp-track-copy" data-reveal>
+        <p class="lp-eyebrow lp-eyebrow-dark"><span class="lp-eyebrow-dot"></span>Application Tracking</p>
+        <h2>Track your application <span>with confidence.</span></h2>
+        <p>Enter your reference number to check the latest available status for your application. For full details and history, sign in to your OneGov PH account.</p>
+
+        <form class="lp-track-form" method="get" action="{{ url_for('public.landing') }}#track">
+          <label class="lp-track-label" for="trackingNumber">Reference number</label>
+          <div class="lp-track-input-row">
+            <div class="lp-track-input-wrap">
+              <i data-lucide="search"></i>
+              <input id="trackingNumber" name="tracking" type="text" value="{{ tracking_number }}" placeholder="Enter reference number, e.g. OG-2026-001284" autocomplete="off">
+            </div>
+            <button type="submit" class="lp-btn lp-btn-primary">Track Application</button>
+          </div>
+          <p class="lp-track-help">Tracking results show public status information only. Sign in for complete application details.</p>
+        </form>
+
+        {% if tracking_error %}
+        <div class="lp-track-result lp-track-result-error" role="status">
+          <i data-lucide="alert-circle"></i>
+          <div><strong>No result found</strong><p>{{ tracking_error }}</p></div>
+        </div>
+        {% elif tracking_result %}
+        <div class="lp-track-result lp-track-result-ok" role="status">
+          <div class="lp-track-result-head">
+            <div><p class="lp-track-result-kicker">Reference found</p><strong>{{ tracking_result.tracking_number }}</strong></div>
+            <span class="lp-pill lp-pill-blue">{{ tracking_result.status }}</span>
+          </div>
+          <div class="lp-track-result-meta">
+            <div><span>Service</span><strong>{{ tracking_result.service }}</strong></div>
+            <div><span>Last updated</span><strong>{{ tracking_result.updated }}</strong></div>
+          </div>
+          <a href="{{ url_for('auth.login', next=url_for('citizen.tracking')) }}" class="lp-service-link">Sign in for full details <i data-lucide="arrow-right"></i></a>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="lp-track-visual" data-reveal="delay">
+        <div class="lp-track-preview-card">
+          <div class="lp-float-head">
+            <div><p class="lp-float-kicker">Sample Progress Preview</p><h3>Application Status Timeline</h3></div>
+            <span class="lp-pill lp-pill-cyan">Sample</span>
+          </div>
+          <div class="lp-preview-ref">
+            <span>Reference</span><strong>OG-2026-001284</strong>
+          </div>
+          <div class="lp-progress-track lp-progress-track-preview">
+            <div class="lp-progress-step is-done"><span class="lp-progress-dot"><i data-lucide="check"></i></span><div><strong>Application Submitted</strong><small>Your request has been received.</small></div></div>
+            <div class="lp-progress-step is-done"><span class="lp-progress-dot"><i data-lucide="check"></i></span><div><strong>Under Review</strong><small>Information and requirements were checked.</small></div></div>
+            <div class="lp-progress-step is-active"><span class="lp-progress-dot"></span><div><strong>Processing</strong><small>The application is currently being processed.</small></div></div>
+            <div class="lp-progress-step"><span class="lp-progress-dot"></span><div><strong>Ready / Completed</strong><small>You will be notified when the next step is available.</small></div></div>
+          </div>
+          <p class="lp-preview-note"><i data-lucide="info"></i>This timeline is a visual preview. Actual statuses depend on the selected service and application progress.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHY -->
+  <section class="lp-section lp-section-soft" id="about">
+    <div class="lp-container">
+      <div class="lp-section-head lp-section-head-center" data-reveal>
+        <p class="lp-eyebrow lp-eyebrow-dark"><span class="lp-eyebrow-dot"></span>Why OneGov PH</p>
+        <h2>Built for clarity, convenience, <span>and trust.</span></h2>
+        <p>A modern digital experience that helps citizens manage government service requests with confidence.</p>
+      </div>
+      <div class="lp-why-grid">
+        <article class="lp-why-card" data-reveal><div class="lp-why-icon"><i data-lucide="building-2"></i></div><h3>Centralized Government Services</h3><p>Find essential service applications in one organized portal instead of navigating scattered processes.</p></article>
+        <article class="lp-why-card" data-reveal><div class="lp-why-icon"><i data-lucide="activity"></i></div><h3>Transparent Application Monitoring</h3><p>Stay informed with clear status updates and a reference-based tracking experience.</p></article>
+        <article class="lp-why-card" data-reveal><div class="lp-why-icon"><i data-lucide="wallet-cards"></i></div><h3>Convenient Digital Payments</h3><p>Complete applicable payments through supported digital channels with visible transaction records.</p></article>
+        <article class="lp-why-card" data-reveal><div class="lp-why-icon"><i data-lucide="folder-check"></i></div><h3>Organized Application Records</h3><p>Keep applications, submissions, and service history accessible from your secure account dashboard.</p></article>
+        <article class="lp-why-card" data-reveal><div class="lp-why-icon"><i data-lucide="bell-ring"></i></div><h3>Timely Notifications</h3><p>Receive important updates about application progress, payment status, and next steps.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="lp-section lp-cta-section">
+    <div class="lp-container">
+      <div class="lp-cta-card" data-reveal>
+        <div class="lp-cta-bg" aria-hidden="true"></div>
+        <div class="lp-cta-copy">
+          <p class="lp-eyebrow"><span class="lp-eyebrow-dot"></span>Get Started Today</p>
+          <h2>Your Government Documents, <span>Within Reach.</span></h2>
+          <p>Create your account to apply for essential services, manage your requests, and track progress in one secure and convenient platform.</p>
+          <div class="lp-hero-actions">
+            <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn-primary lp-btn-lg"><i data-lucide="user-plus"></i>Create Your Account</a>
+            <a href="#services" class="lp-btn lp-btn-outline lp-btn-lg"><i data-lucide="arrow-down-right"></i>Explore Services</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block site_footer %}
+<footer class="lp-footer">
+  <div class="lp-container lp-footer-grid">
+    <div class="lp-footer-brand">
+      <a class="lp-brand" href="{{ url_for('public.landing') }}">
+        <img src="{{ url_for('static', filename='images/onegov-ph-logo-white.png') }}" alt="OneGov PH logo" class="lp-brand-logo" width="44" height="44">
+        <span class="lp-brand-text"><strong>OneGov PH</strong><small>Government Services Portal</small></span>
+      </a>
+      <p>OneGov PH is an independent digital platform prototype designed to demonstrate a more convenient way to access government service applications, payments, and tracking.</p>
+      <p class="lp-footer-disclaimer"><i data-lucide="info"></i><span>Not affiliated with, endorsed by, or an official website of any Philippine government agency. For official transactions and information, please visit the respective agency websites.</span></p>
+    </div>
+    <div class="lp-footer-col">
+      <h4>Quick Links</h4>
+      <a href="#home">Home</a>
+      <a href="#services">Government Services</a>
+      <a href="#how-it-works">How It Works</a>
+      <a href="#track">Track Application</a>
+      <a href="{{ url_for('auth.login') }}">Login</a>
+    </div>
+    <div class="lp-footer-col">
+      <h4>Services</h4>
+      <a href="{{ url_for('auth.login', next=url_for('citizen.services')) }}">PSA Birth Certificate</a>
+      <a href="{{ url_for('auth.login', next=url_for('citizen.services')) }}">NBI Clearance</a>
+      <a href="{{ url_for('auth.login', next=url_for('citizen.services')) }}">PhilSys National ID</a>
+      <a href="{{ url_for('auth.login', next=url_for('citizen.services')) }}">SSS Registration</a>
+      <a href="{{ url_for('auth.login', next=url_for('citizen.services')) }}">LGU Certificates</a>
+    </div>
+    <div class="lp-footer-col">
+      <h4>Help &amp; Legal</h4>
+      <a href="#about">About OneGov PH</a>
+      <a href="{{ url_for('auth.login') }}">Help &amp; Support</a>
+      <a href="{{ url_for('public.landing') }}#about">Privacy Policy</a>
+      <a href="{{ url_for('public.landing') }}#about">Terms and Conditions</a>
+    </div>
+  </div>
+  <div class="lp-container lp-footer-bottom">
+    <p>&copy; 2026 OneGov PH. Independent platform prototype for demonstration purposes.</p>
+    <p>Designed for a secure, accessible, and citizen-centered service experience.</p>
+  </div>
+</footer>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script>
+(function(){
+  if(window.lucide) lucide.createIcons();
+  var nav=document.getElementById('lpNav');
+  var toggle=document.getElementById('lpMobileToggle');
+  var menu=document.getElementById('lpNavMenu');
+  function syncBrandLogo(){
+    if(!nav) return;
+    nav.querySelectorAll('.lp-brand-logo[data-logo-dark]').forEach(function(img){
+      var dark=img.getAttribute('data-logo-dark');
+      var light=img.getAttribute('data-logo-light');
+      var scrolled=nav.classList.contains('is-scrolled') || nav.classList.contains('menu-open');
+      if(light && dark) img.src=scrolled?light:dark;
+    });
+  }
+  function onScroll(){ if(nav) nav.classList.toggle('is-scrolled', window.scrollY > 12); syncBrandLogo(); }
+  onScroll(); window.addEventListener('scroll', onScroll, {passive:true});
+  if(toggle && menu){
+    toggle.addEventListener('click', function(){
+      var open=nav.classList.toggle('menu-open');
+      toggle.setAttribute('aria-expanded', open?'true':'false');
+      toggle.innerHTML=open?'<i data-lucide="x"></i>':'<i data-lucide="menu"></i>';
+      syncBrandLogo();
+      if(window.lucide) lucide.createIcons();
+    });
+    menu.querySelectorAll('a[href^="#"]').forEach(function(a){
+      a.addEventListener('click', function(){ nav.classList.remove('menu-open'); toggle.setAttribute('aria-expanded','false'); toggle.innerHTML='<i data-lucide="menu"></i>'; syncBrandLogo(); if(window.lucide) lucide.createIcons(); });
+    });
+  }
+  var reveals=document.querySelectorAll('[data-reveal]');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('is-visible'); io.unobserve(e.target); } });
+    }, {threshold:0.12, rootMargin:'0px 0px -40px 0px'});
+    reveals.forEach(function(el, i){ el.style.transitionDelay=(el.dataset.reveal==='delay'?'.18s':((i%4)*0.06)+'s'); io.observe(el); });
+  } else { reveals.forEach(function(el){ el.classList.add('is-visible'); }); }
+})();
+</script>
+{% endblock %}

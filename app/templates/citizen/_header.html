@@ -91,7 +91,7 @@
                 <span class="sidebar-account-role">{{ current_user.role_label }}</span>
             </span>
         </div>
-        <form class="sidebar-logout" method="post" action="{{ url_for('auth.logout') }}">
+        <form class="sidebar-logout" method="post" action="{{ url_for('auth.logout') }}" data-confirm="Are you sure you want to log out of your account?" data-confirm-title="Confirm Logout" data-confirm-action="Log out" data-confirm-danger="1">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" title="Log Out">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7V5H5v14h5v-2"></path><path d="M10 12h9"></path><path d="m16 9 3 3-3 3"></path></svg>

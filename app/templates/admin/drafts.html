@@ -3,37 +3,91 @@
 {% block body_class %}citizen-dashboard admin-dashboard{% endblock %}
 {% block site_header %}{% include "admin/_header.html" %}{% endblock %}
 {% block content %}
-<div class="admin-main">
-  <header class="admin-page-heading"><div><p class="admin-eyebrow">WORKSPACE / DRAFTS</p><h1>Draft Applications</h1><p>View draft applications saved in the system.</p></div></header>
-  <section class="admin-panel admin-filter-panel">
-    <form class="admin-filter-form" method="get">
-      <label class="admin-search-field"><span class="visually-hidden">Search drafts</span><input type="search" name="q" value="{{ search }}" placeholder="Tracking number or citizen name"></label>
-      <button class="admin-button admin-button--primary" type="submit">Search</button>
-      {% if search %}<a class="admin-button admin-button--quiet" href="{{ url_for('admin.drafts') }}">Clear</a>{% endif %}
-    </form>
+<div class="adm-dash">
+  <section class="adm-dash-header">
+    <div>
+      <p class="admin-eyebrow">WORKSPACE / DRAFTS</p>
+      <h1>Draft Applications</h1>
+      <p class="adm-dash-welcome">View and manage draft applications saved in the system before submission.</p>
+      <div class="adm-dash-date">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span>{{ applications|length }} draft{{ '' if applications|length == 1 else 's' }} shown</span>
+      </div>
+    </div>
+    <div class="adm-dash-actions">
+      <form class="adm-filter-form" method="get">
+        <label class="adm-filter-field">
+          <span>Search</span>
+          <input type="search" name="q" value="{{ search }}" placeholder="Tracking number or citizen name">
+        </label>
+        <button class="cset-btn cset-btn-primary" type="submit">Search</button>
+        {% if search %}<a class="cset-btn cset-btn-ghost" href="{{ url_for('admin.drafts') }}">Clear</a>{% endif %}
+      </form>
+    </div>
   </section>
-  <section class="admin-panel admin-table-panel">
-    <div class="admin-panel-heading"><div><p class="admin-eyebrow">SAVED DRAFTS</p><h2>Draft requests</h2></div><span class="admin-count-chip">{{ applications|length }} shown</span></div>
+
+  <section class="adm-stats-group" aria-label="Draft summary">
+    <div class="adm-stat-cell">
+      <div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-amber"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16"/><path d="M6 16l9-9 3 3-9 9H6z"/><path d="M13 5l3 3"/></svg></span><span class="adm-stat-label">Drafts Shown</span></div>
+      <div class="adm-stat-value">{{ applications|length }}</div>
+      <div class="adm-stat-hint">Matching current search</div>
+    </div>
+    <div class="adm-stat-cell">
+      <div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span><span class="adm-stat-label">Status</span></div>
+      <div class="adm-stat-value">Draft</div>
+      <div class="adm-stat-hint">Not yet submitted</div>
+    </div>
+  </section>
+
+  <section class="adm-panel">
+    <div class="adm-panel-head">
+      <div class="adm-panel-title">
+        <span class="adm-panel-icon adm-icon-amber"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16"/><path d="M6 16l9-9 3 3-9 9H6z"/><path d="M13 5l3 3"/></svg></span>
+        <div><p class="admin-eyebrow">SAVED DRAFTS</p><h2>Draft Requests</h2></div>
+      </div>
+      <span class="adm-pill">{{ applications|length }} shown</span>
+    </div>
+
     {% if applications %}
-    <div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Tracking number</th><th>Citizen</th><th>Service</th><th>Last updated</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-      {% for application in applications %}{% set applicant = applicants.get(application.applicant_id) %}
-      <tr>
-        <td><strong class="admin-mono">{{ application.tracking_number }}</strong></td>
-        <td>{{ applicant.full_name if applicant else 'Unknown account' }}<small>{{ applicant.email if applicant else '' }}</small></td>
-        <td>{{ application.service.service_name }}</td>
-        <td>{{ application.last_updated.strftime('%d %b %Y') if application.last_updated else '—' }}</td>
-        <td><span class="admin-status-pill admin-status-pill--{{ application.application_status }}">{{ status_labels.get(application.application_status, application.application_status) }}</span></td>
-        <td><div class="admin-row-actions">
-          <a class="admin-row-action" href="{{ url_for('admin.application_detail', application_id=application.application_id) }}">Review <span aria-hidden="true">→</span></a>
-          {% if current_user.role in ['system_admin','department_supervisor'] %}
-          <form method="post" action="{{ url_for('admin.delete_application', application_id=application.application_id) }}" class="admin-inline-form" onsubmit="return confirm('Move {{ application.tracking_number }} to Archive?');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="admin-row-action admin-row-action--danger">Delete</button></form>
-          {% endif %}
-        </div></td>
-      </tr>
-      {% endfor %}
-    </tbody></table></div>
+    <div class="adm-table-wrap adm-table-scroll-lg">
+      <table class="adm-table adm-table-compact adm-tx-table">
+        <thead><tr><th>Tracking Number</th><th>Citizen</th><th>Service</th><th>Last Updated</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for application in applications %}
+          {% set applicant = applicants.get(application.applicant_id) %}
+          <tr>
+            <td><span class="adm-mono">{{ application.tracking_number }}</span></td>
+            <td class="adm-cell-wrap">
+              <strong>{{ applicant.full_name if applicant else 'Unknown account' }}</strong>
+              <div class="adm-cell-sub">{{ applicant.email if applicant else '' }}</div>
+            </td>
+            <td class="adm-cell-wrap">{{ application.service.service_name }}</td>
+            <td>{{ application.last_updated.strftime('%d %b %Y, %I:%M %p') if application.last_updated else '—' }}</td>
+            <td><span class="adm-status adm-status-{{ application.application_status }}">{{ status_labels.get(application.application_status, application.application_status) }}</span></td>
+            <td>
+              <div class="adm-row-actions">
+                <a class="adm-icon-btn adm-icon-btn-primary" href="{{ url_for('admin.application_detail', application_id=application.application_id) }}" title="Review">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <span>Review</span>
+                </a>
+                {% if current_user.role in ['system_admin','department_supervisor'] %}
+                <form method="post" action="{{ url_for('admin.delete_application', application_id=application.application_id) }}" class="adm-inline-form" onsubmit="return confirm('Move {{ application.tracking_number }} to Archive?');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="adm-icon-btn adm-icon-btn-danger" title="Archive">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                    <span>Archive</span>
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% else %}
-    <p class="admin-empty">No draft applications found.</p>
+    <p class="adm-empty">No draft applications found.</p>
     {% endif %}
   </section>
 </div>

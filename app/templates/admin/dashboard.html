@@ -17,7 +17,7 @@
     <div class="adm-dash-actions">
       <form class="adm-filter-form" method="get" action="{{ url_for('admin.dashboard') }}">
         <label class="adm-filter-field"><span>Date Filter</span>
-          <select name="range" id="adm-range" onchange="document.getElementById('adm-custom-range').style.display=this.value==='custom'?'flex':'none'">
+          <select name="range" id="adm-range" onchange="var c=document.getElementById('adm-custom-range'); if(this.value==='custom'){c.hidden=false;}else{c.hidden=true;}">
             <option value="today" {% if rng.preset=='today' %}selected{% endif %}>Today</option>
             <option value="this_week" {% if rng.preset=='this_week' %}selected{% endif %}>This Week</option>
             <option value="this_month" {% if rng.preset=='this_month' %}selected{% endif %}>This Month</option>
@@ -25,7 +25,7 @@
             <option value="custom" {% if rng.preset=='custom' %}selected{% endif %}>Custom Range</option>
           </select>
         </label>
-        <div id="adm-custom-range" class="adm-custom-range" style="display:{% if rng.preset=='custom' %}flex{% else %}none{% endif %}">
+        <div id="adm-custom-range" class="adm-custom-range" {% if rng.preset!='custom' %}hidden{% endif %}>
           <label class="adm-filter-field"><span>Start</span><input type="date" name="start" value="{{ request.args.get('start','') }}"></label>
           <label class="adm-filter-field"><span>End</span><input type="date" name="end" value="{{ request.args.get('end','') }}"></label>
         </div>
@@ -1342,17 +1342,18 @@
   });
 
   const _admCharts = Chart.instances ? Object.values(Chart.instances) : [];
-  document.querySelectorAll('[data-theme-toggle]').forEach(btn => btn.addEventListener('click', () => {
-    setTimeout(() => {
-      Chart.defaults.color = themeTick();
-      Object.values(Chart.instances || {}).forEach(c => {
-        try { c.options.scales && Object.values(c.options.scales).forEach(s => { if(s.ticks) s.ticks.color = themeTick(); if(s.grid && s.grid.color !== undefined && s.grid.display!==false) s.grid.color = s.grid.circular ? (isDark()?'rgba(148,163,184,.18)':'rgba(148,163,184,0.28)') : themeGrid(); if(s.angleLines) s.angleLines.color = isDark()?'rgba(148,163,184,.18)':'rgba(148,163,184,0.28)'; if(s.pointLabels) s.pointLabels.color = themeBody(); }); } catch(e){}
-        try { c.options.plugins.legend.labels.color = themeBody(); } catch(e){}
-        try { if(c.config.type==='doughnut'||c.config.type==='pie'){ c.data.datasets.forEach(d=>{ d.borderColor = isDark()?'#111827':'#FFFFFF'; }); } } catch(e){}
-        try { c.update('none'); } catch(e){}
-      });
-    }, 30);
-  }));
+  const restyleCharts = () => {
+    Chart.defaults.color = themeTick();
+    Object.values(Chart.instances || {}).forEach(c => {
+      try { c.options.scales && Object.values(c.options.scales).forEach(s => { if(s.ticks) s.ticks.color = themeTick(); if(s.grid && s.grid.color !== undefined && s.grid.display!==false) s.grid.color = s.grid.circular ? (isDark()?'rgba(148,163,184,.18)':'rgba(148,163,184,0.28)') : themeGrid(); if(s.angleLines) s.angleLines.color = isDark()?'rgba(148,163,184,.18)':'rgba(148,163,184,0.28)'; if(s.pointLabels) s.pointLabels.color = themeBody(); }); } catch(e){}
+      try { c.options.plugins.legend.labels.color = themeBody(); } catch(e){}
+      try { if(c.config.type==='doughnut'||c.config.type==='pie'){ c.data.datasets.forEach(d=>{ d.borderColor = isDark()?'#111827':'#FFFFFF'; }); } } catch(e){}
+      try { c.update('none'); c.resize(); } catch(e){}
+    });
+  };
+  document.querySelectorAll('[data-theme-toggle]').forEach(btn => btn.addEventListener('click', () => setTimeout(restyleCharts, 30)));
+  new MutationObserver(() => setTimeout(restyleCharts, 30)).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+  window.addEventListener('resize', () => Object.values(Chart.instances||{}).forEach(c=>{ try{c.resize();}catch(e){} }));
 })();
 </script>
 {% endblock %}

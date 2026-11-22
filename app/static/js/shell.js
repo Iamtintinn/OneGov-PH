@@ -101,6 +101,47 @@
         desktopQuery.addListener(handleDesktopChange);
     }
 
+    // Global confirm modal for logout and destructive form actions
+    var confirmModal, confirmTitle, confirmMsg, confirmOk, confirmCancel, pendingConfirmForm;
+    function ensureConfirmModal(){
+        if(confirmModal) return;
+        confirmModal=document.createElement('div');
+        confirmModal.className='og-confirm';
+        confirmModal.hidden=true;
+        confirmModal.innerHTML='<div class="og-confirm-backdrop" data-close="1"></div><div class="og-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="og-confirm-title"><div class="og-confirm-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 7V5H5v14h5v-2"/><path d="M10 12h9"/><path d="m16 9 3 3-3 3"/></svg></div><h3 id="og-confirm-title" class="og-confirm-title"></h3><p class="og-confirm-msg"></p><div class="og-confirm-actions"><button type="button" class="og-confirm-btn og-confirm-cancel">Cancel</button><button type="button" class="og-confirm-btn og-confirm-ok">Confirm</button></div></div>';
+        document.body.appendChild(confirmModal);
+        confirmTitle=confirmModal.querySelector('.og-confirm-title');
+        confirmMsg=confirmModal.querySelector('.og-confirm-msg');
+        confirmOk=confirmModal.querySelector('.og-confirm-ok');
+        confirmCancel=confirmModal.querySelector('.og-confirm-cancel');
+        confirmModal.addEventListener('click',function(e){ if(e.target.closest('[data-close]')||e.target===confirmCancel) closeConfirm(); });
+        confirmOk.addEventListener('click',function(){
+            if(!pendingConfirmForm) return closeConfirm();
+            var f=pendingConfirmForm; pendingConfirmForm=null; closeConfirm();
+            f.dataset.confirmed='1';
+            if(typeof f.requestSubmit==='function') f.requestSubmit(); else f.submit();
+        });
+        document.addEventListener('keydown',function(e){ if(e.key==='Escape' && confirmModal && !confirmModal.hidden) closeConfirm(); });
+    }
+    function openConfirm(form){
+        ensureConfirmModal();
+        pendingConfirmForm=form;
+        confirmTitle.textContent=form.dataset.confirmTitle||'Confirm action';
+        confirmMsg.textContent=form.dataset.confirm||'Are you sure you want to continue?';
+        confirmOk.textContent=form.dataset.confirmAction||'Confirm';
+        confirmOk.className='og-confirm-btn og-confirm-ok'+(form.dataset.confirmDanger==='1'?' is-danger':'');
+        confirmModal.hidden=false;
+        document.body.classList.add('og-confirm-open');
+        confirmCancel.focus();
+    }
+    function closeConfirm(){ if(!confirmModal) return; confirmModal.hidden=true; document.body.classList.remove('og-confirm-open'); pendingConfirmForm=null; }
+    document.addEventListener('submit',function(e){
+        var form=e.target;
+        if(!form || !form.dataset) return;
+        if(form.dataset.confirmed==='1'){ delete form.dataset.confirmed; form.dataset.confirmPassed='1'; return; }
+        if(form.dataset.confirm && !form.dataset.confirmPassed){ e.preventDefault(); openConfirm(form); }
+    }, true);
+
     var sidebar = document.getElementById("citizen-sidebar");
     var backdrop = document.querySelector(".sidebar-backdrop");
     var mobileToggle = document.querySelector(".sidebar-toggle");

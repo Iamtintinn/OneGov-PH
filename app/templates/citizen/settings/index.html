@@ -4,12 +4,12 @@
 {% block site_header %}{% include "admin/_header.html" if admin_settings_mode else "citizen/_header.html" %}{% endblock %}
 {% block content %}
 <div class="{{ 'admin-main' if admin_settings_mode else 'dash-page site-width' }}">
-  <section class="citizen-settings-page" aria-labelledby="settings-heading">
-    <div class="citizen-settings-hero">
-      <div>
-        <p class="dash-kicker">Citizen Account</p>
-        <h1 id="settings-heading">Account Settings</h1>
-        <p class="citizen-list-sub">Manage your profile, security, notifications, privacy, and application preferences in one place.</p>
+  <section class="citizen-settings-page {{ 'citizen-settings-page--admin adm-dash' if admin_settings_mode else '' }}" aria-labelledby="settings-heading">
+    <div class="citizen-settings-hero {{ 'adm-dash-head' if admin_settings_mode else '' }}">
+      <div class="{{ 'adm-dash-head-copy' if admin_settings_mode else '' }}">
+        <p class="dash-kicker">{{ 'Account Settings' if admin_settings_mode else 'Citizen Account' }}</p>
+        <h1 id="settings-heading">{{ 'Settings' if admin_settings_mode else 'Account Settings' }}</h1>
+        <p class="citizen-list-sub {{ 'adm-dash-sub' if admin_settings_mode else '' }}">Manage your profile, security, notifications, privacy, and application preferences in one place.</p>
       </div>
     </div>
 
@@ -90,7 +90,7 @@
               </div>
               <div class="cset-address-actions">
                 <button type="button" class="cset-btn cset-btn-ghost" onclick="editAddress({{ a|tojson|forceescape }})">Edit</button>
-                <form method="post" action="{{ url_for('citizen_settings.save_address') }}" class="ajax-settings-form inline-form-confirm" data-confirm="Remove this address?">
+                <form method="post" action="{{ url_for('citizen_settings.save_address') }}" class="ajax-settings-form inline-form-confirm" data-confirm="Remove this address?" data-confirm-title="Remove address" data-confirm-action="Remove" data-confirm-danger="1">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% if admin_settings_mode %}<input type="hidden" name="admin_mode" value="1">{% endif %}<input type="hidden" name="action" value="delete"><input type="hidden" name="address_id" value="{{ a.id }}">
                   <button type="submit" class="cset-btn cset-btn-danger-ghost">Remove</button>
                 </form>
@@ -163,7 +163,7 @@
             <div class="cset-session-item"><div><p class="cset-address-title">{{ s.user_agent[:80] if s.user_agent else 'Unknown device' }}</p><p class="cset-address-meta">IP: {{ s.ip_address or '—' }} · Last seen: {{ s.last_seen_at.strftime('%d %b %Y, %I:%M %p') if s.last_seen_at else '—' }}</p></div></div>
             {% else %}<p class="cset-empty">No active session records. Session tracking will appear after the migration and next login.</p>{% endfor %}
           </div>
-          <div class="cset-actions"><form method="post" action="{{ url_for('citizen_settings.logout_all_devices') }}" class="inline-form-confirm" data-confirm="Log out from all devices? You will need to sign in again."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% if admin_settings_mode %}<input type="hidden" name="admin_mode" value="1">{% endif %}<button type="submit" class="cset-btn cset-btn-danger">Logout from all devices</button></form></div>
+          <div class="cset-actions"><form method="post" action="{{ url_for('citizen_settings.logout_all_devices') }}" class="inline-form-confirm" data-confirm="Log out from all devices? You will need to sign in again." data-confirm-title="Logout from all devices" data-confirm-action="Log out" data-confirm-danger="1"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% if admin_settings_mode %}<input type="hidden" name="admin_mode" value="1">{% endif %}<button type="submit" class="cset-btn cset-btn-danger">Logout from all devices</button></form></div>
         </section>
         {% endif %}
 
@@ -210,8 +210,8 @@
           <div class="cset-card-head"><div><p class="cset-kicker">Privacy</p><h3>Account Requests</h3></div></div>
           <p class="cset-help">Request account deactivation or deletion. Requests are reviewed by administrators.</p>
           <div class="cset-actions cset-actions-wrap">
-            <form method="post" action="{{ url_for('citizen_settings.account_request') }}" class="ajax-settings-form inline-form-confirm" data-confirm="Submit account deactivation request?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% if admin_settings_mode %}<input type="hidden" name="admin_mode" value="1">{% endif %}<input type="hidden" name="request_type" value="deactivation"><button type="submit" class="cset-btn cset-btn-ghost">Request deactivation</button></form>
-            <form method="post" action="{{ url_for('citizen_settings.account_request') }}" class="ajax-settings-form inline-form-confirm" data-confirm="Submit account deletion request? This will be reviewed by an administrator."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% if admin_settings_mode %}<input type="hidden" name="admin_mode" value="1">{% endif %}<input type="hidden" name="request_type" value="deletion"><button type="submit" class="cset-btn cset-btn-danger-ghost">Request deletion</button></form>
+            <form method="post" action="{{ url_for('citizen_settings.account_request') }}" class="ajax-settings-form inline-form-confirm" data-confirm="Submit account deactivation request?" data-confirm-title="Request deactivation" data-confirm-action="Submit request"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% if admin_settings_mode %}<input type="hidden" name="admin_mode" value="1">{% endif %}<input type="hidden" name="request_type" value="deactivation"><button type="submit" class="cset-btn cset-btn-ghost">Request deactivation</button></form>
+            <form method="post" action="{{ url_for('citizen_settings.account_request') }}" class="ajax-settings-form inline-form-confirm" data-confirm="Submit account deletion request? This will be reviewed by an administrator." data-confirm-title="Request account deletion" data-confirm-action="Submit request" data-confirm-danger="1"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% if admin_settings_mode %}<input type="hidden" name="admin_mode" value="1">{% endif %}<input type="hidden" name="request_type" value="deletion"><button type="submit" class="cset-btn cset-btn-danger-ghost">Request deletion</button></form>
           </div>
           {% if account_requests %}
           <div class="cset-table-wrap" style="margin-top:1rem"><table class="cset-table"><thead><tr><th>Type</th><th>Status</th><th>Date</th></tr></thead><tbody>
@@ -281,12 +281,10 @@ function showCsetToast(msg, ok=true){
   t.textContent=msg; t.className='cset-toast is-visible '+(ok?'is-ok':'is-err');
   clearTimeout(t._timer); t._timer=setTimeout(()=>t.classList.remove('is-visible'),3500);
 }
-document.querySelectorAll('.inline-form-confirm').forEach(f=>{
-  f.addEventListener('submit',e=>{const msg=f.dataset.confirm; if(msg&&!confirm(msg)) e.preventDefault();});
-});
 document.querySelectorAll('.ajax-settings-form').forEach(form=>{
   form.addEventListener('submit', async e=>{
-    if(form.classList.contains('inline-form-confirm')){ /* already confirmed */ }
+    if(form.dataset.confirm && !form.dataset.confirmPassed) return; // global confirm modal handles
+    if(form.dataset.confirmPassed) delete form.dataset.confirmPassed;
     if(form.enctype==='multipart/form-data') return; // let normal submit handle file upload
     e.preventDefault();
     const btn=form.querySelector('[type=submit]'); const old=btn?btn.textContent:''; if(btn){btn.disabled=true; btn.textContent=btn.dataset.loading||'Saving...';}

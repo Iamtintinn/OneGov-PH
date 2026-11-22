@@ -1,150 +1,108 @@
 {% extends "base.html" %}
-{% block title %}Account creation · OneGov PH{% endblock %}
+{% block title %}Account Creation · OneGov PH{% endblock %}
 {% block body_class %}citizen-dashboard admin-dashboard{% endblock %}
 {% block site_header %}{% include "admin/_header.html" %}{% endblock %}
-{% block head %}
-<style>
-    .account-create-page { max-width: 1180px; }
-    .account-create-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr); align-items: start; gap: 1rem; }
-    .account-create-main,.account-create-side { display: grid; gap: 1rem; min-width: 0; }
-    .account-create-section { position: relative; overflow: hidden; }
-    .account-create-section::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: linear-gradient(180deg, #3b82b0, #781f3a); }
-    .account-create-section > * { position: relative; }
-    .account-create-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .9rem 1rem; }
-    .account-create-grid label { display: grid; gap: .4rem; color: #657187; font-size: .76rem; font-weight: 650; }
-    .account-create-grid input,.account-create-grid select,.account-create-grid textarea { width: 100%; min-height: 40px; padding: .55rem .7rem; border: 1px solid #dfe4ec; border-radius: 8px; background: #fff; color: #344158; font: inherit; font-size: .82rem; }
-    .account-create-grid textarea { min-height: 78px; resize: vertical; }
-    .account-create-grid input:focus,.account-create-grid select:focus,.account-create-grid textarea:focus { outline: 3px solid rgba(59,130,176,.18); border-color: #6aa7cb; }
-    .account-create-span { grid-column: 1 / -1; }
-    .account-create-help { color: #98a2b1; font-size: .68rem; font-weight: 450; }
-    .account-create-choice { display: grid; gap: .5rem; margin: .35rem 0 .75rem; }
-    .account-create-choice label { display: flex; align-items: center; gap: .5rem; color: #56637a; font-size: .8rem; font-weight: 550; }
-    .account-create-choice input { width: 16px; min-height: 16px; height: 16px; accent-color: #3b82b0; }
-    .account-create-confirm { display: flex; align-items: flex-start; gap: .55rem; margin-top: 1rem; padding: .8rem; border: 1px solid #e3e8f0; border-radius: 10px; background: #fafcfe; color: #59667d; font-size: .76rem; }
-    .account-create-confirm input { width: 16px; min-height: 16px; height: 16px; margin-top: .05rem; accent-color: #781f3a; }
-    .account-create-steps { display: grid; gap: .8rem; margin: 0; padding: 0; list-style: none; counter-reset: account-step; }
-    .account-create-steps li { position: relative; padding-left: 2.15rem; color: #68768b; font-size: .78rem; }
-    .account-create-steps li::before { counter-increment: account-step; content: counter(account-step); position: absolute; left: 0; top: 0; display: grid; place-items: center; width: 1.55rem; height: 1.55rem; border-radius: 50%; background: #edf4fa; color: #245878; font-size: .72rem; font-weight: 750; }
-    .account-create-steps strong { display: block; margin-bottom: .15rem; color: #344158; font-size: .8rem; }
-    .account-create-note { margin-top: 1rem; padding: .8rem; border-left: 3px solid #d4a016; border-radius: 8px; background: #fffbf0; color: #6f5a2c; font-size: .73rem; }
-    .account-create-secret code { display: block; overflow-wrap: anywhere; padding: .75rem .8rem; border: 1px dashed #7bc79c; border-radius: 8px; background: #fff; color: #17653b; font-size: .95rem; font-weight: 700; letter-spacing: .03em; }
-    .account-create-secret dl { display: grid; grid-template-columns: auto minmax(0,1fr); gap: .35rem .7rem; margin: 0 0 .8rem; }
-    .account-create-secret dt { color: #8b96a8; font-size: .7rem; text-transform: uppercase; }
-    .account-create-secret dd { margin: 0; color: #344158; font-size: .77rem; font-weight: 650; overflow-wrap: anywhere; }
-    .account-create-copy { margin-top: .7rem; }
-    [hidden] { display: none !important; }
-    @media (max-width: 900px) { .account-create-layout,.account-create-grid { grid-template-columns: 1fr; } }
-</style>
-{% endblock %}
 {% block content %}
-<div class="admin-main account-create-page">
-    <p class="admin-breadcrumb"><a href="{{ url_for('admin.accounts') }}">Accounts</a><span>/</span>Account creation</p>
-    <header class="admin-page-heading">
-        <div><p class="admin-eyebrow">ADMINISTRATION / ACCESS CONTROL</p><h1>Create an account</h1><p>Provision a new OneGov PH account, assign its role and department, and issue temporary credentials.</p></div>
-        <a class="admin-button admin-button--quiet" href="{{ url_for('admin.accounts') }}">← Back to accounts</a>
-    </header>
-
-    {% if errors %}
-    <div class="admin-error-summary" role="alert"><strong>Check the highlighted information.</strong><ul>{% for message in errors.values() %}<li>{{ message }}</li>{% endfor %}</ul></div>
-    {% endif %}
-
-    {% if temporary_password and created_account %}
-    <section class="admin-panel admin-secret-panel account-create-secret" role="status">
-        <p class="admin-eyebrow">TEMPORARY CREDENTIALS</p>
-        <h2>Share these credentials securely</h2>
-        <p>The password is shown only in this response. The account must change it after signing in.</p>
-        <dl>
-            <dt>Name</dt><dd>{{ created_account.full_name }}</dd>
-            <dt>Email</dt><dd>{{ created_account.email }}</dd>
-            <dt>Role</dt><dd>{{ department_role_label(created_account) }}</dd>
-            {% if created_account.department %}<dt>Department</dt><dd>{{ created_account.department.department_name }}</dd>{% endif %}
-        </dl>
-        <code id="temporary-password">{{ temporary_password }}</code>
-        <button class="admin-button admin-button--primary account-create-copy" type="button" onclick="navigator.clipboard.writeText(document.getElementById('temporary-password').textContent).then(() => this.textContent = 'Copied')">Copy password</button>
-    </section>
-    {% endif %}
-
-    <div class="account-create-layout">
-        <form class="account-create-main" method="post" onsubmit="return confirm('Create this account now?');">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <section class="admin-panel account-create-section">
-                <div class="admin-panel-heading"><div><p class="admin-eyebrow">SECTION 1 / ACCOUNT DETAILS</p><h2>Personal information and role</h2></div></div>
-                <div class="account-create-grid">
-                    <label>First name<input name="first_name" value="{{ form.first_name }}" maxlength="80" required>{% if errors.first_name %}<small class="admin-field-error">{{ errors.first_name }}</small>{% endif %}</label>
-                    <label>Middle name<input name="middle_name" value="{{ form.middle_name }}" maxlength="80">{% if errors.middle_name %}<small class="admin-field-error">{{ errors.middle_name }}</small>{% endif %}</label>
-                    <label>Last name<input name="last_name" value="{{ form.last_name }}" maxlength="80" required>{% if errors.last_name %}<small class="admin-field-error">{{ errors.last_name }}</small>{% endif %}</label>
-                    <label>Email address<input type="email" name="email" value="{{ form.email }}" maxlength="255" required>{% if errors.email %}<small class="admin-field-error">{{ errors.email }}</small>{% endif %}</label>
-                    <label>Contact number<input type="tel" name="contact_number" value="{{ form.contact_number }}" maxlength="20" required>{% if errors.contact_number %}<small class="admin-field-error">{{ errors.contact_number }}</small>{% endif %}</label>
-                    <label class="account-create-span">Address<textarea name="address" maxlength="500">{{ form.address }}</textarea>{% if errors.address %}<small class="admin-field-error">{{ errors.address }}</small>{% endif %}</label>
-                    <label>Role<select name="role" id="account-creation-role" required>{% for role, label in roles %}<option value="{{ role }}" {% if form.role == role %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% if errors.role %}<small class="admin-field-error">{{ errors.role }}</small>{% endif %}</label>
-                    <label id="account-creation-department" {% if form.role != 'department_supervisor' %}hidden{% endif %}>Department<select name="department_id"><option value="">Select a department</option>{% for department in departments %}<option value="{{ department.department_id }}" {% if form.department_id == department.department_id|string %}selected{% endif %}>{{ department.department_name }}</option>{% endfor %}</select><small class="account-create-help">Department Administrators are restricted to their assigned department.</small>{% if errors.department_id %}<small class="admin-field-error">{{ errors.department_id }}</small>{% endif %}</label>
-                </div>
-            </section>
-
-            <section class="admin-panel account-create-section">
-                <div class="admin-panel-heading"><div><p class="admin-eyebrow">SECTION 2 / TEMPORARY CREDENTIALS</p><h2>Set the initial password</h2></div></div>
-                <div class="account-create-choice">
-                    <label><input type="radio" name="password_mode" value="generate" {% if form.password_mode == 'generate' %}checked{% endif %}> Generate a secure temporary password</label>
-                    <label><input type="radio" name="password_mode" value="custom" {% if form.password_mode == 'custom' %}checked{% endif %}> Provide a temporary password</label>
-                </div>
-                <div class="account-create-grid" id="account-creation-custom-password" {% if form.password_mode != 'custom' %}hidden{% endif %}>
-                    <label>Temporary password<input type="password" name="password" autocomplete="new-password" maxlength="128">{% if errors.password %}<small class="admin-field-error">{{ errors.password }}</small>{% endif %}</label>
-                    <label>Confirm password<input type="password" name="confirm_password" autocomplete="new-password" maxlength="128">{% if errors.confirm_password %}<small class="admin-field-error">{{ errors.confirm_password }}</small>{% endif %}</label>
-                    <small class="account-create-help account-create-span">Use 8 to 128 characters with at least one letter and one number.</small>
-                </div>
-                {% if errors.password_mode %}<small class="admin-field-error">{{ errors.password_mode }}</small>{% endif %}
-                <label class="account-create-confirm"><input type="checkbox" name="confirm_create" value="yes" required {% if form.confirm_create %}checked{% endif %}><span>I confirm that the account details and role assignment are correct.</span></label>
-                {% if errors.confirm_create %}<small class="admin-field-error">{{ errors.confirm_create }}</small>{% endif %}
-                <div class="admin-form-actions"><button class="admin-button admin-button--primary" type="submit">Create account</button></div>
-            </section>
-        </form>
-
-        <aside class="account-create-side">
-            <section class="admin-panel">
-                <div class="admin-panel-heading"><div><p class="admin-eyebrow">WORKFLOW</p><h2>What happens next</h2></div></div>
-                <ol class="account-create-steps">
-                    <li><strong>Review access</strong>Confirm the role and department before creating the account.</li>
-                    <li><strong>Share credentials</strong>Copy the generated password and send it to the account holder securely.</li>
-                    <li><strong>First login</strong>The account is required to set a new password before accessing the console.</li>
-                </ol>
-                <p class="account-create-note">Existing Account Management remains available for profile changes, status control, and security audit history.</p>
-            </section>
-        </aside>
+<div class="adm-dash">
+  <section class="adm-dash-header">
+    <div>
+      <p class="admin-eyebrow">ADMINISTRATION / ACCESS CONTROL</p>
+      <h1>Create an Account</h1>
+      <p class="adm-dash-welcome">Provision a new OneGov PH account, assign its role and department, and issue temporary credentials.</p>
     </div>
+    <div class="adm-dash-actions"><a class="cset-btn cset-btn-ghost" href="{{ url_for('admin.accounts') }}">Back to accounts</a></div>
+  </section>
+
+  {% if errors %}
+  <div class="adm-panel" role="alert" style="border-color:#FECACA;background:#FEF2F2"><div class="adm-panel-body"><strong style="color:#991B1B">Check the highlighted information.</strong><ul style="margin:.5rem 0 0;padding-left:1.1rem;color:#7F1D1D">{% for message in errors.values() %}<li>{{ message }}</li>{% endfor %}</ul></div></div>
+  {% endif %}
+
+  {% if temporary_password and created_account %}
+  <section class="adm-panel" role="status">
+    <div class="adm-panel-head"><div class="adm-panel-title"><span class="adm-panel-icon adm-icon-green"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span><div><p class="admin-eyebrow">TEMPORARY CREDENTIALS</p><h2>Share these credentials securely</h2></div></div></div>
+    <div class="adm-panel-body">
+      <p class="adm-muted" style="margin:0 0 1rem">The password is shown only in this response. The account must change it after signing in.</p>
+      <div class="adm-acct-detail-grid" style="margin-bottom:1rem">
+        <div class="adm-acct-detail"><span>Name</span><strong>{{ created_account.full_name }}</strong></div>
+        <div class="adm-acct-detail"><span>Email</span><strong>{{ created_account.email }}</strong></div>
+        <div class="adm-acct-detail"><span>Role</span><strong>{{ department_role_label(created_account) }}</strong></div>
+        {% if created_account.department %}<div class="adm-acct-detail"><span>Department</span><strong>{{ created_account.department.department_name }}</strong></div>{% endif %}
+      </div>
+      <div class="adm-acct-detail adm-acct-detail-span"><span>Temporary password</span><strong id="temporary-password" style="font-family:ui-monospace,SFMono-Regular,monospace;font-size:1rem;letter-spacing:.02em;word-break:break-all">{{ temporary_password }}</strong></div>
+      <div style="margin-top:1rem"><button class="cset-btn cset-btn-primary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('temporary-password').textContent).then(()=>this.textContent='Copied')">Copy password</button></div>
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="adm-grid-2 adm-acct-create-layout">
+    <form class="adm-acct-create-main" method="post" onsubmit="return confirm('Create this account now?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <section class="adm-panel">
+        <div class="adm-panel-head"><div class="adm-panel-title"><span class="adm-panel-icon adm-icon-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span><div><p class="admin-eyebrow">SECTION 1 / ACCOUNT DETAILS</p><h2>Personal information and role</h2></div></div></div>
+        <div class="adm-panel-body">
+          <div class="adm-form-grid">
+            <label class="adm-filter-field"><span>First name</span><input name="first_name" value="{{ form.first_name }}" maxlength="80" required>{% if errors.first_name %}<small class="adm-field-error">{{ errors.first_name }}</small>{% endif %}</label>
+            <label class="adm-filter-field"><span>Middle name</span><input name="middle_name" value="{{ form.middle_name }}" maxlength="80">{% if errors.middle_name %}<small class="adm-field-error">{{ errors.middle_name }}</small>{% endif %}</label>
+            <label class="adm-filter-field"><span>Last name</span><input name="last_name" value="{{ form.last_name }}" maxlength="80" required>{% if errors.last_name %}<small class="adm-field-error">{{ errors.last_name }}</small>{% endif %}</label>
+            <label class="adm-filter-field"><span>Email address</span><input type="email" name="email" value="{{ form.email }}" maxlength="255" required>{% if errors.email %}<small class="adm-field-error">{{ errors.email }}</small>{% endif %}</label>
+            <label class="adm-filter-field"><span>Contact number</span><input type="tel" name="contact_number" value="{{ form.contact_number }}" maxlength="20" required>{% if errors.contact_number %}<small class="adm-field-error">{{ errors.contact_number }}</small>{% endif %}</label>
+            <label class="adm-filter-field adm-form-span"><span>Address</span><textarea name="address" maxlength="500" rows="3">{{ form.address }}</textarea>{% if errors.address %}<small class="adm-field-error">{{ errors.address }}</small>{% endif %}</label>
+            <label class="adm-filter-field"><span>Role</span><select name="role" id="account-creation-role" required>{% for role, label in roles %}<option value="{{ role }}" {% if form.role == role %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% if errors.role %}<small class="adm-field-error">{{ errors.role }}</small>{% endif %}</label>
+            <label class="adm-filter-field" id="account-creation-department" {% if form.role != 'department_supervisor' %}hidden{% endif %}><span>Department</span><select name="department_id"><option value="">Select a department</option>{% for department in departments %}<option value="{{ department.department_id }}" {% if form.department_id == department.department_id|string %}selected{% endif %}>{{ department.department_name }}</option>{% endfor %}</select><small class="adm-cell-sub">Department Administrators are restricted to their assigned department.</small>{% if errors.department_id %}<small class="adm-field-error">{{ errors.department_id }}</small>{% endif %}</label>
+          </div>
+        </div>
+      </section>
+
+      <section class="adm-panel">
+        <div class="adm-panel-head"><div class="adm-panel-title"><span class="adm-panel-icon adm-icon-amber"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span><div><p class="admin-eyebrow">SECTION 2 / TEMPORARY CREDENTIALS</p><h2>Set the initial password</h2></div></div></div>
+        <div class="adm-panel-body">
+          <div class="adm-choice-list">
+            <label class="adm-choice"><input type="radio" name="password_mode" value="generate" {% if form.password_mode == 'generate' %}checked{% endif %}><span>Generate a secure temporary password</span></label>
+            <label class="adm-choice"><input type="radio" name="password_mode" value="custom" {% if form.password_mode == 'custom' %}checked{% endif %}><span>Provide a temporary password</span></label>
+          </div>
+          <div class="adm-form-grid" id="account-creation-custom-password" {% if form.password_mode != 'custom' %}hidden{% endif %} style="margin-top:1rem">
+            <label class="adm-filter-field"><span>Temporary password</span><input type="password" name="password" autocomplete="new-password" maxlength="128">{% if errors.password %}<small class="adm-field-error">{{ errors.password }}</small>{% endif %}</label>
+            <label class="adm-filter-field"><span>Confirm password</span><input type="password" name="confirm_password" autocomplete="new-password" maxlength="128">{% if errors.confirm_password %}<small class="adm-field-error">{{ errors.confirm_password }}</small>{% endif %}</label>
+            <small class="adm-cell-sub adm-form-span">Use 8 to 128 characters with at least one letter and one number.</small>
+          </div>
+          {% if errors.password_mode %}<small class="adm-field-error">{{ errors.password_mode }}</small>{% endif %}
+          <label class="adm-confirm-box"><input type="checkbox" name="confirm_create" value="yes" required {% if form.confirm_create %}checked{% endif %}><span>I confirm that the account details and role assignment are correct.</span></label>
+          {% if errors.confirm_create %}<small class="adm-field-error">{{ errors.confirm_create }}</small>{% endif %}
+          <div class="adm-form-actions" style="margin-top:1rem"><button class="cset-btn cset-btn-primary" type="submit">Create account</button></div>
+        </div>
+      </section>
+    </form>
+
+    <aside class="adm-acct-create-side">
+      <section class="adm-panel">
+        <div class="adm-panel-head"><div class="adm-panel-title"><span class="adm-panel-icon adm-icon-slate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span><div><p class="admin-eyebrow">WORKFLOW</p><h2>What happens next</h2></div></div></div>
+        <div class="adm-panel-body">
+          <ol class="adm-steps">
+            <li><strong>Review access</strong><span>Confirm the role and department before creating the account.</span></li>
+            <li><strong>Share credentials</strong><span>Copy the generated password and send it to the account holder securely.</span></li>
+            <li><strong>First login</strong><span>The account is required to set a new password before accessing the console.</span></li>
+          </ol>
+          <p class="adm-note">Existing Account Management remains available for profile changes, status control, and security audit history.</p>
+        </div>
+      </section>
+    </aside>
+  </div>
 </div>
 {% endblock %}
 {% block scripts %}
 {{ super() }}
 <script>
 (function () {
-    var role = document.getElementById("account-creation-role");
-    var department = document.getElementById("account-creation-department");
-    var modes = document.querySelectorAll('input[name="password_mode"]');
-    var customFields = document.getElementById("account-creation-custom-password");
-
-    function syncRole() {
-        if (!role || !department) return;
-        var visible = role.value === "department_supervisor";
-        department.hidden = !visible;
-        var select = department.querySelector("select");
-        if (select) {
-            select.disabled = !visible;
-            if (!visible) select.value = "";
-        }
-    }
-
-    function syncPasswordMode() {
-        if (!customFields) return;
-        var selected = Array.prototype.find.call(modes, function (mode) { return mode.checked; });
-        var custom = selected && selected.value === "custom";
-        customFields.hidden = !custom;
-        customFields.querySelectorAll("input").forEach(function (input) { input.disabled = !custom; });
-    }
-
-    if (role) role.addEventListener("change", syncRole);
-    modes.forEach(function (mode) { mode.addEventListener("change", syncPasswordMode); });
-    syncRole();
-    syncPasswordMode();
+  var role=document.getElementById("account-creation-role");
+  var department=document.getElementById("account-creation-department");
+  var modes=document.querySelectorAll('input[name="password_mode"]');
+  var customFields=document.getElementById("account-creation-custom-password");
+  function syncRole(){ if(!role||!department) return; var visible=role.value==="department_supervisor"; department.hidden=!visible; var select=department.querySelector("select"); if(select){ select.disabled=!visible; if(!visible) select.value=""; } }
+  function syncPasswordMode(){ if(!customFields) return; var selected=Array.prototype.find.call(modes,function(m){return m.checked;}); var custom=selected&&selected.value==="custom"; customFields.hidden=!custom; customFields.querySelectorAll("input").forEach(function(i){ i.disabled=!custom; }); }
+  if(role) role.addEventListener("change", syncRole);
+  modes.forEach(function(m){ m.addEventListener("change", syncPasswordMode); });
+  syncRole(); syncPasswordMode();
 })();
 </script>
 {% endblock %}

@@ -1343,9 +1343,9 @@ def accounts():
     return render_template(
         "admin/manage_users.html",
         users=users,
-        roles=(User.ROLE_CITIZEN,) if is_department_admin() else User.ROLES,
+        roles=(User.ROLE_CITIZEN,) if is_department_admin() else tuple(r for r in User.ROLES if r != User.ROLE_DEPARTMENT_STAFF),
         role_labels=User.ROLE_LABELS,
-        account_statuses=ACCOUNT_STATUSES,
+        account_statuses=("active","inactive"),
         selected_role=role if not is_department_admin() else "",
         selected_status=status,
         search=search,
@@ -1515,6 +1515,8 @@ def account_detail(user_id):
     temporary_password = None
     if request.method == "POST":
         action = clean_text(request.form.get("action"))
+        if is_system_admin() and action in {"update", "reset_password"}:
+            abort(403, description="System administrators can only activate or deactivate accounts.")
         if action == "update":
             form, errors = _account_form_from_request(allow_admin_fields=is_system_admin())
             if not errors and account.user_id == current_user.user_id and (
@@ -1558,6 +1560,19 @@ def account_detail(user_id):
             )
             db.session.commit()
             flash("Password reset. Share the temporary password securely; it is shown only once.", "success")
+        elif action == "activate":
+            if is_system_admin() and account.user_id == current_user.user_id:
+                flash("You cannot change your own account status here.", "warning")
+            elif account.account_status == "active":
+                flash("Account is already active.", "info")
+            else:
+                account.account_status = "active"
+                _record_account_activity(account, "account_activated", f"Account activated by {current_user.full_name}.")
+                db.session.commit()
+                flash("User account activated.", "success")
+                form = _account_form_values(account)
+                if clean_text(request.form.get("next")) == "accounts":
+                    return redirect(url_for("admin.accounts"))
         elif action == "deactivate":
             if account.account_status != "active":
                 flash("Account is already not active.", "info")
@@ -1610,7 +1625,7 @@ def account_detail(user_id):
         form=form,
         errors=errors,
         departments=departments,
-        roles=(User.ROLE_CITIZEN,) if is_department_admin() else User.ROLES,
+        roles=(User.ROLE_CITIZEN,) if is_department_admin() else tuple(r for r in User.ROLES if r != User.ROLE_DEPARTMENT_STAFF),
         role_labels=User.ROLE_LABELS,
         account_statuses=ACCOUNT_STATUSES,
         permission_options=PERMISSION_OPTIONS,

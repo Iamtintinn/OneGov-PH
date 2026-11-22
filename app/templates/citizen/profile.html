@@ -1,87 +1,86 @@
 {% extends "base.html" %}
 {% block title %}My Profile · OneGov PH{% endblock %}
-{% block body_class %}citizen-dashboard{% endblock %}
-{% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
+{% block body_class %}{{ 'citizen-dashboard admin-dashboard' if is_admin_console_user else 'citizen-dashboard' }}{% endblock %}
+{% block site_header %}{% if is_admin_console_user %}{% include "admin/_header.html" %}{% else %}{% include "citizen/_header.html" %}{% endif %}{% endblock %}
 {% block content %}
-<div class="dash-page site-width">
-  <section class="citizen-profile-page" aria-labelledby="profile-heading">
-    <div class="citizen-settings-hero">
-      <div>
-        <p class="dash-kicker">Citizen Identity</p>
-        <h1 id="profile-heading">My Profile</h1>
-        <p class="citizen-list-sub">Your account overview, application activity, and government document history.</p>
-      </div>
-    </div>
-
-    <div class="cprof-hero-card">
-      <div class="cprof-identity">
-        <div class="cset-avatar-wrap cprof-avatar" aria-hidden="true">
-          {% if profile_picture_url %}
-          <img src="{{ profile_picture_url }}" alt="Profile picture" class="cset-avatar-img" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"><div class="cset-avatar-fallback" style="display:none">{{ ((current_user.first_name or '')[:1] ~ (current_user.last_name or '')[:1])|upper or 'U' }}</div>
-          {% else %}
-          <div class="cset-avatar-fallback">{{ ((current_user.first_name or '')[:1] ~ (current_user.last_name or '')[:1])|upper or 'U' }}</div>
-          {% endif %}
-        </div>
-        <div class="cprof-identity-main">
-          <div class="cprof-name-row">
-            <h2 class="cprof-name">{{ current_user.full_name }}</h2>
-            <span class="cset-badge {{ 'cset-badge-ok' if current_user.email_verification_status == 'verified' else 'cset-badge-warn' }}">{{ 'Verified' if current_user.email_verification_status == 'verified' else 'Unverified' }}</span>
-            <span class="cset-badge {{ 'cset-badge-ok' if current_user.account_status == 'active' else 'cset-badge-warn' }}">{{ current_user.account_status|replace('_',' ')|title }}</span>
-          </div>
-          <p class="cprof-sub">Citizen account overview and activity summary.</p>
-        </div>
-      </div>
-      <div class="cprof-meta-grid">
-        <div class="cprof-meta"><span class="cprof-meta-label">Citizen Account ID</span><strong>#{{ '%06d'|format(current_user.user_id) }}</strong></div>
-        <div class="cprof-meta"><span class="cprof-meta-label">Account Type</span><strong>Citizen</strong></div>
-        <div class="cprof-meta"><span class="cprof-meta-label">Member Since</span><strong>{{ current_user.date_registered.strftime('%d %b %Y') if current_user.date_registered else '—' }}</strong></div>
-        <div class="cprof-meta"><span class="cprof-meta-label">Email</span><strong>{{ current_user.email }}</strong></div>
-      </div>
-    </div>
-
-    <div class="cprof-stats">
-      <article class="cprof-stat"><span class="cprof-stat-label">Total Applications</span><strong>{{ stats.total }}</strong><small>All submitted applications</small></article>
-      <article class="cprof-stat"><span class="cprof-stat-label">Pending</span><strong>{{ stats.pending }}</strong><small>Awaiting review or action</small></article>
-      <article class="cprof-stat"><span class="cprof-stat-label">Processing</span><strong>{{ stats.processing }}</strong><small>In progress or for release</small></article>
-      <article class="cprof-stat"><span class="cprof-stat-label">Completed</span><strong>{{ stats.completed }}</strong><small>Successfully completed</small></article>
-    </div>
-
-    <div class="cprof-grid">
-      <section class="cset-card">
-        <div class="cset-card-head"><div><p class="cset-kicker">Documents</p><h3>Government Documents</h3><p class="cset-help" style="margin-top:.45rem">Previously applied government services and documents.</p></div></div>
-        <div class="cprof-doc-list">
-          {% for d in documents %}
-          <div class="cprof-doc-item">
-            <div>
-              <p class="cprof-doc-name">{{ d.name }}</p>
-              <p class="cprof-doc-meta">{{ d.department }}{% if d.date %} · {{ d.date.strftime('%d %b %Y') }}{% endif %}</p>
-            </div>
-            <span class="cset-badge cset-badge-muted">{{ d.status }}</span>
-          </div>
-          {% else %}
-          <p class="cset-empty">No government documents applied yet.</p>
-          {% endfor %}
-        </div>
-      </section>
-
-      <section class="cset-card">
-        <div class="cset-card-head"><div><p class="cset-kicker">Activity</p><h3>Recent Activities</h3><p class="cset-help" style="margin-top:.45rem">Recent application submissions, payments, approvals, and delivery updates.</p></div></div>
-        <div class="cprof-activity-list">
-          {% for a in activities %}
-          <div class="cprof-activity-item">
-            <div class="cprof-activity-dot"></div>
-            <div class="cprof-activity-body">
-              <p class="cprof-activity-title">{{ a.label }}</p>
-              <p class="cprof-activity-desc">{{ a.description }}</p>
-              <p class="cprof-activity-meta">{{ a.service }}{% if a.date %} · {{ a.date.strftime('%d %b %Y, %I:%M %p') }}{% endif %}</p>
-            </div>
-          </div>
-          {% else %}
-          <p class="cset-empty">No recent activity yet.</p>
-          {% endfor %}
-        </div>
-      </section>
+{% set admin_shell = is_admin_console_user %}
+<div class="{{ 'adm-dash' if admin_shell else 'dash-page site-width' }}">
+  <section class="{{ 'adm-dash-header' if admin_shell else 'citizen-settings-hero' }}" aria-labelledby="profile-heading">
+    <div>
+      <p class="{{ 'admin-eyebrow' if admin_shell else 'dash-kicker' }}">{{ 'ACCOUNT' if admin_shell else 'Citizen Identity' }}</p>
+      <h1 id="profile-heading">My Profile</h1>
+      <p class="{{ 'adm-dash-welcome' if admin_shell else 'citizen-list-sub' }}">Your account overview, application activity, and government document history.</p>
     </div>
   </section>
+
+  <section class="adm-profile-hero">
+    <div class="adm-profile-identity">
+      <div class="adm-profile-avatar" aria-hidden="true">
+        {% if profile_picture_url %}
+        <img src="{{ profile_picture_url }}" alt="Profile picture" class="adm-profile-avatar-img" onerror="this.style.display='none';this.nextElementSibling.style.display='grid';"><div class="adm-profile-avatar-fallback" style="display:none">{{ ((current_user.first_name or '')[:1] ~ (current_user.last_name or '')[:1])|upper or 'U' }}</div>
+        {% else %}
+        <div class="adm-profile-avatar-fallback">{{ ((current_user.first_name or '')[:1] ~ (current_user.last_name or '')[:1])|upper or 'U' }}</div>
+        {% endif %}
+      </div>
+      <div class="adm-profile-main">
+        <div class="adm-profile-name-row">
+          <h2>{{ current_user.full_name }}</h2>
+          <span class="adm-status adm-status-{{ 'completed' if current_user.email_verification_status == 'verified' else 'pending' }}">{{ 'Verified' if current_user.email_verification_status == 'verified' else 'Unverified' }}</span>
+          <span class="adm-status adm-status-{{ 'completed' if current_user.account_status == 'active' else 'cancelled' }}">{{ current_user.account_status|replace('_',' ')|title }}</span>
+        </div>
+        <p class="adm-profile-sub">Account overview and activity summary.</p>
+      </div>
+    </div>
+    <div class="adm-profile-meta-grid">
+      <div class="adm-profile-meta"><span>Account ID</span><strong>#{{ '%06d'|format(current_user.user_id) }}</strong></div>
+      <div class="adm-profile-meta"><span>Account Type</span><strong>{{ 'Admin' if admin_shell else 'Citizen' }}</strong></div>
+      <div class="adm-profile-meta"><span>Member Since</span><strong>{{ current_user.date_registered.strftime('%d %b %Y') if current_user.date_registered else '—' }}</strong></div>
+      <div class="adm-profile-meta"><span>Email</span><strong>{{ current_user.email }}</strong></div>
+    </div>
+  </section>
+
+  <section class="adm-stats-group" aria-label="Profile summary">
+    <div class="adm-stat-cell"><div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span><span class="adm-stat-label">Total Applications</span></div><div class="adm-stat-value">{{ stats.total }}</div><div class="adm-stat-hint">All submitted applications</div></div>
+    <div class="adm-stat-cell"><div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-amber"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span><span class="adm-stat-label">Pending</span></div><div class="adm-stat-value">{{ stats.pending }}</div><div class="adm-stat-hint">Awaiting review/action</div></div>
+    <div class="adm-stat-cell"><div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-violet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/></svg></span><span class="adm-stat-label">Processing</span></div><div class="adm-stat-value">{{ stats.processing }}</div><div class="adm-stat-hint">In progress / for release</div></div>
+    <div class="adm-stat-cell"><div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-green"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg></span><span class="adm-stat-label">Completed</span></div><div class="adm-stat-value">{{ stats.completed }}</div><div class="adm-stat-hint">Successfully completed</div></div>
+  </section>
+
+  <div class="adm-grid-2">
+    <section class="adm-panel">
+      <div class="adm-panel-head"><div class="adm-panel-title"><span class="adm-panel-icon adm-icon-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span><div><p class="admin-eyebrow">DOCUMENTS</p><h2>Government Documents</h2></div></div></div>
+      <div class="adm-profile-list">
+        {% for d in documents %}
+        <div class="adm-profile-list-item">
+          <div>
+            <p class="adm-profile-item-title">{{ d.name }}</p>
+            <p class="adm-profile-item-meta">{{ d.department }}{% if d.date %} · {{ d.date.strftime('%d %b %Y') }}{% endif %}</p>
+          </div>
+          <span class="adm-status">{{ d.status }}</span>
+        </div>
+        {% else %}
+        <p class="adm-empty">No government documents applied yet.</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="adm-panel">
+      <div class="adm-panel-head"><div class="adm-panel-title"><span class="adm-panel-icon adm-icon-green"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span><div><p class="admin-eyebrow">ACTIVITY</p><h2>Recent Activities</h2></div></div></div>
+      <div class="adm-profile-list">
+        {% for a in activities %}
+        <div class="adm-profile-activity">
+          <div class="adm-timeline-dot adm-timeline-success"></div>
+          <div class="adm-profile-activity-body">
+            <p class="adm-profile-item-title">{{ a.label }}</p>
+            <p class="adm-profile-item-meta">{{ a.description }}</p>
+            <p class="adm-profile-item-meta">{{ a.service }}{% if a.date %} · {{ a.date.strftime('%d %b %Y, %I:%M %p') }}{% endif %}</p>
+          </div>
+        </div>
+        {% else %}
+        <p class="adm-empty">No recent activity yet.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
 </div>
 {% endblock %}

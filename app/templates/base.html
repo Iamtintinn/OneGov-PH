@@ -51,7 +51,7 @@
                 <nav class="site-nav" aria-label="Account">
                     {% if current_user.is_authenticated %}
                     <span class="nav-role">{{ current_user.role_label }}</span>
-                    <form class="inline-form" method="post" action="{{ url_for('auth.logout') }}">
+                    <form class="inline-form" method="post" action="{{ url_for('auth.logout') }}" data-confirm="Are you sure you want to log out?" data-confirm-title="Log out" data-confirm-action="Log out">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button class="nav-button" type="submit">Log out</button>
                     </form>
@@ -76,11 +76,13 @@
         {% endwith %}
         {% block content %}{% endblock %}
     </main>
+    {% block site_footer %}
     <footer class="site-footer">
         <div class="site-width">
             <p>OneGov PH is an independent government services platform prototype developed for demonstration purposes. Your account credentials are protected using secure password hashing. All application and payment activities are simulated.</p>
         </div>
     </footer>
+    {% endblock %}
     <script src="{{ url_for('static', filename='js/shell.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>

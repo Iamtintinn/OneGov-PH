@@ -1,8 +1,126 @@
 {% extends "base.html" %}
 {% block title %}Government services · OneGov PH{% endblock %}
-{% block body_class %}citizen-dashboard services-page{% endblock %}
+{% set _admin_shell = request.path.startswith('/admin') or (current_user.is_authenticated and current_user.role in ['system_admin','department_supervisor'] and request.endpoint in ['citizen.services','admin_portal.services']) %}
+{% block body_class %}citizen-dashboard{% if _admin_shell %} admin-dashboard{% else %} services-page{% endif %}{% endblock %}
 {% block site_header %}{% include "citizen/_header.html" %}{% endblock %}
 {% block content %}
+{% if _admin_shell %}
+{% set total_services = services|length %}
+{% set ready_services = services|selectattr('service_name', 'in', applicable_service_names)|list|length if applicable_service_names is defined else 0 %}
+<div class="adm-dash">
+  <section class="adm-dash-header">
+    <div>
+      <p class="admin-eyebrow">SERVICE CATALOG</p>
+      <h1>Government Services</h1>
+      <p class="adm-dash-welcome">Browse active services and submit applications for citizens through the admin portal.</p>
+      <div class="adm-dash-date">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span>{{ total_services }} service{{ '' if total_services == 1 else 's' }} available</span>
+      </div>
+    </div>
+    <div class="adm-dash-actions">
+      <form class="adm-filter-form" method="get" action="{{ url_for(request.endpoint) }}">
+        <label class="adm-filter-field">
+          <span>Category</span>
+          <select name="category" onchange="this.form.submit()">
+            <option value="" {% if not service_category %}selected{% endif %}>All services</option>
+            <option value="id" {% if service_category == 'id' %}selected{% endif %}>ID</option>
+            <option value="clearance" {% if service_category == 'clearance' %}selected{% endif %}>Clearance</option>
+            <option value="certificate" {% if service_category == 'certificate' %}selected{% endif %}>Certificate</option>
+          </select>
+        </label>
+        <label class="adm-filter-field">
+          <span>Search</span>
+          <input type="search" name="q" value="{{ service_query|default('') }}" placeholder="Search government services" maxlength="80" autocomplete="off">
+        </label>
+        <button class="cset-btn cset-btn-primary" type="submit">Search</button>
+        {% if service_query or service_category %}<a class="cset-btn cset-btn-ghost" href="{{ url_for(request.endpoint) }}">Clear</a>{% endif %}
+      </form>
+    </div>
+  </section>
+
+  <section class="adm-stats-group" aria-label="Service catalog summary">
+    <div class="adm-stat-cell">
+      <div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 22h18"/><path d="M6 18V11M10 18V11M14 18V11M18 18V11"/><path d="M2 9l10-7 10 7v2H2z"/></svg></span><span class="adm-stat-label">Available Services</span></div>
+      <div class="adm-stat-value">{{ category_counts.all if category_counts is defined else total_services }}</div>
+      <div class="adm-stat-hint">Active in catalog</div>
+    </div>
+    <div class="adm-stat-cell">
+      <div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-green"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span><span class="adm-stat-label">Ready to Apply</span></div>
+      <div class="adm-stat-value">{{ ready_services }}</div>
+      <div class="adm-stat-hint">Online application enabled</div>
+    </div>
+    <div class="adm-stat-cell">
+      <div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-violet"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M15 8h2M15 12h2"/></svg></span><span class="adm-stat-label">ID Services</span></div>
+      <div class="adm-stat-value">{{ category_counts.id if category_counts is defined else 0 }}</div>
+      <div class="adm-stat-hint">Identity-related</div>
+    </div>
+    <div class="adm-stat-cell">
+      <div class="adm-stat-label-row"><span class="adm-stat-icon adm-stat-icon-amber"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span><span class="adm-stat-label">Certificates/Clearances</span></div>
+      <div class="adm-stat-value">{{ (category_counts.certificate if category_counts is defined else 0) + (category_counts.clearance if category_counts is defined else 0) }}</div>
+      <div class="adm-stat-hint">Documents and clearances</div>
+    </div>
+  </section>
+
+  <section class="adm-panel">
+    <div class="adm-panel-head">
+      <div class="adm-panel-title">
+        <span class="adm-panel-icon adm-icon-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 22h18"/><path d="M6 18V11M10 18V11M14 18V11M18 18V11"/><path d="M2 9l10-7 10 7v2H2z"/></svg></span>
+        <div><p class="admin-eyebrow">APPLY FOR SERVICES</p><h2>Available Services</h2></div>
+      </div>
+      {% if service_query or service_category %}<span class="adm-pill">Filtered</span>{% endif %}
+    </div>
+
+    {% if service_query %}
+    <p class="adm-search-note" role="status">Showing services matching “{{ service_query }}”. <a href="{{ url_for(request.endpoint, category=service_category or none) }}">View all services</a></p>
+    {% endif %}
+    {% if services %}
+    <div class="adm-svc-catalog">
+      {% for service in services %}
+      {% set can_apply = service.service_name in applicable_service_names %}
+      {% set service_key = service.service_name|lower %}
+      {% if 'passport' in service_key %}{% set tile_tone = 'passport' %}
+      {% elif 'nbi' in service_key or 'clearance' in service_key %}{% set tile_tone = 'clearance' %}
+      {% elif 'certificate' in service_key or 'cenomar' in service_key or 'residency' in service_key %}{% set tile_tone = 'certificate' %}
+      {% elif 'barangay' in service_key %}{% set tile_tone = 'local' %}
+      {% elif 'sss' in service_key or 'senior' in service_key or 'national id' in service_key or 'philsys' in service_key %}{% set tile_tone = 'id' %}
+      {% else %}{% set tile_tone = 'general' %}{% endif %}
+      <article class="adm-catalog-card adm-catalog-{{ tile_tone }}">
+        <div class="adm-catalog-top">
+          <span class="adm-catalog-icon" aria-hidden="true">
+            {% if tile_tone == 'passport' %}<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 3a3 3 0 1 0 3 3 3 3 0 0 0-3-3zm-6 9.2c.9-1.8 2.8-3.2 6-3.2s5.1 1.4 6 3.2V18H6z"/></svg>
+            {% elif tile_tone == 'clearance' %}<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 1 3 5v6c0 5.5 3.8 10.7 9 12 5.2-1.3 9-6.5 9-12V5l-9-4zm-1.2 13.7-3.3-3.3 1.4-1.4 1.9 1.9 4.3-4.3 1.4 1.4-5.7 5.7z"/></svg>
+            {% elif tile_tone == 'certificate' %}<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm1 15H9v-2h6v2zm0-4H9v-2h6v2zm-1-5V3.5L18.5 8H14z"/></svg>
+            {% elif tile_tone == 'local' %}<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 2 3 7v2h18V7l-9-5zM5 10v9H3v2h18v-2h-2v-9h-2v9h-4v-9H9v9H5v-9z"/></svg>
+            {% elif tile_tone == 'id' %}<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm-9 5.5A2.5 2.5 0 1 1 8.5 12 2.5 2.5 0 0 1 11 9.5zM5 17.2c.8-1.7 2.5-2.7 4.5-2.7s3.7 1 4.5 2.7V18H5zm14-1.2h-4v-1.5h4zm0-3h-4V10h4z"/></svg>
+            {% else %}<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm4 4v2h8V8zm0 4v2h5v-2z"/></svg>{% endif %}
+          </span>
+          <span class="adm-status {{ 'adm-status-completed' if can_apply else 'adm-status-cancelled' }}">{{ 'Ready to apply' if can_apply else 'Coming soon' }}</span>
+        </div>
+        <p class="adm-catalog-dept">{{ service.department.department_name }}</p>
+        <h3 class="adm-catalog-name">{{ service.service_name }}</h3>
+        <p class="adm-catalog-desc">{{ service.description or "No description is listed for this service." }}</p>
+        <div class="adm-catalog-meta">
+          {% if service.estimated_processing_time %}<span class="adm-catalog-chip"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 11H7v-2h4V7h2z"/></svg>{{ service.estimated_processing_time }}</span>{% endif %}
+          <span class="adm-catalog-chip">{% if service.processing_fee %}₱{{ "%.2f"|format(service.processing_fee) }}{% else %}Fee varies{% endif %}</span>
+        </div>
+        <div class="adm-catalog-actions">
+          {% if can_apply %}
+          <a class="cset-btn cset-btn-primary" href="{{ url_for('citizen.apply_details', service_id=service.service_id) }}">Apply now</a>
+          {% else %}
+          <button class="cset-btn cset-btn-ghost" type="button" disabled>Apply now</button>
+          {% endif %}
+        </div>
+        {% if not can_apply %}<p class="adm-catalog-note">Applications for this service cannot be submitted on the website yet.</p>{% endif %}
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="adm-empty" role="status">{% if service_query %}No services in the catalog match that search.{% elif service_category == 'id' %}No government ID services are listed.{% elif service_category == 'certificate' %}No certificate services are listed.{% elif service_category == 'clearance' %}No clearance services are listed.{% else %}No services are listed.{% endif %}</p>
+    {% endif %}
+  </section>
+</div>
+{% else %}
 <div class="dash-page site-width">
     <section class="services-shell" aria-labelledby="services-heading">
         <header class="services-hero">
@@ -149,4 +267,5 @@ document.querySelectorAll(".service-menu").forEach(function (menu) {
     });
 });
 </script>
+{% endif %}
 {% endblock %}
