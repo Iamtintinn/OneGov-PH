@@ -27,9 +27,17 @@
             </li>
             {% if can_manage_services %}
             <li>
-                <a class="sidebar-link{% if page == 'admin.services' or page == 'admin_portal.services' or (page and page.startswith('admin_portal.apply_')) %} is-active{% endif %}" href="{{ url_for('admin.services') }}" title="Government Services">
+                <a class="sidebar-link{% if page == 'admin.services' %} is-active{% endif %}" href="{{ url_for('admin.services') }}" title="Manage Services">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16"></path><path d="M6 20V9l6-5 6 5v11"></path><path d="M10 20v-6h4v6"></path></svg>
-                    <span>Government Services</span>
+                    <span>Manage Services</span>
+                </a>
+            </li>
+            {% endif %}
+            {% if is_admin_console_user %}
+            <li>
+                <a class="sidebar-link{% if page in ['citizen.services','admin_portal.services'] or (page and page.startswith('citizen.apply_')) or (page and page.startswith('admin_portal.apply_')) or page in ['citizen.application_continue','admin_portal.application_continue'] or request.path in ['/citizen/services','/admin/portal/services'] %} is-active{% endif %}" href="{{ url_for('admin_portal.services') }}" title="Apply for Services">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M8 9h8"></path><path d="M8 13h5"></path><path d="M16 16l2 2 3-3"></path></svg>
+                    <span>Apply for Services</span>
                 </a>
             </li>
             {% endif %}

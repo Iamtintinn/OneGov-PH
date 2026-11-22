@@ -1,4 +1,7 @@
-{% if request.path.startswith('/admin') %}
+{% set _is_admin_console = current_user.is_authenticated and (current_user.role == 'system_admin' or (current_user.role == 'department_supervisor' and current_user.department_id)) %}
+{% set _ep = request.endpoint or '' %}
+{% set _admin_shell = request.path.startswith('/admin') or (_is_admin_console and (_ep == 'citizen.services' or _ep.startswith('citizen.apply_') or _ep == 'citizen.application_continue' or _ep.endswith('_confirmation_pdf'))) %}
+{% if _admin_shell %}
 {% include "admin/_header.html" %}
 {% else %}
 {% set page = request.endpoint %}
