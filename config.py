@@ -52,3 +52,6 @@ class Config:
     OTP_EXPIRY_MINUTES = int(os.getenv("OTP_EXPIRY_MINUTES", "5") or 5)
     OTP_MAX_ATTEMPTS = int(os.getenv("OTP_MAX_ATTEMPTS", "5") or 5)
     OTP_RESEND_COOLDOWN_SECONDS = int(os.getenv("OTP_RESEND_COOLDOWN_SECONDS", "60") or 60)
+
+    # Gemini AI Chatbot
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()

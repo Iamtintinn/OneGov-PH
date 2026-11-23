@@ -58,8 +58,8 @@ def create_app():
 
     @application.before_request
     def protect_post_requests():
-        # Maya webhooks are server-to-server POSTs without a browser CSRF token.
-        if request.path.startswith("/webhooks/"):
+        # Webhooks and public chatbot API are JSON endpoints without browser CSRF form tokens.
+        if request.path.startswith("/webhooks/") or request.path.startswith("/api/chatbot/"):
             return
         if request.method == "POST":
             validate_csrf()

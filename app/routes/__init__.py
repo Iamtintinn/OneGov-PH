@@ -1,5 +1,6 @@
 from app.routes.admin import admin_bp
 from app.routes.auth import auth_bp
+from app.routes.chatbot import chatbot_bp
 from app.routes.citizen import citizen_bp
 from app.routes.citizen_settings import settings_bp
 from app.routes.admin_portal import admin_portal_bp
@@ -11,6 +12,7 @@ from app.routes.audit import audit_bp
 
 def register_blueprints(application):
     application.register_blueprint(public_bp)
+    application.register_blueprint(chatbot_bp)
     application.register_blueprint(auth_bp)
     application.register_blueprint(citizen_bp)
     application.register_blueprint(settings_bp)

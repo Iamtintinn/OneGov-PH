@@ -370,6 +370,42 @@
     <p>&copy; 2026 OneGov PH. Independent platform prototype for demonstration purposes.</p>
     <p>Designed for a secure, accessible, and citizen-centered service experience.</p>
   </div>
+
+  <!-- CHATBOT -->
+  <div class="lp-chatbot" id="lpChatbot">
+    <button class="lp-chatbot-toggle" id="lpChatbotToggle" aria-label="Open GovAssist" aria-expanded="false" aria-controls="lpChatbotWindow">
+      <span class="lp-chatbot-toggle-icon lp-chatbot-icon-open"><img src="{{ url_for('static', filename='images/govassist-face.png') }}" alt="" class="lp-chatbot-toggle-face"></span>
+      <span class="lp-chatbot-toggle-icon lp-chatbot-icon-close"><i data-lucide="x"></i></span>
+    </button>
+    <section class="lp-chatbot-window" id="lpChatbotWindow" hidden aria-label="GovAssist">
+      <header class="lp-chatbot-head">
+        <div class="lp-chatbot-head-id">
+          <div class="lp-chatbot-avatar"><img src="{{ url_for('static', filename='images/govassist-face.png') }}" alt="" class="lp-chatbot-avatar-img"></div>
+          <div>
+            <strong>GovAssist</strong>
+            <span><span class="lp-chatbot-dot"></span>Government assistance assistant</span>
+          </div>
+        </div>
+        <div class="lp-chatbot-head-actions">
+          <button type="button" class="lp-chatbot-head-btn" id="lpChatbotMinimize" aria-label="Minimize chat"><i data-lucide="minus"></i></button>
+          <button type="button" class="lp-chatbot-head-btn" id="lpChatbotClose" aria-label="Close chat"><i data-lucide="x"></i></button>
+        </div>
+      </header>
+      <div class="lp-chatbot-body" id="lpChatbotBody" role="log" aria-live="polite" aria-relevant="additions"></div>
+      <div class="lp-chatbot-quick" id="lpChatbotQuick" aria-label="Suggested questions">
+        <button type="button" class="lp-chatbot-chip" data-msg="What government services are available?">Available services</button>
+        <button type="button" class="lp-chatbot-chip" data-msg="What are the application requirements?">Requirements</button>
+        <button type="button" class="lp-chatbot-chip" data-msg="How much are the processing fees?">Processing fees</button>
+        <button type="button" class="lp-chatbot-chip" data-msg="How can I track my application?">Track application</button>
+        <button type="button" class="lp-chatbot-chip" data-msg="How does document delivery work?">Document delivery</button>
+      </div>
+      <form class="lp-chatbot-form" id="lpChatbotForm">
+        <label class="visually-hidden" for="lpChatbotInput">Message GovAssist</label>
+        <input id="lpChatbotInput" type="text" maxlength="800" autocomplete="off" placeholder="Ask about services, requirements, or tracking..." />
+        <button type="submit" class="lp-chatbot-send" id="lpChatbotSend" aria-label="Send message"><i data-lucide="send"></i></button>
+      </form>
+    </section>
+  </div>
 </footer>
 {% endblock %}
 
@@ -404,13 +440,80 @@
       a.addEventListener('click', function(){ nav.classList.remove('menu-open'); toggle.setAttribute('aria-expanded','false'); toggle.innerHTML='<i data-lucide="menu"></i>'; syncBrandLogo(); if(window.lucide) lucide.createIcons(); });
     });
   }
+  var reduceMotion=window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var reveals=document.querySelectorAll('[data-reveal]');
-  if('IntersectionObserver' in window){
+  function revealStagger(container, selector){
+    var items=container.querySelectorAll(selector);
+    items.forEach(function(el, idx){ if(!el.style.transitionDelay) el.style.transitionDelay=Math.min(idx,5)*0.08+'s'; });
+  }
+  document.querySelectorAll('.lp-highlights-grid, .lp-services-grid, .lp-steps, .lp-why-grid, .lp-footer-grid, .lp-track-result-meta').forEach(function(g){
+    revealStagger(g, '[data-reveal], .lp-highlight-card, .lp-service-card, .lp-step-card, .lp-why-card, .lp-footer-col, .lp-track-stat');
+  });
+  if(!reduceMotion && 'IntersectionObserver' in window){
     var io=new IntersectionObserver(function(entries){
       entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('is-visible'); io.unobserve(e.target); } });
     }, {threshold:0.12, rootMargin:'0px 0px -40px 0px'});
-    reveals.forEach(function(el, i){ el.style.transitionDelay=(el.dataset.reveal==='delay'?'.18s':((i%4)*0.06)+'s'); io.observe(el); });
+    reveals.forEach(function(el, i){ if(!el.style.transitionDelay) el.style.transitionDelay=(el.dataset.reveal==='delay'?'.18s':((i%4)*0.06)+'s'); io.observe(el); });
   } else { reveals.forEach(function(el){ el.classList.add('is-visible'); }); }
+
+  // active nav link on scroll
+  var sections=[].slice.call(document.querySelectorAll('section[id], .lp-page[id]'));
+  var navLinks=[].slice.call(document.querySelectorAll('.lp-nav-link[href^="#"]'));
+  if(!reduceMotion && 'IntersectionObserver' in window && sections.length){
+    var navIo=new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ if(e.isIntersecting){ navLinks.forEach(function(a){ a.classList.toggle('is-active', a.getAttribute('href')==='#'+e.target.id); }); } });
+    }, {rootMargin:'-30% 0px -60% 0px', threshold:0});
+    sections.forEach(function(s){ navIo.observe(s); });
+  }
+
+  // Chatbot
+  var cToggle=document.getElementById('lpChatbotToggle');
+  var cWin=document.getElementById('lpChatbotWindow');
+  var cClose=document.getElementById('lpChatbotClose');
+  var cMin=document.getElementById('lpChatbotMinimize');
+  var cBody=document.getElementById('lpChatbotBody');
+  var cForm=document.getElementById('lpChatbotForm');
+  var cInput=document.getElementById('lpChatbotInput');
+  var cSend=document.getElementById('lpChatbotSend');
+  var cQuick=document.getElementById('lpChatbotQuick');
+  if(cToggle&&cWin&&cBody&&cForm&&cInput){
+    var cHistory=[];
+    var cWelcome="Hello! Welcome to OneGov PH. I’m your virtual assistant, here to help you understand our government services, application requirements, fees, and application procedures. How can I assist you today?";
+    var cBusy=false;
+    function cEsc(s){ return (s||'').replace(/[&<>"']/g,function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+    function cFmt(text){
+      var safe=cEsc(text).replace(/\r\n/g,'\n'); var lines=safe.split('\n'); var html='', inList=false, listTag='ul';
+      function closeList(){ if(inList){ html+='</'+listTag+'>'; inList=false; } }
+      lines.forEach(function(line){
+        var mNum=line.match(/^\s*(\d+)[\.\)]\s+(.*)/); var mBul=line.match(/^\s*[\*\-]\s+(.*)/);
+        if(mNum){ if(!inList||listTag!=='ol'){ closeList(); html+='<ol>'; inList=true; listTag='ol'; } html+='<li>'+mNum[2]+'</li>'; }
+        else if(mBul){ if(!inList||listTag!=='ul'){ closeList(); html+='<ul>'; inList=true; listTag='ul'; } html+='<li>'+mBul[1]+'</li>'; }
+        else { closeList(); if(line.trim()) html+='<p>'+line+'</p>'; }
+      }); closeList(); return html||'<p></p>';
+    }
+    function cAdd(role,text){ var item=document.createElement('div'); item.className='lp-chat-msg is-'+role; item.innerHTML='<div class="lp-chat-bubble">'+cFmt(text)+'</div>'; cBody.appendChild(item); cBody.scrollTop=cBody.scrollHeight; }
+    function cBusySet(on){ cBusy=!!on; if(cSend) cSend.disabled=cBusy; cInput.disabled=cBusy; if(cQuick) cQuick.querySelectorAll('button').forEach(function(b){ b.disabled=cBusy; }); }
+    function cTyping(on){ var t=document.getElementById('lpChatTyping'); if(on&&!t){ t=document.createElement('div'); t.id='lpChatTyping'; t.className='lp-chat-msg is-bot'; t.innerHTML='<div class="lp-chat-bubble lp-chat-typing"><span></span><span></span><span></span></div>'; cBody.appendChild(t); cBody.scrollTop=cBody.scrollHeight; } if(!on&&t) t.remove(); }
+    var cCloseTimer=null;
+    function cOpen(){ if(cCloseTimer){ clearTimeout(cCloseTimer); cCloseTimer=null; } cWin.classList.remove('is-closing'); cWin.hidden=false; cToggle.setAttribute('aria-expanded','true'); cToggle.classList.add('is-open'); if(!cBody.dataset.init){ cAdd('bot',cWelcome); cHistory.push({role:'assistant',text:cWelcome}); cBody.dataset.init='1'; } setTimeout(function(){ cInput.focus(); },140); if(window.lucide) lucide.createIcons(); }
+    function cCloseWin(){ if(cWin.hidden) return; cWin.classList.add('is-closing'); cToggle.setAttribute('aria-expanded','false'); cToggle.classList.remove('is-open'); if(window.lucide) lucide.createIcons(); var finish=function(){ cWin.hidden=true; cWin.classList.remove('is-closing'); }; if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){ finish(); return; } cCloseTimer=setTimeout(finish, 260); }
+    async function cSendMsg(msg){
+      msg=(msg||'').trim(); if(!msg||cBusy) return;
+      cAdd('user',msg); cHistory.push({role:'user',text:msg}); cInput.value=''; cBusySet(true); cTyping(true);
+      try{
+        var res=await fetch('{{ url_for("chatbot.message") }}', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg, history:cHistory.slice(-8)})});
+        var data=await res.json().catch(function(){ return {}; }); cTyping(false);
+        var reply=data.reply || data.error || 'I’m sorry, I couldn’t process that request right now. Please try again later.';
+        cAdd('bot',reply); cHistory.push({role:'assistant',text:reply});
+      }catch(err){ cTyping(false); var errMsg='I’m sorry, I’m having trouble connecting right now. Please try again in a moment.'; cAdd('bot',errMsg); cHistory.push({role:'assistant',text:errMsg}); }
+      finally{ cBusySet(false); cInput.focus(); }
+    }
+    cToggle.addEventListener('click', function(){ cWin.hidden ? cOpen() : cCloseWin(); });
+    if(cClose) cClose.addEventListener('click', cCloseWin);
+    if(cMin) cMin.addEventListener('click', cCloseWin);
+    if(cQuick) cQuick.addEventListener('click', function(e){ var btn=e.target.closest('[data-msg]'); if(btn) cSendMsg(btn.getAttribute('data-msg')); });
+    cForm.addEventListener('submit', function(e){ e.preventDefault(); cSendMsg(cInput.value); });
+  }
 })();
 </script>
 {% endblock %}
