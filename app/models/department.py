@@ -14,6 +14,12 @@ class Department(db.Model):
     department_status = db.Column(
         db.Enum("active", "inactive", name="department_status"),
         nullable=False,
+        default="active",
+        server_default="active",
+    )
+
+    __table_args__ = (
+        db.Index("idx_departments_status", "department_status"),
     )
 
     def __repr__(self):

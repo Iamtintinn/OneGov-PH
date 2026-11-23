@@ -16,15 +16,28 @@ class Service(db.Model):
     )
     service_name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
-    processing_fee = db.Column(db.Numeric(10, 2), nullable=False)
+    processing_fee = db.Column(
+        db.Numeric(10, 2),
+        nullable=False,
+        default=0,
+        server_default="0.00",
+    )
     estimated_processing_time = db.Column(db.String(100))
     service_requirements = db.Column(db.Text)
     service_status = db.Column(
         db.Enum("active", "inactive", name="service_status"),
         nullable=False,
+        default="active",
+        server_default="active",
     )
 
     department = db.relationship("Department", foreign_keys=[department_id])
+
+    __table_args__ = (
+        db.UniqueConstraint("department_id", "service_name", name="uq_services_department_name"),
+        db.UniqueConstraint("service_id", "department_id", name="uq_services_department_pair"),
+        db.CheckConstraint("processing_fee >= 0", name="chk_services_processing_fee"),
+    )
 
     def __repr__(self):
         return f"<Service {self.service_id} {self.service_name}>"

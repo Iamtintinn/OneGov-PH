@@ -121,8 +121,10 @@ def _check_database_connection(application):
         except SQLAlchemyError as exc:
             application.logger.error("Database connection failed: %s", exc)
             raise RuntimeError(
-                "Could not connect to the OneGov PH MySQL database. "
-                "Start MySQL in XAMPP and confirm the onegov_ph database is available."
+                "Could not connect to the OneGov PH database. "
+                "For local development, start MySQL in XAMPP and confirm the onegov_ph "
+                "database is available. For TiDB Cloud, check DATABASE_MODE, DB_HOST, "
+                "DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, and the TLS settings in .env."
             ) from exc
 
 

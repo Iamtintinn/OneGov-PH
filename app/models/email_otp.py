@@ -43,6 +43,16 @@ class EmailOtp(db.Model):
 
     user = db.relationship("User", foreign_keys=[user_id])
 
+    __table_args__ = (
+        db.Index(
+            "idx_email_otps_active_lookup",
+            "purpose",
+            "email",
+            "consumed_at",
+            "invalidated_at",
+        ),
+    )
+
     def is_active(self, now=None):
         now = now or datetime.utcnow()
         return (

@@ -1,18 +1,91 @@
 import os
 from datetime import timedelta
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
+DEFAULT_LOCAL_DATABASE_URL = "mysql+pymysql://root:@localhost/onegov_ph"
+
+
+def _env_bool(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on", "required"}
+
+
+def _using_tidb():
+    mode = (os.getenv("DATABASE_MODE") or "auto").strip().lower()
+    if mode == "tidb":
+        return True
+    if mode == "local":
+        return False
+    return bool((os.getenv("DB_HOST") or "").strip())
+
+
+def _build_database_uri():
+    """Build the SQLAlchemy URI from DATABASE_URL or the TiDB DB_* variables.
+
+    DATABASE_MODE controls the active environment:
+      - local: always use DATABASE_URL (XAMPP/MySQL).
+      - tidb / cloud: build mysql+pymysql from DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME.
+      - auto (default): use DB_* when DB_HOST is set, otherwise DATABASE_URL.
+    Existing DATABASE_URL values without a mode still work for local development.
+    """
+    database_url = (os.getenv("DATABASE_URL") or "").strip()
+    mode = (os.getenv("DATABASE_MODE") or "auto").strip().lower()
+
+    if mode == "local":
+        return database_url or DEFAULT_LOCAL_DATABASE_URL
+
+    db_host = (os.getenv("DB_HOST") or "").strip()
+    if mode in {"tidb", "cloud"} and not db_host:
+        raise RuntimeError(
+            "DB_HOST is required when DATABASE_MODE=tidb/cloud. "
+            "Add the TiDB Cloud host to your .env file."
+        )
+    if db_host:
+        user = quote(os.getenv("DB_USER") or "", safe="")
+        password = quote(os.getenv("DB_PASSWORD") or "", safe="")
+        port = (os.getenv("DB_PORT") or "4000").strip()
+        database = quote((os.getenv("DB_NAME") or "onegov_ph").strip(), safe="")
+        return f"mysql+pymysql://{user}:{password}@{db_host}:{port}/{database}?charset=utf8mb4"
+
+    return database_url or DEFAULT_LOCAL_DATABASE_URL
+
+
+def _build_engine_options():
+    """Engine options that keep TiDB Cloud TLS connections healthy."""
+    options = {
+        "pool_pre_ping": True,
+        "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "280") or 280),
+    }
+    if not _using_tidb():
+        return options
+
+    if not _env_bool("DB_SSL", False):
+        return options
+
+    ca_path = (os.getenv("DB_SSL_CA") or "").strip()
+    verify_cert = _env_bool("DB_SSL_VERIFY_CERT", bool(ca_path))
+    verify_identity = _env_bool("DB_SSL_VERIFY_IDENTITY", bool(ca_path))
+    connect_args = {
+        "ssl_verify_cert": verify_cert,
+        "ssl_verify_identity": verify_identity,
+    }
+    if ca_path:
+        connect_args["ssl_ca"] = ca_path
+    options["connect_args"] = connect_args
+    return options
+
 
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "onegov-ph-development-key")
 
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        "DATABASE_URL",
-        "mysql+pymysql://root:@localhost/onegov_ph"
-    )
+    SQLALCHEMY_DATABASE_URI = _build_database_uri()
+    SQLALCHEMY_ENGINE_OPTIONS = _build_engine_options()
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
