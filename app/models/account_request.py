@@ -15,7 +15,3 @@ class AccountRequest(db.Model):
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = db.relationship("User", foreign_keys=[user_id])
-
-    __table_args__ = (
-        db.Index("idx_account_requests_status", "status"),
-    )

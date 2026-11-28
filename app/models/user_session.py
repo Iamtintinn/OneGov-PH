@@ -17,10 +17,6 @@ class UserSession(db.Model):
 
     user = db.relationship("User", foreign_keys=[user_id])
 
-    __table_args__ = (
-        db.Index("idx_user_sessions_revoked", "revoked_at"),
-    )
-
     @property
     def is_active(self):
         return self.revoked_at is None

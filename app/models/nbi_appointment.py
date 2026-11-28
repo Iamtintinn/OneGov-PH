@@ -19,11 +19,7 @@ class NbiAppointment(db.Model):
     location_label = db.Column(db.String(200), nullable=False)
     appointment_date = db.Column(db.Date, nullable=False)
     appointment_time = db.Column(db.String(5), nullable=False)
-    created_at = db.Column(
-        db.DateTime,
-        nullable=False,
-        server_default=db.text("CURRENT_TIMESTAMP"),
-    )
+    created_at = db.Column(db.DateTime, nullable=False)
 
     application = db.relationship("Application", backref=db.backref("nbi_appointment", uselist=False))
 
@@ -34,7 +30,6 @@ class NbiAppointment(db.Model):
             "appointment_time",
             name="uq_nbi_appointments_slot",
         ),
-        db.Index("idx_nbi_appointments_date", "appointment_date"),
     )
 
     def __repr__(self):

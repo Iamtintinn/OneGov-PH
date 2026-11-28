@@ -42,19 +42,9 @@ class Application(db.Model):
     application_status = db.Column(
         db.Enum(*APPLICATION_STATUSES, name="application_status"),
         nullable=False,
-        default="submitted",
-        server_default="submitted",
     )
-    submission_date = db.Column(
-        db.DateTime,
-        nullable=False,
-        server_default=db.text("CURRENT_TIMESTAMP"),
-    )
-    last_updated = db.Column(
-        db.DateTime,
-        nullable=False,
-        server_default=db.text("CURRENT_TIMESTAMP"),
-    )
+    submission_date = db.Column(db.DateTime, nullable=False)
+    last_updated = db.Column(db.DateTime, nullable=False)
     assigned_department_id = db.Column(
         INTEGER(unsigned=True),
         db.ForeignKey("departments.department_id"),
@@ -70,20 +60,6 @@ class Application(db.Model):
         "ApplicationRequirement",
         back_populates="application",
         order_by="ApplicationRequirement.requirement_id",
-    )
-
-    __table_args__ = (
-        db.ForeignKeyConstraint(
-            ["service_id", "assigned_department_id"],
-            ["services.service_id", "services.department_id"],
-            name="fk_applications_service_department",
-            onupdate="CASCADE",
-        ),
-        db.Index("idx_applications_service", "service_id"),
-        db.Index("idx_applications_department", "assigned_department_id"),
-        db.Index("idx_applications_status", "application_status"),
-        db.Index("idx_applications_submission_date", "submission_date"),
-        db.Index("idx_applications_service_department", "service_id", "assigned_department_id"),
     )
 
     @property
@@ -113,19 +89,9 @@ class ApplicationEvent(db.Model):
     new_status = db.Column(db.Enum(*APPLICATION_STATUSES, name="application_status"), nullable=False)
     update_description = db.Column(db.String(500), nullable=False)
     updated_by = db.Column(INTEGER(unsigned=True), db.ForeignKey("users.user_id"))
-    recorded_at = db.Column(
-        db.DateTime,
-        nullable=False,
-        server_default=db.text("CURRENT_TIMESTAMP"),
-    )
+    recorded_at = db.Column(db.DateTime, nullable=False)
 
     application = db.relationship("Application", foreign_keys=[application_id])
-
-    __table_args__ = (
-        db.Index("idx_application_tracking_application", "application_id"),
-        db.Index("idx_application_tracking_recorded_at", "recorded_at"),
-        db.Index("idx_application_tracking_updated_by", "updated_by"),
-    )
 
     def __repr__(self):
         return f"<ApplicationEvent {self.tracking_id} application={self.application_id}>"
@@ -153,11 +119,6 @@ class ApplicationRequirement(db.Model):
     remarks = db.Column(db.String(500))
 
     application = db.relationship("Application", back_populates="requirements")
-
-    __table_args__ = (
-        db.Index("idx_application_requirements_application", "application_id"),
-        db.Index("idx_application_requirements_status", "verification_status"),
-    )
 
     def __repr__(self):
         return f"<ApplicationRequirement {self.requirement_id} {self.requirement_name}>"

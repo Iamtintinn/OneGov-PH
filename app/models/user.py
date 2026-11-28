@@ -84,10 +84,6 @@ class User(UserMixin, db.Model):
 
     department = db.relationship("Department", foreign_keys=[department_id])
 
-    __table_args__ = (
-        db.Index("idx_users_account_status", "account_status"),
-    )
-
     @property
     def is_active(self):
         return self.account_status == "active"

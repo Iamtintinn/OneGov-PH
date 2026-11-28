@@ -27,25 +27,12 @@ class Notification(db.Model):
             name="notification_type",
         ),
         nullable=False,
-        default="system",
-        server_default="system",
     )
     read_status = db.Column(
         db.Enum("unread", "read", name="read_status"),
         nullable=False,
-        default="unread",
-        server_default="unread",
     )
-    created_date = db.Column(
-        db.DateTime,
-        nullable=False,
-        server_default=db.text("CURRENT_TIMESTAMP"),
-    )
-
-    __table_args__ = (
-        db.Index("idx_notifications_read_status", "read_status"),
-        db.Index("idx_notifications_created_date", "created_date"),
-    )
+    created_date = db.Column(db.DateTime, nullable=False)
 
     def __repr__(self):
         return f"<Notification {self.notification_id} user={self.user_id}>"

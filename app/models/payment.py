@@ -30,20 +30,12 @@ class Payment(db.Model):
     payment_status = db.Column(
         db.Enum("pending", "paid", "failed", "refunded", "cancelled", name="payment_status"),
         nullable=False,
-        default="pending",
-        server_default="pending",
     )
     transaction_date = db.Column(db.DateTime)
     provider_checkout_id = db.Column(db.String(64), unique=True)
     provider_status = db.Column(db.String(40))
 
     application = db.relationship("Application", back_populates="payments")
-
-    __table_args__ = (
-        db.Index("idx_payments_application", "application_id"),
-        db.Index("idx_payments_status", "payment_status"),
-        db.CheckConstraint("amount >= 0", name="chk_payments_amount"),
-    )
 
     def __repr__(self):
         return f"<Payment {self.payment_id} {self.payment_reference}>"
